@@ -1,11 +1,10 @@
 package com.dx9901mk5.filemanager.ui.gesture
 
+import android.content.Context
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.hapticfeedback.HapticFeedback
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
@@ -13,20 +12,19 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * 雙指堆疊觸控手勢：
- * 1. 第一指長壓不動滿 2000ms (2秒) -> 震動提示並彈出功能/選擇選單 (onLongPressStationary)
- * 2. 長壓期間微幅移動 (< 2000ms 內超過 touchSlop) -> 進入多選拖曳狀態 (onStartDragSelection)
- * 3. 第一指按住不放時，第二指點擊其他檔案 -> 觸發加入選取與卡片疊合動畫 (onSecondFingerTapItem)
- * 4. 跨區移動與空白處/目標資料夾放開 -> 彈出「複製或移動」詢問視窗 (onDropComplete)
+ * 1. 滑動過程 (> touchSlop) 立即放行，絕不誤入選擇或拖曳模式
+ * 2. 觸控停住不動至少 2000ms (2秒) -> 觸發「大振動」並進入多選拖曳狀態
+ * 3. 第一指按住不放時，第二指點擊其他檔案 -> 觸發「小震動」、加入選取與卡片疊合動畫
+ * 4. 確實等到第一指放開且有拖曳位移或跨區時，才判定彈出「複製 / 移動 / 取消」視窗
  */
 fun Modifier.dxFileTouchGesture(
-    hapticFeedback: HapticFeedback? = null,
+    context: Context,
     findItemAtPosition: (Offset) -> String?,
-    onLongPressStationary: (filePath: String, pressOffset: Offset) -> Unit,
     onEmptySpaceLongPress: (pressOffset: Offset) -> Unit = {},
     onStartDragSelection: (initialFilePath: String, startOffset: Offset) -> Unit,
     onSecondFingerTapItem: (tappedFilePath: String, tapOffset: Offset) -> Unit,
     onPrimaryFingerDrag: (currentOffset: Offset, hoveredFolderPath: String?) -> Unit,
-    onDropComplete: (dropOffset: Offset, targetFolderPath: String?) -> Unit,
+    onDropComplete: (dropOffset: Offset, targetFolderPath: String?, didDrag: Boolean) -> Unit,
     onDragCancel: () -> Unit = {}
 ): Modifier = this.pointerInput(Unit) {
     awaitEachGesture {
@@ -36,80 +34,66 @@ fun Modifier.dxFileTouchGesture(
         val touchedFile = findItemAtPosition(startPosition)
         val touchSlop = viewConfiguration.touchSlop
 
-        if (touchedFile == null) {
-            // 空白處長壓：原地不動滿 2000ms 震動提示並跳出新增資料夾功能
-            val movedOrReleased = withTimeoutOrNull(2000L) {
-                while (true) {
-                    val event = awaitPointerEvent()
-                    val primaryChange = event.changes.firstOrNull { it.id == primaryPointerId }
-                    if (primaryChange == null || !primaryChange.pressed) return@withTimeoutOrNull true
-                    if ((primaryChange.position - startPosition).getDistance() > touchSlop) {
-                        return@withTimeoutOrNull true
-                    }
-                }
-                @Suppress("UNREACHABLE_CODE")
-                true
-            }
-            if (movedOrReleased == null) {
-                hapticFeedback?.performHapticFeedback(HapticFeedbackType.LongPress)
-                onEmptySpaceLongPress(startPosition)
-            }
-            return@awaitEachGesture
-        }
-
-        var isDraggingMode = false
-
-        val movedSlightlyBeforeTimeout = withTimeoutOrNull(2000L) {
+        // 必須原地停住不動滿 2000ms；任何滑動或放開皆立即結束，不進入選擇模式
+        val movedOrReleasedBefore2s = withTimeoutOrNull(2000L) {
             while (true) {
                 val event = awaitPointerEvent()
                 val primaryChange = event.changes.firstOrNull { it.id == primaryPointerId }
                 if (primaryChange == null || !primaryChange.pressed) {
-                    return@withTimeoutOrNull false
+                    return@withTimeoutOrNull true
                 }
                 if ((primaryChange.position - startPosition).getDistance() > touchSlop) {
                     return@withTimeoutOrNull true
                 }
             }
             @Suppress("UNREACHABLE_CODE")
-            false
+            true
         }
 
-        when (movedSlightlyBeforeTimeout) {
-            null -> {
-                // 滿 2000ms (2秒) 且原地不動 -> 震動提示並進入選擇/功能選單
-                hapticFeedback?.performHapticFeedback(HapticFeedbackType.LongPress)
-                onLongPressStationary(touchedFile, startPosition)
-                return@awaitEachGesture
-            }
-            true -> {
-                isDraggingMode = true
-                onStartDragSelection(touchedFile, startPosition)
-            }
-            false -> return@awaitEachGesture
+        if (movedOrReleasedBefore2s != null) {
+            return@awaitEachGesture
         }
+
+        // 滿 2000ms 且原地不動 -> 給予大振動！
+        DxHaptics.strongVibrate(context)
+
+        if (touchedFile == null) {
+            onEmptySpaceLongPress(startPosition)
+            return@awaitEachGesture
+        }
+
+        // 進入多選＋拖曳狀態
+        onStartDragSelection(touchedFile, startPosition)
+        var isDraggingMode = true
+        var didDragBeyondSlop = false
 
         while (isDraggingMode) {
             val event = awaitPointerEvent()
             val primaryChange = event.changes.firstOrNull { it.id == primaryPointerId }
 
-            // 偵測第二根手指點擊其他檔案
+            // 第二指點擊其他檔案 -> 小震動 + 疊合動畫
             event.changes
                 .filter { it.id != primaryPointerId && it.pressed && !it.previousPressed }
                 .forEach { secondFinger ->
                     secondFinger.consume()
                     val secondTappedFile = findItemAtPosition(secondFinger.position)
                     if (secondTappedFile != null) {
+                        DxHaptics.lightVibrate(context)
                         onSecondFingerTapItem(secondTappedFile, secondFinger.position)
                     }
                 }
 
             if (primaryChange == null || !primaryChange.pressed) {
+                // 確實手指觸控放開才判定是否彈出複製/移動/取消
                 val finalPos = primaryChange?.position ?: startPosition
                 val targetFolder = findItemAtPosition(finalPos)
-                onDropComplete(finalPos, targetFolder)
+                onDropComplete(finalPos, targetFolder, didDragBeyondSlop)
                 isDraggingMode = false
             } else if (primaryChange.positionChange() != Offset.Zero) {
                 primaryChange.consume()
+                if ((primaryChange.position - startPosition).getDistance() > touchSlop * 2f) {
+                    didDragBeyondSlop = true
+                }
                 val hoveredItem = findItemAtPosition(primaryChange.position)
                 onPrimaryFingerDrag(primaryChange.position, hoveredItem)
             }

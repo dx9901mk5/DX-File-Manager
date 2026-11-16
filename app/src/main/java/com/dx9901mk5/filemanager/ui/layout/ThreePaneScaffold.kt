@@ -1,5 +1,6 @@
 package com.dx9901mk5.filemanager.ui.layout
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -29,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +39,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -64,6 +68,8 @@ fun ThreePaneScaffold(
     pane3Expanded: Boolean,
     onPaneExpandedChange: (paneIndex: Int, expanded: Boolean) -> Unit,
     autoCollapseUnusedPaneOnDrag: Int?,
+    hoveredExpandButtonPane: Int? = null,
+    onExpandButtonBoundsChanged: (paneIndex: Int, rect: Rect?) -> Unit = { _, _ -> },
     onPaneBoundsChanged: (paneIndex: Int, leftX: Float, rightX: Float) -> Unit = { _, _, _ -> },
     pane1Content: @Composable () -> Unit,
     pane2Content: @Composable (onCollapse: () -> Unit) -> Unit,
@@ -222,8 +228,15 @@ fun ThreePaneScaffold(
             }
         }
 
-        // 第一區摺疊後：左緣保留一個小半圓形展開按鈕（無整條邊界）
+        // 第一區摺疊後：左緣保留一個小半圓形展開按鈕（拖曳經過時放大提示）
         if (!effectivePane1Expanded) {
+            val scale1 by animateFloatAsState(
+                targetValue = if (hoveredExpandButtonPane == 1) 1.35f else 1f,
+                label = "ExpandBtn1Scale"
+            )
+            DisposableEffect(Unit) {
+                onDispose { onExpandButtonBoundsChanged(1, null) }
+            }
             Surface(
                 shape = RoundedCornerShape(topEnd = 22.dp, bottomEnd = 22.dp),
                 color = MaterialTheme.colorScheme.primary,
@@ -231,8 +244,10 @@ fun ThreePaneScaffold(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(top = 56.dp)
+                    .scale(scale1)
                     .width(26.dp)
                     .height(48.dp)
+                    .onGloballyPositioned { onExpandButtonBoundsChanged(1, it.boundsInRoot()) }
                     .clickable { onPaneExpandedChange(1, true) }
             ) {
                 Box(contentAlignment = Alignment.Center) {
@@ -246,16 +261,25 @@ fun ThreePaneScaffold(
             }
         }
 
-        // 第二區摺疊後：上方保留一個小半圓形展開按鈕
+        // 第二區摺疊後：上方保留一個小半圓形展開按鈕（拖曳經過時放大提示）
         if (!effectivePane2Expanded) {
+            val scale2 by animateFloatAsState(
+                targetValue = if (hoveredExpandButtonPane == 2) 1.35f else 1f,
+                label = "ExpandBtn2Scale"
+            )
+            DisposableEffect(Unit) {
+                onDispose { onExpandButtonBoundsChanged(2, null) }
+            }
             Surface(
                 shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp),
                 color = MaterialTheme.colorScheme.primary,
                 shadowElevation = 6.dp,
                 modifier = Modifier
                     .align(Alignment.TopCenter)
+                    .scale(scale2)
                     .width(48.dp)
                     .height(26.dp)
+                    .onGloballyPositioned { onExpandButtonBoundsChanged(2, it.boundsInRoot()) }
                     .clickable { onPaneExpandedChange(2, true) }
             ) {
                 Box(contentAlignment = Alignment.Center) {
@@ -269,8 +293,15 @@ fun ThreePaneScaffold(
             }
         }
 
-        // 第三區摺疊後：右緣保留一個小半圓形展開按鈕（無整條邊界）
+        // 第三區摺疊後：右緣保留一個小半圓形展開按鈕（拖曳經過時放大提示）
         if (showPane3 && !effectivePane3Expanded) {
+            val scale3 by animateFloatAsState(
+                targetValue = if (hoveredExpandButtonPane == 3) 1.35f else 1f,
+                label = "ExpandBtn3Scale"
+            )
+            DisposableEffect(Unit) {
+                onDispose { onExpandButtonBoundsChanged(3, null) }
+            }
             Surface(
                 shape = RoundedCornerShape(topStart = 22.dp, bottomStart = 22.dp),
                 color = MaterialTheme.colorScheme.primary,
@@ -278,8 +309,10 @@ fun ThreePaneScaffold(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 56.dp)
+                    .scale(scale3)
                     .width(26.dp)
                     .height(48.dp)
+                    .onGloballyPositioned { onExpandButtonBoundsChanged(3, it.boundsInRoot()) }
                     .clickable { onPaneExpandedChange(3, true) }
             ) {
                 Box(contentAlignment = Alignment.Center) {

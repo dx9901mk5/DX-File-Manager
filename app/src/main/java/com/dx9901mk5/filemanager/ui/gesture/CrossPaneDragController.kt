@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -58,15 +59,23 @@ class CrossPaneDragController {
     var draggedFiles by mutableStateOf<List<VfsFile>>(emptyList())
     var pointerRootOffset by mutableStateOf(Offset.Zero)
     var activePaneIndexDuringDrag by mutableStateOf<Int?>(null)
+    var hoveredExpandButtonPane by mutableStateOf<Int?>(null)
     var hoveredFolderPath by mutableStateOf<String?>(null)
     var flyingCard by mutableStateOf<FlyingStackCard?>(null)
 
     var pendingDropTarget by mutableStateOf<PendingDropRequest?>(null)
+    var onRequestCrossPaneSwitch: ((targetPaneIndex: Int) -> Unit)? = null
 
     private val paneBounds = mutableMapOf<Int, Pair<Float, Float>>()
+    private val expandButtonBounds = mutableMapOf<Int, Rect>()
 
     fun updatePaneBounds(paneIndex: Int, leftX: Float, rightX: Float) {
         paneBounds[paneIndex] = leftX to rightX
+    }
+
+    fun updateExpandButtonBounds(paneIndex: Int, rect: Rect?) {
+        if (rect == null) expandButtonBounds.remove(paneIndex)
+        else expandButtonBounds[paneIndex] = rect
     }
 
     fun startDrag(paneIndex: Int, initialFile: VfsFile, rootOffset: Offset) {
@@ -75,6 +84,7 @@ class CrossPaneDragController {
         draggedFiles = listOf(initialFile)
         pointerRootOffset = rootOffset
         activePaneIndexDuringDrag = paneIndex
+        hoveredExpandButtonPane = null
         hoveredFolderPath = null
     }
 
@@ -92,6 +102,23 @@ class CrossPaneDragController {
     fun updateDrag(rootOffset: Offset, hoveredFolder: String?) {
         pointerRootOffset = rootOffset
         hoveredFolderPath = hoveredFolder
+
+        // 偵測手指是否拖曳到各分區的半圓形展開按鈕上
+        val hitExpandPane = expandButtonBounds.entries.firstOrNull { (_, r) ->
+            r.inflate(16f).contains(rootOffset)
+        }?.key
+
+        if (hitExpandPane != null) {
+            if (hoveredExpandButtonPane != hitExpandPane) {
+                hoveredExpandButtonPane = hitExpandPane
+                activePaneIndexDuringDrag = hitExpandPane
+                onRequestCrossPaneSwitch?.invoke(hitExpandPane)
+            }
+            return
+        } else {
+            hoveredExpandButtonPane = null
+        }
+
         val detectedPane = paneBounds.entries.firstOrNull { (_, range) ->
             rootOffset.x in range.first..range.second
         }?.key
@@ -101,17 +128,26 @@ class CrossPaneDragController {
     }
 
     fun finishDrag(
-        targetPaneIndex: Int,
-        targetMountId: String,
-        targetDirPath: String
+        fallbackPaneIndex: Int,
+        resolveTarget: (paneIndex: Int) -> Pair<String, String>,
+        targetFolderPath: String?,
+        didDrag: Boolean
     ) {
-        if (isDragging && draggedFiles.isNotEmpty()) {
+        val dropPane = activePaneIndexDuringDrag ?: fallbackPaneIndex
+        val (targetMountId, defaultDirPath) = resolveTarget(dropPane)
+        val finalDir = if (dropPane == fallbackPaneIndex && targetFolderPath != null) {
+            targetFolderPath
+        } else {
+            defaultDirPath
+        }
+        val shouldPrompt = didDrag || dropPane != sourcePaneIndex || (targetFolderPath != null && draggedFiles.none { it.path == targetFolderPath })
+        if (isDragging && draggedFiles.isNotEmpty() && shouldPrompt) {
             pendingDropTarget = PendingDropRequest(
                 files = draggedFiles,
                 sourcePaneIndex = sourcePaneIndex,
-                targetPaneIndex = targetPaneIndex,
+                targetPaneIndex = dropPane,
                 targetMountId = targetMountId,
-                targetDirPath = targetDirPath
+                targetDirPath = finalDir
             )
         }
         resetDrag()
@@ -120,6 +156,7 @@ class CrossPaneDragController {
     fun resetDrag() {
         isDragging = false
         activePaneIndexDuringDrag = null
+        hoveredExpandButtonPane = null
         hoveredFolderPath = null
         flyingCard = null
     }

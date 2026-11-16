@@ -72,7 +72,7 @@ import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
-import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -113,6 +113,7 @@ fun FileExplorerPane(
     onSelectAll: () -> Unit,
     onClearSelection: () -> Unit,
     onRubberBandSelect: (Set<String>) -> Unit,
+    resolvePaneTarget: (paneIndex: Int) -> Pair<String, String> = { state.mountId to state.currentPath },
     onShowContextMenu: (VfsFile?) -> Unit,
     onSearchChange: (String) -> Unit,
     onViewModeChange: (FileViewMode) -> Unit,
@@ -129,7 +130,7 @@ fun FileExplorerPane(
     var showSearchBar by remember { mutableStateOf(false) }
     var rubberBandRect by remember { mutableStateOf<Rect?>(null) }
     var listContainerRootOffset by remember { mutableStateOf(Offset.Zero) }
-    val haptic = LocalHapticFeedback.current
+    val context = LocalContext.current
 
     val itemLocalBounds = remember { mutableStateMapOf<String, Rect>() }
     val filesByPath = remember(state.files) { state.files.associateBy { it.path } }
@@ -431,13 +432,9 @@ fun FileExplorerPane(
                             onMouseForward = onNavigateForward
                         )
                         .dxFileTouchGesture(
-                            hapticFeedback = haptic,
+                            context = context,
                             findItemAtPosition = { localPos ->
                                 itemLocalBounds.entries.firstOrNull { (_, rect) -> rect.contains(localPos) }?.key
-                            },
-                            onLongPressStationary = { filePath, _ ->
-                                onFocusPane()
-                                onShowContextMenu(filesByPath[filePath])
                             },
                             onEmptySpaceLongPress = {
                                 if (state.mode == PaneMode.FILES) {
@@ -448,6 +445,7 @@ fun FileExplorerPane(
                             onStartDragSelection = { initialPath, localOffset ->
                                 onFocusPane()
                                 val file = filesByPath[initialPath] ?: return@dxFileTouchGesture
+                                onToggleSelect(initialPath)
                                 dragController.startDrag(
                                     paneIndex = state.paneIndex,
                                     initialFile = file,
@@ -456,6 +454,7 @@ fun FileExplorerPane(
                             },
                             onSecondFingerTapItem = { tappedPath, localOffset ->
                                 val file = filesByPath[tappedPath] ?: return@dxFileTouchGesture
+                                onToggleSelect(tappedPath)
                                 dragController.addSecondFingerFile(
                                     file = file,
                                     tapRootOffset = listContainerRootOffset + localOffset
@@ -468,16 +467,13 @@ fun FileExplorerPane(
                                     hoveredFolder = hoveredFolder
                                 )
                             },
-                            onDropComplete = { _, targetFolderPath ->
-                                val targetDir = if (targetFolderPath != null && filesByPath[targetFolderPath]?.isDirectory == true) {
-                                    targetFolderPath
-                                } else {
-                                    state.currentPath
-                                }
+                            onDropComplete = { _, targetFolderPath, didDrag ->
+                                val validFolder = targetFolderPath?.takeIf { filesByPath[it]?.isDirectory == true }
                                 dragController.finishDrag(
-                                    targetPaneIndex = state.paneIndex,
-                                    targetMountId = state.mountId,
-                                    targetDirPath = targetDir
+                                    fallbackPaneIndex = state.paneIndex,
+                                    resolveTarget = resolvePaneTarget,
+                                    targetFolderPath = validFolder,
+                                    didDrag = didDrag
                                 )
                             }
                         )

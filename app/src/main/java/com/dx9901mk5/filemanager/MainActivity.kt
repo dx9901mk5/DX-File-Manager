@@ -124,6 +124,16 @@ private fun DxFileManagerScreen(
     val selectedAppPackages by viewModel.selectedAppPackages.collectAsState()
 
     val dragController = remember { CrossPaneDragController() }
+    dragController.onRequestCrossPaneSwitch = { targetPane ->
+        // 拖曳到各分區展開按鈕時，自動展開目標分區並摺疊先前分區
+        if (targetPane == 2 || targetPane == 3) {
+            val prevPane = if (targetPane == 2) 3 else 2
+            viewModel.setPaneExpanded(isExpandedScreen, targetPane, true)
+            viewModel.setPaneExpanded(isExpandedScreen, prevPane, false)
+        } else if (targetPane == 1) {
+            viewModel.setPaneExpanded(isExpandedScreen, 1, true)
+        }
+    }
 
     var showShortcutsDialog by remember { mutableStateOf(false) }
     var showCloudWizard by remember { mutableStateOf(false) }
@@ -243,6 +253,8 @@ private fun DxFileManagerScreen(
             pane3Expanded = pane3Expanded,
             onPaneExpandedChange = { idx, exp -> viewModel.setPaneExpanded(isExpandedScreen, idx, exp) },
             autoCollapseUnusedPaneOnDrag = dragController.activePaneIndexDuringDrag,
+            hoveredExpandButtonPane = dragController.hoveredExpandButtonPane,
+            onExpandButtonBoundsChanged = { idx, rect -> dragController.updateExpandButtonBounds(idx, rect) },
             onPaneBoundsChanged = { idx, left, right -> dragController.updatePaneBounds(idx, left, right) },
             pane1Content = {
                 NavigationPane(
@@ -295,6 +307,10 @@ private fun DxFileManagerScreen(
                     onSelectAll = { viewModel.selectAll(2) },
                     onClearSelection = { viewModel.clearSelection(2) },
                     onRubberBandSelect = { viewModel.setSelection(2, it) },
+                    resolvePaneTarget = { idx ->
+                        val st = if (idx == 3) pane3State else pane2State
+                        st.mountId to st.currentPath
+                    },
                     onShowContextMenu = { file -> contextMenuTarget = 2 to file },
                     onSearchChange = { viewModel.updateSearchQuery(2, it) },
                     onViewModeChange = { viewModel.setViewMode(2, it) },
@@ -329,6 +345,10 @@ private fun DxFileManagerScreen(
                     onSelectAll = { viewModel.selectAll(3) },
                     onClearSelection = { viewModel.clearSelection(3) },
                     onRubberBandSelect = { viewModel.setSelection(3, it) },
+                    resolvePaneTarget = { idx ->
+                        val st = if (idx == 2) pane2State else pane3State
+                        st.mountId to st.currentPath
+                    },
                     onShowContextMenu = { file -> contextMenuTarget = 3 to file },
                     onSearchChange = { viewModel.updateSearchQuery(3, it) },
                     onViewModeChange = { viewModel.setViewMode(3, it) },
