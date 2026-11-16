@@ -2,6 +2,7 @@ package com.dx9901mk5.filemanager.ui.layout
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,10 +15,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -35,22 +39,26 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 
 /**
  * 三區彈性容器 (Pane 1 / Pane 2 / Pane 3)：
- * - isExpandedScreen (摺疊機展開/平板) 預設自動開啟第一區
- * - 任何一區摺疊時強制保留 48.dp 展開按鈕空間
- * - 分隔線可自由左右拖曳調整寬度
- * - 跨區拖曳時自動暫時收合未經過的分區 (autoCollapseUnusedPaneOnDrag)
+ * - 支援手機 / 摺疊 / 展開摺疊 / 小平板 / 大平板 DPI 比例
+ * - 記憶各分區上次展開或摺疊狀態
+ * - 任何一區摺疊時強制保留 48.dp 展開按鈕空間，上方皆有可點擊的展開/摺疊按鈕
+ * - 加寬分區間拖曳把手 (18.dp)，避免誤按
  */
 @Composable
 fun ThreePaneScaffold(
     isExpandedScreen: Boolean,
+    isLargeTablet: Boolean,
+    pane1Expanded: Boolean,
+    pane2Expanded: Boolean,
+    pane3Expanded: Boolean,
+    onPaneExpandedChange: (paneIndex: Int, expanded: Boolean) -> Unit,
     autoCollapseUnusedPaneOnDrag: Int?,
-    pane1ExpandedOverride: Boolean? = null,
-    pane3ExpandedOverride: Boolean? = null,
     onPaneBoundsChanged: (paneIndex: Int, leftX: Float, rightX: Float) -> Unit = { _, _, _ -> },
     pane1Content: @Composable () -> Unit,
     pane2Content: @Composable (onCollapse: () -> Unit) -> Unit,
@@ -59,14 +67,9 @@ fun ThreePaneScaffold(
     val minCollapsedWidth = 48.dp
     val density = LocalDensity.current
 
-    var pane1Expanded by remember(isExpandedScreen) { mutableStateOf(isExpandedScreen) }
-    var pane2Expanded by remember { mutableStateOf(true) }
-    var pane3Expanded by remember { mutableStateOf(true) }
-
-    pane1ExpandedOverride?.let { pane1Expanded = it }
-    pane3ExpandedOverride?.let { pane3Expanded = it }
-
-    var pane1Width by remember { mutableStateOf(280.dp) }
+    var pane1Width by remember(isLargeTablet) {
+        mutableStateOf(if (isLargeTablet) 280.dp else 230.dp)
+    }
     var pane2Weight by remember { mutableFloatStateOf(0.5f) }
 
     val effectivePane1Expanded = if (autoCollapseUnusedPaneOnDrag != null) autoCollapseUnusedPaneOnDrag == 1 else pane1Expanded
@@ -98,33 +101,43 @@ fun ThreePaneScaffold(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = "根目錄與導覽",
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold),
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(start = 8.dp)
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
-                        IconButton(onClick = { pane1Expanded = false }) {
-                            Icon(Icons.Default.ChevronLeft, contentDescription = "摺疊第一區")
+                        IconButton(
+                            onClick = { onPaneExpandedChange(1, false) },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.ChevronLeft,
+                                contentDescription = "摺疊第一區",
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
                         }
                     }
                     pane1Content()
                 }
             } else {
-                CollapsedPaneBar(title = "根目錄", onExpand = { pane1Expanded = true })
+                CollapsedPaneBar(title = "根目錄", onExpand = { onPaneExpandedChange(1, true) })
             }
         }
 
-        // 分隔線 1
+        // 加寬分隔線 1 (第一區與第二區之間，避免誤按)
         ResizableDivider(
             onDrag = { deltaPx ->
                 if (effectivePane1Expanded) {
                     val deltaDp = with(density) { deltaPx.toDp() }
-                    pane1Width = (pane1Width + deltaDp).coerceIn(200.dp, 420.dp)
+                    val maxW = if (isExpandedScreen) 420.dp else 280.dp
+                    pane1Width = (pane1Width + deltaDp).coerceIn(180.dp, maxW)
                 }
             }
         )
@@ -151,12 +164,13 @@ fun ThreePaneScaffold(
                         }
                 ) {
                     if (effectivePane2Expanded) {
-                        pane2Content { pane2Expanded = false }
+                        pane2Content { onPaneExpandedChange(2, false) }
                     } else {
-                        CollapsedPaneBar(title = "視窗 A", onExpand = { pane2Expanded = true })
+                        CollapsedPaneBar(title = "視窗 A", onExpand = { onPaneExpandedChange(2, true) })
                     }
                 }
 
+                // 加寬分隔線 2 (第二區與第三區之間)
                 ResizableDivider(
                     onDrag = { deltaPx ->
                         if (effectivePane2Expanded && effectivePane3Expanded) {
@@ -180,9 +194,9 @@ fun ThreePaneScaffold(
                         }
                 ) {
                     if (effectivePane3Expanded) {
-                        pane3Content { pane3Expanded = false }
+                        pane3Content { onPaneExpandedChange(3, false) }
                     } else {
-                        CollapsedPaneBar(title = "視窗 B", onExpand = { pane3Expanded = true })
+                        CollapsedPaneBar(title = "視窗 B", onExpand = { onPaneExpandedChange(3, true) })
                     }
                 }
             }
@@ -195,18 +209,27 @@ private fun CollapsedPaneBar(title: String, onExpand: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable(onClick = onExpand)
+            .padding(top = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top
     ) {
-        IconButton(onClick = onExpand) {
-            Icon(Icons.Default.ChevronRight, contentDescription = "展開 $title")
+        IconButton(
+            onClick = onExpand,
+            modifier = Modifier.size(44.dp)
+        ) {
+            Icon(
+                Icons.Default.ChevronRight,
+                contentDescription = "展開 $title",
+                tint = MaterialTheme.colorScheme.primary
+            )
         }
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(16.dp))
         Text(
             text = title,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+            color = MaterialTheme.colorScheme.onSurface,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.rotate(90f)
@@ -219,21 +242,32 @@ private fun ResizableDivider(onDrag: (Float) -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxHeight()
-            .width(8.dp)
+            .width(18.dp)
             .pointerInput(Unit) {
                 detectHorizontalDragGestures { change, dragAmount ->
                     change.consume()
                     onDrag(dragAmount)
                 }
             }
-            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+            .background(MaterialTheme.colorScheme.background),
         contentAlignment = Alignment.Center
     ) {
         Box(
             modifier = Modifier
-                .width(2.dp)
-                .height(36.dp)
-                .background(MaterialTheme.colorScheme.outline)
-        )
+                .width(6.dp)
+                .height(64.dp)
+                .background(
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.75f),
+                    shape = RoundedCornerShape(3.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.DragHandle,
+                contentDescription = "拖曳調整分區寬度",
+                tint = MaterialTheme.colorScheme.onPrimary,
+                modifier = Modifier.size(12.dp).rotate(90f)
+            )
+        }
     }
 }

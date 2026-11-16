@@ -8,9 +8,16 @@ import android.os.Environment
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
@@ -21,6 +28,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import com.dx9901mk5.filemanager.core.vfs.VfsFile
 import com.dx9901mk5.filemanager.ui.FileManagerViewModel
 import com.dx9901mk5.filemanager.ui.dialogs.CloudMountWizardDialog
@@ -51,6 +59,7 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
         ensureStoragePermission()
 
         intent.getStringExtra("shortcut_path")?.let { path ->
@@ -64,11 +73,13 @@ class MainActivity : ComponentActivity() {
             val settings by viewModel.settings.collectAsState()
             val windowSizeClass = calculateWindowSizeClass(this)
             val isExpandedScreen = windowSizeClass.widthSizeClass != WindowWidthSizeClass.Compact
+            val isLargeTablet = windowSizeClass.widthSizeClass == WindowWidthSizeClass.Expanded
 
             DxFileManagerTheme(darkTheme = settings.darkTheme) {
                 DxFileManagerScreen(
                     viewModel = viewModel,
-                    isExpandedScreen = isExpandedScreen
+                    isExpandedScreen = isExpandedScreen,
+                    isLargeTablet = isLargeTablet
                 )
             }
         }
@@ -89,7 +100,8 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun DxFileManagerScreen(
     viewModel: FileManagerViewModel,
-    isExpandedScreen: Boolean
+    isExpandedScreen: Boolean,
+    isLargeTablet: Boolean
 ) {
     val settings by viewModel.settings.collectAsState()
     val pane2State by viewModel.pane2State.collectAsState()
@@ -116,8 +128,9 @@ private fun DxFileManagerScreen(
     var passwordPrompt by remember { mutableStateOf<Triple<String, String, (String) -> Unit>?>(null) }
     var propertiesTarget by remember { mutableStateOf<VfsFile?>(null) }
 
-    var pane1Override by remember { mutableStateOf<Boolean?>(null) }
-    var pane3Override by remember { mutableStateOf<Boolean?>(null) }
+    val pane1Expanded = if (isExpandedScreen) settings.pane1ExpandedTablet else settings.pane1ExpandedCompact
+    val pane2Expanded = if (isExpandedScreen) settings.pane2ExpandedTablet else settings.pane2ExpandedCompact
+    val pane3Expanded = if (isExpandedScreen) settings.pane3ExpandedTablet else settings.pane3ExpandedCompact
 
     fun activeFiles(paneIdx: Int): List<VfsFile> {
         val st = if (paneIdx == 2) pane2State else pane3State
@@ -163,7 +176,7 @@ private fun DxFileManagerScreen(
                 viewModel.navigateToPath(paneIdx, parent)
             }
             ContextMenuAction.SEND_TO_OTHER_PANE -> if (selected.isNotEmpty()) {
-                if (otherPane == 3) pane3Override = true
+                if (otherPane == 3) viewModel.setPaneExpanded(isExpandedScreen, 3, true)
                 val curMount = if (paneIdx == 2) pane2State.mountId else pane3State.mountId
                 viewModel.performTransfer(curMount, selected, otherState.mountId, otherState.currentPath, isMove = false)
             }
@@ -176,6 +189,9 @@ private fun DxFileManagerScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(top = 4.dp, bottom = 6.dp)
             .dxKeyboardShortcuts { shortcut ->
                 val curPane = focusedPane
                 val curState = if (curPane == 2) pane2State else pane3State
@@ -191,8 +207,8 @@ private fun DxFileManagerScreen(
                     DxShortcutAction.DELETE_PERMANENT -> if (selected.isNotEmpty()) viewModel.deleteFiles(curPane, selected, true)
                     DxShortcutAction.SEND_TO_OTHER_PANE -> handleContextAction(curPane, selected.firstOrNull(), ContextMenuAction.SEND_TO_OTHER_PANE)
                     DxShortcutAction.CYCLE_FOCUS_PANE -> viewModel.focusedPaneIndex.value = if (curPane == 2) 3 else 2
-                    DxShortcutAction.TOGGLE_SIDEBAR -> pane1Override = !(pane1Override ?: isExpandedScreen)
-                    DxShortcutAction.TOGGLE_DUAL_PANE -> pane3Override = !(pane3Override ?: true)
+                    DxShortcutAction.TOGGLE_SIDEBAR -> viewModel.setPaneExpanded(isExpandedScreen, 1, !pane1Expanded)
+                    DxShortcutAction.TOGGLE_DUAL_PANE -> viewModel.setPaneExpanded(isExpandedScreen, 3, !pane3Expanded)
                     DxShortcutAction.COMPRESS -> handleContextAction(curPane, selected.firstOrNull(), ContextMenuAction.COMPRESS_OR_EXTRACT)
                     DxShortcutAction.EXTRACT -> handleContextAction(curPane, selected.firstOrNull(), ContextMenuAction.COMPRESS_OR_EXTRACT)
                     DxShortcutAction.ENCRYPT_DECRYPT -> handleContextAction(curPane, selected.firstOrNull(), ContextMenuAction.ENCRYPT_OR_DECRYPT)
@@ -203,9 +219,12 @@ private fun DxFileManagerScreen(
     ) {
         ThreePaneScaffold(
             isExpandedScreen = isExpandedScreen,
+            isLargeTablet = isLargeTablet,
+            pane1Expanded = pane1Expanded,
+            pane2Expanded = pane2Expanded,
+            pane3Expanded = pane3Expanded,
+            onPaneExpandedChange = { idx, exp -> viewModel.setPaneExpanded(isExpandedScreen, idx, exp) },
             autoCollapseUnusedPaneOnDrag = dragController.activePaneIndexDuringDrag,
-            pane1ExpandedOverride = pane1Override,
-            pane3ExpandedOverride = pane3Override,
             onPaneBoundsChanged = { idx, left, right -> dragController.updatePaneBounds(idx, left, right) },
             pane1Content = {
                 NavigationPane(
@@ -223,7 +242,7 @@ private fun DxFileManagerScreen(
                     },
                     onToggleTheme = { viewModel.setDarkTheme(!settings.darkTheme) },
                     onOpenSettings = { showSettingsDialog = true },
-                    onToggleDualPane = { pane3Override = !(pane3Override ?: true) },
+                    onToggleDualPane = { viewModel.setPaneExpanded(isExpandedScreen, 3, !pane3Expanded) },
                     onOpenLocalRoot = {
                         viewModel.navigateToPath(
                             focusedPane,
@@ -264,6 +283,7 @@ private fun DxFileManagerScreen(
                     onRubberBandSelect = { viewModel.setSelection(2, it) },
                     onShowContextMenu = { file -> contextMenuTarget = 2 to file },
                     onSearchChange = { viewModel.updateSearchQuery(2, it) },
+                    onViewModeChange = { viewModel.setViewMode(2, it) },
                     onCtrlWheelZoom = { viewModel.adjustIconScale(2, it) },
                     onAddBookmark = { viewModel.addBookmark(it) },
                     onCreateNewFolderClick = { showNewFolderForPane = 2 },
@@ -296,6 +316,7 @@ private fun DxFileManagerScreen(
                     onRubberBandSelect = { viewModel.setSelection(3, it) },
                     onShowContextMenu = { file -> contextMenuTarget = 3 to file },
                     onSearchChange = { viewModel.updateSearchQuery(3, it) },
+                    onViewModeChange = { viewModel.setViewMode(3, it) },
                     onCtrlWheelZoom = { viewModel.adjustIconScale(3, it) },
                     onAddBookmark = { viewModel.addBookmark(it) },
                     onCreateNewFolderClick = { showNewFolderForPane = 3 },

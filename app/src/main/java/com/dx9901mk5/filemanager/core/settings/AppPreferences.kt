@@ -26,7 +26,14 @@ data class DxSettingsState(
     val darkTheme: Boolean = true,
     val language: AppLanguage = AppLanguage.fromSystemOrCode(null),
     val bookmarks: List<String> = emptyList(),
-    val cloudMounts: List<VfsMountConfig> = emptyList()
+    val cloudMounts: List<VfsMountConfig> = emptyList(),
+    // 記憶各分區上次展開或折疊狀態 (手機 Compact 與摺疊/平板 Expanded 分開記憶)
+    val pane1ExpandedCompact: Boolean = false,
+    val pane2ExpandedCompact: Boolean = true,
+    val pane3ExpandedCompact: Boolean = false,
+    val pane1ExpandedTablet: Boolean = true,
+    val pane2ExpandedTablet: Boolean = true,
+    val pane3ExpandedTablet: Boolean = true
 )
 
 class AppPreferences(private val context: Context) {
@@ -39,6 +46,13 @@ class AppPreferences(private val context: Context) {
         val LANGUAGE = stringPreferencesKey("app_language")
         val BOOKMARKS = stringSetPreferencesKey("bookmarks")
         val CLOUD_MOUNTS_JSON = stringPreferencesKey("cloud_mounts_json")
+
+        val P1_COMPACT = booleanPreferencesKey("pane1_expanded_compact")
+        val P2_COMPACT = booleanPreferencesKey("pane2_expanded_compact")
+        val P3_COMPACT = booleanPreferencesKey("pane3_expanded_compact")
+        val P1_TABLET = booleanPreferencesKey("pane1_expanded_tablet")
+        val P2_TABLET = booleanPreferencesKey("pane2_expanded_tablet")
+        val P3_TABLET = booleanPreferencesKey("pane3_expanded_tablet")
     }
 
     private val defaultDownloadPath: String
@@ -52,7 +66,13 @@ class AppPreferences(private val context: Context) {
             darkTheme = prefs[Keys.DARK_THEME] ?: true,
             language = AppLanguage.fromSystemOrCode(prefs[Keys.LANGUAGE]),
             bookmarks = (prefs[Keys.BOOKMARKS] ?: setOf(defaultDownloadPath)).toList().sorted(),
-            cloudMounts = decodeMounts(prefs[Keys.CLOUD_MOUNTS_JSON])
+            cloudMounts = decodeMounts(prefs[Keys.CLOUD_MOUNTS_JSON]),
+            pane1ExpandedCompact = prefs[Keys.P1_COMPACT] ?: false,
+            pane2ExpandedCompact = prefs[Keys.P2_COMPACT] ?: true,
+            pane3ExpandedCompact = prefs[Keys.P3_COMPACT] ?: false,
+            pane1ExpandedTablet = prefs[Keys.P1_TABLET] ?: true,
+            pane2ExpandedTablet = prefs[Keys.P2_TABLET] ?: true,
+            pane3ExpandedTablet = prefs[Keys.P3_TABLET] ?: true
         )
     }
 
@@ -74,6 +94,20 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setLanguage(language: AppLanguage) {
         context.dxDataStore.edit { it[Keys.LANGUAGE] = language.code }
+    }
+
+    suspend fun setPaneExpanded(isExpandedScreen: Boolean, paneIndex: Int, expanded: Boolean) {
+        context.dxDataStore.edit { prefs ->
+            val key = when {
+                !isExpandedScreen && paneIndex == 1 -> Keys.P1_COMPACT
+                !isExpandedScreen && paneIndex == 2 -> Keys.P2_COMPACT
+                !isExpandedScreen && paneIndex == 3 -> Keys.P3_COMPACT
+                isExpandedScreen && paneIndex == 1 -> Keys.P1_TABLET
+                isExpandedScreen && paneIndex == 2 -> Keys.P2_TABLET
+                else -> Keys.P3_TABLET
+            }
+            prefs[key] = expanded
+        }
     }
 
     suspend fun addBookmark(path: String) {

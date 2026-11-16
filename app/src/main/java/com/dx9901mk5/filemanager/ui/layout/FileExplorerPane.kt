@@ -18,18 +18,25 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Android
+import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.RestoreFromTrash
 import androidx.compose.material.icons.filled.Search
@@ -62,12 +69,14 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.dx9901mk5.filemanager.core.shizuku.InstalledAppInfo
 import com.dx9901mk5.filemanager.core.trash.TrashItemEntity
 import com.dx9901mk5.filemanager.core.vfs.VfsFile
 import com.dx9901mk5.filemanager.ui.ExplorerPaneState
+import com.dx9901mk5.filemanager.ui.FileViewMode
 import com.dx9901mk5.filemanager.ui.PaneMode
 import com.dx9901mk5.filemanager.ui.dialogs.formatFileSize
 import com.dx9901mk5.filemanager.ui.gesture.CrossPaneDragController
@@ -100,6 +109,7 @@ fun FileExplorerPane(
     onRubberBandSelect: (Set<String>) -> Unit,
     onShowContextMenu: (VfsFile?) -> Unit,
     onSearchChange: (String) -> Unit,
+    onViewModeChange: (FileViewMode) -> Unit,
     onCtrlWheelZoom: (Float) -> Unit,
     onAddBookmark: (String) -> Unit,
     onCreateNewFolderClick: () -> Unit,
@@ -175,15 +185,49 @@ fun FileExplorerPane(
                             }
                         }
                     }
-                    IconButton(onClick = { showSearchBar = !showSearchBar }, modifier = Modifier.size(34.dp)) {
+                    IconButton(onClick = { showSearchBar = !showSearchBar }, modifier = Modifier.size(32.dp)) {
                         Icon(Icons.Default.Search, contentDescription = "搜尋", modifier = Modifier.size(18.dp))
                     }
+                    // 清單列表 / 小圖示 / 大圖示 檢視切換按鈕
+                    IconButton(
+                        onClick = { onViewModeChange(FileViewMode.LIST) },
+                        modifier = Modifier.size(30.dp)
+                    ) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ViewList,
+                            contentDescription = "清單列表",
+                            tint = if (state.viewMode == FileViewMode.LIST) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = { onViewModeChange(FileViewMode.SMALL_GRID) },
+                        modifier = Modifier.size(30.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.GridView,
+                            contentDescription = "小圖示",
+                            tint = if (state.viewMode == FileViewMode.SMALL_GRID) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = { onViewModeChange(FileViewMode.LARGE_GRID) },
+                        modifier = Modifier.size(30.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Apps,
+                            contentDescription = "大圖示",
+                            tint = if (state.viewMode == FileViewMode.LARGE_GRID) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
                     if (state.mode == PaneMode.FILES) {
-                        IconButton(onClick = { onAddBookmark(state.currentPath) }, modifier = Modifier.size(34.dp)) {
-                            Icon(Icons.Default.BookmarkAdd, contentDescription = "加入書籤", modifier = Modifier.size(18.dp))
+                        IconButton(onClick = { onAddBookmark(state.currentPath) }, modifier = Modifier.size(30.dp)) {
+                            Icon(Icons.Default.BookmarkAdd, contentDescription = "加入書籤", modifier = Modifier.size(17.dp))
                         }
                     }
-                    IconButton(onClick = onCollapsePane, modifier = Modifier.size(34.dp)) {
+                    IconButton(onClick = onCollapsePane, modifier = Modifier.size(32.dp)) {
                         Icon(Icons.Default.Close, contentDescription = "摺疊此面板", modifier = Modifier.size(18.dp))
                     }
                 }
@@ -363,6 +407,58 @@ fun FileExplorerPane(
                                 modifier = Modifier.align(Alignment.Center)
                             )
                         }
+                        state.viewMode != FileViewMode.LIST -> {
+                            val cellMinSize = if (state.viewMode == FileViewMode.LARGE_GRID) 132.dp else 88.dp
+                            val gridIconDp = if (state.viewMode == FileViewMode.LARGE_GRID) 56.dp else 36.dp
+                            LazyVerticalGrid(
+                                columns = GridCells.Adaptive(minSize = cellMinSize),
+                                modifier = Modifier.fillMaxSize().padding(6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                groupedByMonth.forEach { (monthLabel, monthFiles) ->
+                                    item(key = "header_$monthLabel", span = { GridItemSpan(maxLineSpan) }) {
+                                        Text(
+                                            text = monthLabel,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                    gridItems(monthFiles, key = { it.path }) { file ->
+                                        val isSelected = file.path in state.selectedPaths
+                                        val isHoveredTarget = dragController.isDragging &&
+                                            file.isDirectory &&
+                                            dragController.hoveredFolderPath == file.path
+                                        val hoverScale by animateFloatAsState(
+                                            targetValue = if (isHoveredTarget) 1.15f else 1f,
+                                            label = "GridFolderHoverScale"
+                                        )
+                                        FileGridItem(
+                                            file = file,
+                                            isSelected = isSelected,
+                                            isHoveredTarget = isHoveredTarget,
+                                            iconSizeDp = gridIconDp,
+                                            modifier = Modifier
+                                                .scale(hoverScale)
+                                                .onGloballyPositioned { coords ->
+                                                    itemLocalBounds[file.path] = coords.boundsInParent()
+                                                }
+                                                .clickable {
+                                                    onFocusPane()
+                                                    if (state.isMultiSelectMode) {
+                                                        onToggleSelect(file.path)
+                                                    } else if (file.isDirectory) {
+                                                        onNavigateToPath(file.path)
+                                                    } else {
+                                                        onOpenFile(file)
+                                                    }
+                                                }
+                                        )
+                                    }
+                                }
+                            }
+                        }
                         else -> {
                             LazyColumn(modifier = Modifier.fillMaxSize()) {
                                 groupedByMonth.forEach { (monthLabel, monthFiles) ->
@@ -433,6 +529,48 @@ fun FileExplorerPane(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun FileGridItem(
+    file: VfsFile,
+    isSelected: Boolean,
+    isHoveredTarget: Boolean,
+    iconSizeDp: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier
+) {
+    val bgColor = when {
+        isHoveredTarget -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
+        isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
+        else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+    }
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(bgColor, RoundedCornerShape(10.dp))
+            .then(
+                if (isHoveredTarget) Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
+                else Modifier
+            )
+            .padding(8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            imageVector = if (file.isDirectory) Icons.Default.Folder else Icons.Default.InsertDriveFile,
+            contentDescription = null,
+            tint = if (file.isDirectory) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.size(iconSizeDp)
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = file.name,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center
+        )
     }
 }
 

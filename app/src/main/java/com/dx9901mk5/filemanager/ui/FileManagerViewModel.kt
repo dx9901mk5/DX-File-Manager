@@ -39,9 +39,16 @@ enum class PaneMode {
     TRASH
 }
 
+enum class FileViewMode {
+    LIST,
+    SMALL_GRID,
+    LARGE_GRID
+}
+
 data class ExplorerPaneState(
     val paneIndex: Int,
     val mode: PaneMode = PaneMode.FILES,
+    val viewMode: FileViewMode = FileViewMode.LIST,
     val mountId: String = "local",
     val mountName: String = "內部儲存空間",
     val currentPath: String = Environment.getExternalStorageDirectory().absolutePath,
@@ -227,6 +234,16 @@ class FileManagerViewModel(application: Application) : AndroidViewModel(applicat
     fun adjustIconScale(paneIndex: Int, delta: Float) {
         getPaneFlow(paneIndex).update {
             it.copy(iconScale = (it.iconScale + delta * 0.1f).coerceIn(0.75f, 1.8f))
+        }
+    }
+
+    fun setViewMode(paneIndex: Int, mode: FileViewMode) {
+        getPaneFlow(paneIndex).update { it.copy(viewMode = mode) }
+    }
+
+    fun setPaneExpanded(isExpandedScreen: Boolean, paneIndex: Int, expanded: Boolean) {
+        viewModelScope.launch {
+            prefs.setPaneExpanded(isExpandedScreen, paneIndex, expanded)
         }
     }
 
