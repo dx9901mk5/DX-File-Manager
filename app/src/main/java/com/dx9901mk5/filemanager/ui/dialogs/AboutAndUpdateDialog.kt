@@ -52,6 +52,8 @@ fun SettingsAndAboutDialog(
     onToggleShowHidden: (Boolean) -> Unit,
     onToggleDarkTheme: (Boolean) -> Unit,
     onChangeLanguage: (AppLanguage) -> Unit,
+    onOpenStorageAnalyzer: () -> Unit,
+    onOpenWebShare: () -> Unit,
     onInstallUpdateApk: (File) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -122,6 +124,29 @@ fun SettingsAndAboutDialog(
                             onClick = { onChangeLanguage(lang) },
                             label = { Text(lang.label) }
                         )
+                    }
+                }
+
+                HorizontalDivider()
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = {
+                            onDismiss()
+                            onOpenStorageAnalyzer()
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(s.storageAnalyzer)
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            onDismiss()
+                            onOpenWebShare()
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(s.webShare)
                     }
                 }
 

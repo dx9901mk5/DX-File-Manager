@@ -490,6 +490,14 @@ class FileManagerViewModel(application: Application) : AndroidViewModel(applicat
         }
     }
 
+    fun removeCloudMount(mountId: String) {
+        viewModelScope.launch {
+            prefs.removeCloudMount(mountId)
+            vfsRegistry.removeMount(mountId)
+            toast("已移除掛載")
+        }
+    }
+
     fun setRecycleBinEnabled(enabled: Boolean) = viewModelScope.launch { prefs.setRecycleBinEnabled(enabled) }
     fun setUseShizukuInstall(enabled: Boolean) = viewModelScope.launch { prefs.setUseShizukuInstall(enabled) }
     fun setShowHiddenFiles(show: Boolean) = viewModelScope.launch {

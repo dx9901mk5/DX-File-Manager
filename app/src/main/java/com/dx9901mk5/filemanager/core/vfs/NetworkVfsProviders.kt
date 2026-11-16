@@ -23,15 +23,9 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.io.OutputStream
+import java.net.URLDecoder
 import java.net.URLEncoder
-import java.security.MessageDigest
-import java.text.SimpleDateFormat
-import java.util.Date
 import java.util.EnumSet
-import java.util.Locale
-import java.util.TimeZone
-import javax.crypto.Mac
-import javax.crypto.spec.SecretKeySpec
 
 /**
  * SMBv2/v3 區域網路掛載實作 (smbj)
@@ -177,13 +171,14 @@ class FtpVfsProvider(private val config: VfsMountConfig) : VfsProvider {
 
     private fun <T> withFtp(block: (FTPClient) -> T): T {
         val ftp = FTPClient()
-        ftp.connectTimeout = 10_000
         ftp.controlEncoding = "UTF-8"
+        ftp.connectTimeout = 10_000
         ftp.connect(config.host, if (config.port > 0) config.port else 21)
-        val loggedIn = ftp.login(config.username.ifBlank { "anonymous" }, config.password)
-        if (!loggedIn) {
+        val user = config.username.ifBlank { "anonymous" }
+        val pass = config.password.ifBlank { "anonymous@" }
+        if (!ftp.login(user, pass)) {
             ftp.disconnect()
-            throw IllegalStateException("FTP 登入失敗：${ftp.replyString}")
+            throw IllegalStateException("FTP 登入失敗 (${ftp.replyString.trim()})")
         }
         ftp.enterLocalPassiveMode()
         ftp.setFileType(FTP.BINARY_FILE_TYPE)
@@ -203,14 +198,14 @@ class FtpVfsProvider(private val config: VfsMountConfig) : VfsProvider {
                     ftp.listFiles(target)
                         .filter { it.name != "." && it.name != ".." }
                         .filter { showHidden || !it.name.startsWith(".") }
-                        .map { f ->
-                            val fullPath = if (target == "/") "/${f.name}" else "$target/${f.name}"
+                        .map { entry ->
+                            val fullPath = if (target == "/") "/${entry.name}" else "${target.trimEnd('/')}/${entry.name}"
                             VfsFile(
                                 path = fullPath,
-                                name = f.name,
-                                isDirectory = f.isDirectory,
-                                size = f.size,
-                                lastModified = f.timestamp?.timeInMillis ?: System.currentTimeMillis(),
+                                name = entry.name,
+                                isDirectory = entry.isDirectory,
+                                size = entry.size,
+                                lastModified = entry.timestamp?.timeInMillis ?: System.currentTimeMillis(),
                                 protocol = protocol,
                                 mountId = config.id
                             )
@@ -223,8 +218,10 @@ class FtpVfsProvider(private val config: VfsMountConfig) : VfsProvider {
     override suspend fun createDirectory(parentPath: String, name: String): Result<VfsFile> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val full = if (parentPath == "/") "/$name" else "$parentPath/$name"
-                withFtp { it.makeDirectory(full) }
+                val full = if (parentPath == "/") "/$name" else "${parentPath.trimEnd('/')}/$name"
+                withFtp { ftp ->
+                    if (!ftp.makeDirectory(full)) throw IllegalStateException("FTP 建立資料夾失敗: ${ftp.replyString}")
+                }
                 VfsFile(full, name, true, 0L, System.currentTimeMillis(), protocol = protocol, mountId = config.id)
             }
         }
@@ -233,8 +230,8 @@ class FtpVfsProvider(private val config: VfsMountConfig) : VfsProvider {
         withContext(Dispatchers.IO) {
             runCatching {
                 withFtp { ftp ->
-                    if (!ftp.deleteFile(path)) {
-                        ftp.removeDirectory(path)
+                    if (!ftp.deleteFile(path) && !ftp.removeDirectory(path)) {
+                        throw IllegalStateException("FTP 刪除失敗: ${ftp.replyString}")
                     }
                 }
             }
@@ -245,7 +242,9 @@ class FtpVfsProvider(private val config: VfsMountConfig) : VfsProvider {
             runCatching {
                 val parent = path.substringBeforeLast('/', "")
                 val dest = if (parent.isEmpty()) "/$newName" else "$parent/$newName"
-                withFtp { it.rename(path, dest) }
+                withFtp { ftp ->
+                    if (!ftp.rename(path, dest)) throw IllegalStateException("FTP 重命名失敗: ${ftp.replyString}")
+                }
                 VfsFile(dest, newName, false, 0L, System.currentTimeMillis(), protocol = protocol, mountId = config.id)
             }
         }
@@ -254,16 +253,14 @@ class FtpVfsProvider(private val config: VfsMountConfig) : VfsProvider {
         Result.failure(UnsupportedOperationException("請透過 VFS 串流複製"))
 
     override suspend fun move(sourcePath: String, targetDirPath: String): Result<VfsFile> =
-        rename(sourcePath, sourcePath.substringAfterLast('/'))
+        Result.failure(UnsupportedOperationException("請透過 VFS 串流移動"))
 
     override suspend fun openInputStream(path: String): Result<InputStream> =
         withContext(Dispatchers.IO) {
             runCatching {
                 val bytes = withFtp { ftp ->
                     val out = ByteArrayOutputStream()
-                    if (!ftp.retrieveFile(path, out)) {
-                        throw IllegalStateException("FTP 下載失敗：${ftp.replyString}")
-                    }
+                    if (!ftp.retrieveFile(path, out)) throw IllegalStateException("FTP 下載失敗")
                     out.toByteArray()
                 }
                 ByteArrayInputStream(bytes)
@@ -278,7 +275,9 @@ class FtpVfsProvider(private val config: VfsMountConfig) : VfsProvider {
                         super.close()
                         val data = toByteArray()
                         withFtp { ftp ->
-                            ftp.storeFile(path, ByteArrayInputStream(data))
+                            if (!ftp.storeFile(path, ByteArrayInputStream(data))) {
+                                throw IllegalStateException("FTP 上傳失敗")
+                            }
                         }
                     }
                 }
@@ -314,11 +313,11 @@ class SftpVfsProvider(private val config: VfsMountConfig) : VfsProvider {
                 val target = path.ifBlank { "/" }
                 withSftp { sftp ->
                     @Suppress("UNCHECKED_CAST")
-                    val entries = sftp.ls(target) as List<ChannelSftp.LsEntry>
+                    val entries = sftp.ls(target) as VectorLikeList
                     entries.filter { it.filename != "." && it.filename != ".." }
                         .filter { showHidden || !it.filename.startsWith(".") }
                         .map { entry ->
-                            val fullPath = if (target == "/") "/${entry.filename}" else "$target/${entry.filename}"
+                            val fullPath = if (target == "/") "/${entry.filename}" else "${target.trimEnd('/')}/${entry.filename}"
                             VfsFile(
                                 path = fullPath,
                                 name = entry.filename,
@@ -337,7 +336,7 @@ class SftpVfsProvider(private val config: VfsMountConfig) : VfsProvider {
     override suspend fun createDirectory(parentPath: String, name: String): Result<VfsFile> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val full = if (parentPath == "/") "/$name" else "$parentPath/$name"
+                val full = if (parentPath == "/") "/$name" else "${parentPath.trimEnd('/')}/$name"
                 withSftp { it.mkdir(full) }
                 VfsFile(full, name, true, 0L, System.currentTimeMillis(), protocol = protocol, mountId = config.id)
             }
@@ -391,8 +390,10 @@ class SftpVfsProvider(private val config: VfsMountConfig) : VfsProvider {
         }
 }
 
+private typealias VectorLikeList = List<ChannelSftp.LsEntry>
+
 /**
- * 雲端 REST API 與 WebDAV / OwnCloud / Nextcloud / Amazon S3 統一實作
+ * 雲端 REST API 與 WebDAV / OwnCloud / Nextcloud / S3 統一 VFS 介面卡
  */
 class CloudAndWebDavVfsProvider(private val config: VfsMountConfig) : VfsProvider {
     override val protocol: VfsProtocol = config.protocol
@@ -401,10 +402,7 @@ class CloudAndWebDavVfsProvider(private val config: VfsMountConfig) : VfsProvide
     private fun baseUrl(): String {
         val raw = config.host.trimEnd('/')
         val withScheme = if (raw.startsWith("http://") || raw.startsWith("https://")) raw else "https://$raw"
-        return if (protocol == VfsProtocol.OWNCLOUD_NEXTCLOUD &&
-            !withScheme.contains("/remote.php/dav", ignoreCase = true) &&
-            config.username.isNotBlank()
-        ) {
+        return if (protocol == VfsProtocol.OWNCLOUD_NEXTCLOUD && !withScheme.contains("/remote.php/dav")) {
             "$withScheme/remote.php/dav/files/${URLEncoder.encode(config.username, "UTF-8")}"
         } else {
             withScheme
@@ -419,39 +417,34 @@ class CloudAndWebDavVfsProvider(private val config: VfsMountConfig) : VfsProvide
         }
     }
 
-    private fun requireToken(): String {
-        val token = config.accessToken.trim()
-        if (token.isEmpty()) {
-            throw IllegalStateException("尚未完成 ${protocol.displayName} 帳號授權，請點選「網頁登入授權」或填入 Access Token")
-        }
-        return token
-    }
-
     override suspend fun listFiles(path: String, showHidden: Boolean): Result<List<VfsFile>> =
         withContext(Dispatchers.IO) {
             runCatching {
                 when (protocol) {
                     VfsProtocol.GOOGLE_DRIVE -> listGoogleDriveFiles(path)
-                    VfsProtocol.ONEDRIVE -> listOneDriveFiles(path)
                     VfsProtocol.DROPBOX -> listDropboxFiles(path)
+                    VfsProtocol.ONEDRIVE -> listOneDriveFiles(path)
                     VfsProtocol.BOX -> listBoxFiles(path)
                     VfsProtocol.PCLOUD -> listPCloudFiles(path)
                     VfsProtocol.YANDEX -> listYandexFiles(path)
-                    VfsProtocol.AMAZON_S3 -> listS3Objects(path)
                     VfsProtocol.WEBDAV, VfsProtocol.OWNCLOUD_NEXTCLOUD -> listWebDavFiles(path, showHidden)
-                    VfsProtocol.SUGARSYNC, VfsProtocol.MEDIAFIRE -> listGenericBearerCheck(path)
+                    VfsProtocol.AMAZON_S3 -> listS3Bucket(path)
+                    VfsProtocol.SUGARSYNC, VfsProtocol.MEDIAFIRE -> {
+                        require(config.accessToken.isNotBlank()) { "請先完成 ${protocol.displayName} 帳號授權或填入 Access Token" }
+                        emptyList()
+                    }
                     else -> emptyList()
                 }
             }
         }
 
     private fun listGoogleDriveFiles(folderIdOrPath: String): List<VfsFile> {
-        requireToken()
+        require(config.accessToken.isNotBlank()) { "請先登入 Google 雲端硬碟取得授權 Token" }
         val folderId = if (folderIdOrPath == "/" || folderIdOrPath.isBlank()) "root" else folderIdOrPath.trim('/')
         val url = "https://www.googleapis.com/drive/v3/files?q='$folderId'+in+parents+and+trashed=false&fields=files(id,name,mimeType,size,modifiedTime)&pageSize=200"
         val req = Request.Builder().url(url).header("Authorization", authHeader()).build()
         http.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) throw IllegalStateException("Google Drive 驗證/讀取失敗 (HTTP ${resp.code})")
+            if (!resp.isSuccessful) throw IllegalStateException("Google Drive 驗證/連線失敗 (HTTP ${resp.code})")
             val json = JSONObject(resp.body?.string() ?: "{}")
             val arr = json.optJSONArray("files") ?: return emptyList()
             return buildList {
@@ -476,32 +469,29 @@ class CloudAndWebDavVfsProvider(private val config: VfsMountConfig) : VfsProvide
         }
     }
 
-    private fun listOneDriveFiles(path: String): List<VfsFile> {
-        requireToken()
-        val clean = path.trim('/')
-        val url = if (clean.isEmpty()) {
-            "https://graph.microsoft.com/v1.0/me/drive/root/children"
-        } else {
-            val encoded = clean.split("/").joinToString("/") { URLEncoder.encode(it, "UTF-8").replace("+", "%20") }
-            "https://graph.microsoft.com/v1.0/me/drive/root:/$encoded:/children"
-        }
-        val req = Request.Builder().url(url).header("Authorization", authHeader()).build()
+    private fun listDropboxFiles(path: String): List<VfsFile> {
+        require(config.accessToken.isNotBlank()) { "請先登入 Dropbox 取得授權 Token" }
+        val dbxPath = if (path == "/" || path.isBlank()) "" else "/${path.trim('/')}"
+        val payload = JSONObject().put("path", dbxPath).toString()
+            .toRequestBody("application/json".toMediaTypeOrNull())
+        val req = Request.Builder()
+            .url("https://api.dropboxapi.com/2/files/list_folder")
+            .post(payload)
+            .header("Authorization", authHeader())
+            .build()
         http.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) throw IllegalStateException("OneDrive 驗證/讀取失敗 (HTTP ${resp.code})")
-            val json = JSONObject(resp.body?.string() ?: "{}")
-            val arr = json.optJSONArray("value") ?: return emptyList()
+            if (!resp.isSuccessful) throw IllegalStateException("Dropbox 連線失敗 (HTTP ${resp.code})")
+            val entries = JSONObject(resp.body?.string() ?: "{}").optJSONArray("entries") ?: return emptyList()
             return buildList {
-                for (i in 0 until arr.length()) {
-                    val obj = arr.getJSONObject(i)
-                    val name = obj.optString("name")
-                    val isDir = obj.has("folder")
-                    val childPath = if (clean.isEmpty()) "/$name" else "/$clean/$name"
+                for (i in 0 until entries.length()) {
+                    val o = entries.getJSONObject(i)
+                    val isDir = o.optString(".tag") == "folder"
                     add(
                         VfsFile(
-                            path = childPath,
-                            name = name,
+                            path = o.optString("path_display"),
+                            name = o.optString("name"),
                             isDirectory = isDir,
-                            size = obj.optLong("size", 0L),
+                            size = o.optLong("size", 0L),
                             lastModified = System.currentTimeMillis(),
                             protocol = protocol,
                             mountId = config.id
@@ -512,29 +502,30 @@ class CloudAndWebDavVfsProvider(private val config: VfsMountConfig) : VfsProvide
         }
     }
 
-    private fun listDropboxFiles(path: String): List<VfsFile> {
-        requireToken()
-        val dbxPath = if (path == "/" || path.isBlank()) "" else "/${path.trim('/')}"
-        val payload = JSONObject().put("path", dbxPath).toString()
-        val req = Request.Builder()
-            .url("https://api.dropboxapi.com/2/files/list_folder")
-            .post(payload.toRequestBody("application/json".toMediaTypeOrNull()))
-            .header("Authorization", authHeader())
-            .build()
+    private fun listOneDriveFiles(path: String): List<VfsFile> {
+        require(config.accessToken.isNotBlank()) { "請先登入 OneDrive 取得授權 Token" }
+        val clean = path.trim('/')
+        val url = if (clean.isEmpty()) {
+            "https://graph.microsoft.com/v1.0/me/drive/root/children"
+        } else {
+            "https://graph.microsoft.com/v1.0/me/drive/root:/$clean:/children"
+        }
+        val req = Request.Builder().url(url).header("Authorization", authHeader()).build()
         http.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) throw IllegalStateException("Dropbox 驗證/讀取失敗 (HTTP ${resp.code})")
-            val json = JSONObject(resp.body?.string() ?: "{}")
-            val arr = json.optJSONArray("entries") ?: return emptyList()
+            if (!resp.isSuccessful) throw IllegalStateException("OneDrive 連線失敗 (HTTP ${resp.code})")
+            val arr = JSONObject(resp.body?.string() ?: "{}").optJSONArray("value") ?: return emptyList()
             return buildList {
                 for (i in 0 until arr.length()) {
-                    val obj = arr.getJSONObject(i)
-                    val tag = obj.optString(".tag")
+                    val o = arr.getJSONObject(i)
+                    val name = o.optString("name")
+                    val isDir = o.has("folder")
+                    val childPath = if (clean.isEmpty()) "/$name" else "/$clean/$name"
                     add(
                         VfsFile(
-                            path = obj.optString("path_display"),
-                            name = obj.optString("name"),
-                            isDirectory = tag == "folder",
-                            size = obj.optLong("size", 0L),
+                            path = childPath,
+                            name = name,
+                            isDirectory = isDir,
+                            size = o.optLong("size", 0L),
                             lastModified = System.currentTimeMillis(),
                             protocol = protocol,
                             mountId = config.id
@@ -546,152 +537,100 @@ class CloudAndWebDavVfsProvider(private val config: VfsMountConfig) : VfsProvide
     }
 
     private fun listBoxFiles(path: String): List<VfsFile> {
-        requireToken()
+        require(config.accessToken.isNotBlank()) { "請先登入 Box 取得授權 Token" }
         val folderId = if (path == "/" || path.isBlank()) "0" else path.trim('/')
         val req = Request.Builder()
-            .url("https://api.box.com/2.0/folders/$folderId/items?limit=200&fields=id,name,type,size")
+            .url("https://api.box.com/2.0/folders/$folderId/items?limit=200")
             .header("Authorization", authHeader())
             .build()
         http.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) throw IllegalStateException("Box 驗證/讀取失敗 (HTTP ${resp.code})")
-            val json = JSONObject(resp.body?.string() ?: "{}")
-            val arr = json.optJSONArray("entries") ?: return emptyList()
+            if (!resp.isSuccessful) throw IllegalStateException("Box 連線失敗 (HTTP ${resp.code})")
+            val arr = JSONObject(resp.body?.string() ?: "{}").optJSONArray("entries") ?: return emptyList()
             return buildList {
                 for (i in 0 until arr.length()) {
-                    val obj = arr.getJSONObject(i)
+                    val o = arr.getJSONObject(i)
                     add(
                         VfsFile(
-                            path = "/${obj.optString("id")}",
-                            name = obj.optString("name"),
-                            isDirectory = obj.optString("type") == "folder",
-                            size = obj.optLong("size", 0L),
+                            path = "/${o.optString("id")}",
+                            name = o.optString("name"),
+                            isDirectory = o.optString("type") == "folder",
+                            size = o.optLong("size", 0L),
                             lastModified = System.currentTimeMillis(),
                             protocol = protocol,
                             mountId = config.id
                         )
                     )
                 }
-            }.sortedWith(compareByDescending<VfsFile> { it.isDirectory }.thenBy { it.name.lowercase() })
+            }
         }
     }
 
     private fun listPCloudFiles(path: String): List<VfsFile> {
-        val token = requireToken()
+        require(config.accessToken.isNotBlank()) { "請先登入 pCloud 取得授權 Token" }
         val folderId = if (path == "/" || path.isBlank()) "0" else path.trim('/')
         val req = Request.Builder()
             .url("https://api.pcloud.com/listfolder?folderid=$folderId")
-            .header("Authorization", "Bearer $token")
+            .header("Authorization", authHeader())
             .build()
         http.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) throw IllegalStateException("pCloud 驗證/讀取失敗 (HTTP ${resp.code})")
-            val json = JSONObject(resp.body?.string() ?: "{}")
-            if (json.optInt("result", -1) != 0) {
-                throw IllegalStateException("pCloud API 錯誤：${json.optString("error")}")
-            }
-            val arr = json.optJSONObject("metadata")?.optJSONArray("contents") ?: return emptyList()
+            if (!resp.isSuccessful) throw IllegalStateException("pCloud 連線失敗 (HTTP ${resp.code})")
+            val meta = JSONObject(resp.body?.string() ?: "{}").optJSONObject("metadata") ?: return emptyList()
+            val arr = meta.optJSONArray("contents") ?: return emptyList()
             return buildList {
                 for (i in 0 until arr.length()) {
-                    val obj = arr.getJSONObject(i)
-                    val isDir = obj.optBoolean("isfolder", false)
-                    val id = if (isDir) obj.optLong("folderid").toString() else obj.optLong("fileid").toString()
+                    val o = arr.getJSONObject(i)
+                    val isDir = o.optBoolean("isfolder", false)
+                    val id = if (isDir) o.optLong("folderid").toString() else o.optLong("fileid").toString()
                     add(
                         VfsFile(
                             path = "/$id",
-                            name = obj.optString("name"),
+                            name = o.optString("name"),
                             isDirectory = isDir,
-                            size = obj.optLong("size", 0L),
+                            size = o.optLong("size", 0L),
                             lastModified = System.currentTimeMillis(),
                             protocol = protocol,
                             mountId = config.id
                         )
                     )
                 }
-            }.sortedWith(compareByDescending<VfsFile> { it.isDirectory }.thenBy { it.name.lowercase() })
+            }
         }
     }
 
     private fun listYandexFiles(path: String): List<VfsFile> {
-        requireToken()
-        val yPath = if (path.isBlank()) "/" else path
-        val encoded = URLEncoder.encode(yPath, "UTF-8")
+        require(config.accessToken.isNotBlank()) { "請先登入 Yandex.Disk 取得授權 Token" }
+        val yPath = if (path == "/" || path.isBlank()) "/" else "/${path.trim('/')}"
         val req = Request.Builder()
-            .url("https://cloud-api.yandex.net/v1/disk/resources?path=$encoded&limit=200")
+            .url("https://cloud-api.yandex.net/v1/disk/resources?path=${URLEncoder.encode(yPath, "UTF-8")}&limit=200")
             .header("Authorization", "OAuth ${config.accessToken.trim()}")
             .build()
         http.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) throw IllegalStateException("Yandex.Disk 驗證/讀取失敗 (HTTP ${resp.code})")
-            val json = JSONObject(resp.body?.string() ?: "{}")
-            val arr = json.optJSONObject("_embedded")?.optJSONArray("items") ?: return emptyList()
+            if (!resp.isSuccessful) throw IllegalStateException("Yandex.Disk 連線失敗 (HTTP ${resp.code})")
+            val items = JSONObject(resp.body?.string() ?: "{}")
+                .optJSONObject("_embedded")
+                ?.optJSONArray("items") ?: return emptyList()
             return buildList {
-                for (i in 0 until arr.length()) {
-                    val obj = arr.getJSONObject(i)
-                    val rawPath = obj.optString("path").removePrefix("disk:")
+                for (i in 0 until items.length()) {
+                    val o = items.getJSONObject(i)
                     add(
                         VfsFile(
-                            path = rawPath.ifBlank { "/${obj.optString("name")}" },
-                            name = obj.optString("name"),
-                            isDirectory = obj.optString("type") == "dir",
-                            size = obj.optLong("size", 0L),
+                            path = o.optString("path").removePrefix("disk:"),
+                            name = o.optString("name"),
+                            isDirectory = o.optString("type") == "dir",
+                            size = o.optLong("size", 0L),
                             lastModified = System.currentTimeMillis(),
                             protocol = protocol,
                             mountId = config.id
                         )
                     )
                 }
-            }.sortedWith(compareByDescending<VfsFile> { it.isDirectory }.thenBy { it.name.lowercase() })
-        }
-    }
-
-    private fun listS3Objects(path: String): List<VfsFile> {
-        if (config.username.isBlank() || config.password.isBlank() || config.shareOrBucket.isBlank()) {
-            throw IllegalStateException("Amazon S3 請填寫 Endpoint、Bucket、Access Key 與 Secret Key")
-        }
-        val endpoint = baseUrl()
-        val bucket = config.shareOrBucket.trim('/')
-        val prefix = path.trim('/').let { if (it.isEmpty()) "" else "$it/" }
-        val query = "list-type=2&delimiter=%2F" + if (prefix.isNotEmpty()) "&prefix=${URLEncoder.encode(prefix, "UTF-8")}" else ""
-        val url = "$endpoint/$bucket?$query"
-        val signedReq = signAwsV4(url, "GET", ByteArray(0))
-        http.newCall(signedReq).execute().use { resp ->
-            if (!resp.isSuccessful) throw IllegalStateException("S3 連線/簽名驗證失敗 (HTTP ${resp.code})")
-            val xml = resp.body?.string().orEmpty()
-            val results = mutableListOf<VfsFile>()
-            Regex("<Prefix>([^<]+)</Prefix>").findAll(xml).forEach { m ->
-                val p = m.groupValues[1].trimEnd('/')
-                if (p != prefix.trimEnd('/') && p.isNotEmpty()) {
-                    results.add(VfsFile("/$p", p.substringAfterLast('/'), true, 0L, System.currentTimeMillis(), protocol = protocol, mountId = config.id))
-                }
             }
-            Regex("<Contents>.*?<Key>([^<]+)</Key>.*?<Size>(\\d+)</Size>.*?</Contents>", RegexOption.DOT_MATCHES_ALL)
-                .findAll(xml).forEach { m ->
-                    val k = m.groupValues[1]
-                    val sz = m.groupValues[2].toLongOrNull() ?: 0L
-                    if (!k.endsWith("/")) {
-                        results.add(VfsFile("/$k", k.substringAfterLast('/'), false, sz, System.currentTimeMillis(), protocol = protocol, mountId = config.id))
-                    }
-                }
-            return results.sortedWith(compareByDescending<VfsFile> { it.isDirectory }.thenBy { it.name.lowercase() })
-        }
-    }
-
-    private fun listGenericBearerCheck(path: String): List<VfsFile> {
-        requireToken()
-        val endpoint = if (protocol == VfsProtocol.SUGARSYNC) {
-            "https://api.sugarsync.com/user"
-        } else {
-            "https://www.mediafire.com/api/1.5/folder/get_content.php?session_token=${URLEncoder.encode(config.accessToken.trim(), "UTF-8")}&content_type=folders&response_format=json"
-        }
-        val req = Request.Builder().url(endpoint).header("Authorization", authHeader()).build()
-        http.newCall(req).execute().use { resp ->
-            if (!resp.isSuccessful) throw IllegalStateException("${protocol.displayName} 驗證失敗 (HTTP ${resp.code})")
-            return emptyList()
         }
     }
 
     private fun listWebDavFiles(path: String, showHidden: Boolean): List<VfsFile> {
-        if (config.host.isBlank()) throw IllegalStateException("請輸入伺服器網址")
         val cleanPath = path.trim('/')
-        val url = if (cleanPath.isEmpty()) "${baseUrl()}/" else "${baseUrl()}/$cleanPath"
+        val url = if (cleanPath.isEmpty()) baseUrl() else "${baseUrl()}/$cleanPath"
         val body = """
             <?xml version="1.0" encoding="utf-8" ?>
             <D:propfind xmlns:D="DAV:">
@@ -706,17 +645,18 @@ class CloudAndWebDavVfsProvider(private val config: VfsMountConfig) : VfsProvide
             .build()
         http.newCall(req).execute().use { resp ->
             if (!resp.isSuccessful && resp.code != 207) {
-                throw IllegalStateException("WebDAV 驗證/連線失敗 (HTTP ${resp.code})")
+                throw IllegalStateException("WebDAV PROPFIND 失敗 (HTTP ${resp.code})")
             }
             val xml = resp.body?.string().orEmpty()
-            val hrefRegex = Regex("<[dD]:href>([^<]+)</[dD]:href>")
+            val hrefRegex = Regex("<(?:[a-zA-Z0-9_-]+:)?href>([^<]+)</(?:[a-zA-Z0-9_-]+:)?href>")
             return hrefRegex.findAll(xml)
                 .map { it.groupValues[1].trimEnd('/') }
                 .filter { it.isNotEmpty() && !url.trimEnd('/').endsWith(it) }
                 .map { href ->
-                    val name = java.net.URLDecoder.decode(href.substringAfterLast('/'), "UTF-8")
+                    val decoded = URLDecoder.decode(href, "UTF-8")
+                    val name = decoded.substringAfterLast('/')
                     VfsFile(
-                        path = "/${href.trimStart('/')}",
+                        path = "/${decoded.trimStart('/')}",
                         name = name,
                         isDirectory = !name.contains('.'),
                         size = 0L,
@@ -725,9 +665,27 @@ class CloudAndWebDavVfsProvider(private val config: VfsMountConfig) : VfsProvide
                         mountId = config.id
                     )
                 }
-                .filter { showHidden || !it.name.startsWith(".") }
-                .sortedWith(compareByDescending<VfsFile> { it.isDirectory }.thenBy { it.name.lowercase() })
+                .filter { it.name.isNotBlank() && (showHidden || !it.name.startsWith(".")) }
                 .toList()
+        }
+    }
+
+    private fun listS3Bucket(path: String): List<VfsFile> {
+        val prefix = path.trim('/')
+        val bucketUrl = "${baseUrl()}/${config.shareOrBucket}?list-type=2&delimiter=/&prefix=${URLEncoder.encode(if (prefix.isEmpty()) "" else "$prefix/", "UTF-8")}"
+        val req = Request.Builder().url(bucketUrl).build()
+        http.newCall(req).execute().use { resp ->
+            if (!resp.isSuccessful) throw IllegalStateException("S3 連線失敗 (HTTP ${resp.code})")
+            val xml = resp.body?.string().orEmpty()
+            val keys = Regex("<Key>([^<]+)</Key>").findAll(xml).map { it.groupValues[1] }.toList()
+            val prefixes = Regex("<Prefix>([^<]+)</Prefix>").findAll(xml).map { it.groupValues[1].trimEnd('/') }.toList()
+            val dirItems = prefixes.filter { it.isNotBlank() && it != prefix }.map { p ->
+                VfsFile("/$p", p.substringAfterLast('/'), true, 0L, System.currentTimeMillis(), protocol = protocol, mountId = config.id)
+            }
+            val fileItems = keys.filter { !it.endsWith("/") }.map { k ->
+                VfsFile("/$k", k.substringAfterLast('/'), false, 0L, System.currentTimeMillis(), protocol = protocol, mountId = config.id)
+            }
+            return dirItems + fileItems
         }
     }
 
@@ -739,21 +697,25 @@ class CloudAndWebDavVfsProvider(private val config: VfsMountConfig) : VfsProvide
                         val url = "${baseUrl()}/${parentPath.trim('/')}/$name".replace("//", "/")
                         val req = Request.Builder()
                             .url(url)
-                            .method("MKCOL", ByteArray(0).toRequestBody(null))
+                            .method("MKCOL", "".toRequestBody(null))
                             .header("Authorization", authHeader())
                             .build()
-                        http.newCall(req).execute().use { if (!it.isSuccessful) throw IllegalStateException("HTTP ${it.code}") }
+                        http.newCall(req).execute().close()
                     }
-                    VfsProtocol.DROPBOX -> {
-                        val full = "/${parentPath.trim('/')}/$name".replace("//", "/")
+                    VfsProtocol.GOOGLE_DRIVE -> {
+                        val parentId = if (parentPath == "/" || parentPath.isBlank()) "root" else parentPath.trim('/')
+                        val json = JSONObject()
+                            .put("name", name)
+                            .put("mimeType", "application/vnd.google-apps.folder")
+                            .put("parents", org.json.JSONArray().put(parentId))
                         val req = Request.Builder()
-                            .url("https://api.dropboxapi.com/2/files/create_folder_v2")
-                            .post(JSONObject().put("path", full).toString().toRequestBody("application/json".toMediaTypeOrNull()))
+                            .url("https://www.googleapis.com/drive/v3/files")
+                            .post(json.toString().toRequestBody("application/json".toMediaTypeOrNull()))
                             .header("Authorization", authHeader())
                             .build()
-                        http.newCall(req).execute().use { if (!it.isSuccessful) throw IllegalStateException("HTTP ${it.code}") }
+                        http.newCall(req).execute().close()
                     }
-                    else -> Unit
+                    else -> {}
                 }
                 VfsFile("/$name", name, true, 0L, System.currentTimeMillis(), protocol = protocol, mountId = config.id)
             }
@@ -768,14 +730,6 @@ class CloudAndWebDavVfsProvider(private val config: VfsMountConfig) : VfsProvide
                         val req = Request.Builder()
                             .url("https://www.googleapis.com/drive/v3/files/$id")
                             .delete()
-                            .header("Authorization", authHeader())
-                            .build()
-                        http.newCall(req).execute().close()
-                    }
-                    VfsProtocol.DROPBOX -> {
-                        val req = Request.Builder()
-                            .url("https://api.dropboxapi.com/2/files/delete_v2")
-                            .post(JSONObject().put("path", path).toString().toRequestBody("application/json".toMediaTypeOrNull()))
                             .header("Authorization", authHeader())
                             .build()
                         http.newCall(req).execute().close()
@@ -802,10 +756,22 @@ class CloudAndWebDavVfsProvider(private val config: VfsMountConfig) : VfsProvide
         withContext(Dispatchers.IO) {
             runCatching {
                 val req = when (protocol) {
-                    VfsProtocol.GOOGLE_DRIVE -> Request.Builder()
-                        .url("https://www.googleapis.com/drive/v3/files/${path.trim('/')}?alt=media")
-                        .header("Authorization", authHeader())
-                        .build()
+                    VfsProtocol.GOOGLE_DRIVE -> {
+                        val id = path.trim('/')
+                        Request.Builder()
+                            .url("https://www.googleapis.com/drive/v3/files/$id?alt=media")
+                            .header("Authorization", authHeader())
+                            .build()
+                    }
+                    VfsProtocol.DROPBOX -> {
+                        val arg = JSONObject().put("path", path).toString()
+                        Request.Builder()
+                            .url("https://content.dropboxapi.com/2/files/download")
+                            .post("".toRequestBody(null))
+                            .header("Authorization", authHeader())
+                            .header("Dropbox-API-Arg", arg)
+                            .build()
+                    }
                     VfsProtocol.ONEDRIVE -> {
                         val clean = path.trim('/')
                         Request.Builder()
@@ -813,21 +779,12 @@ class CloudAndWebDavVfsProvider(private val config: VfsMountConfig) : VfsProvide
                             .header("Authorization", authHeader())
                             .build()
                     }
-                    VfsProtocol.DROPBOX -> Request.Builder()
-                        .url("https://content.dropboxapi.com/2/files/download")
-                        .post(ByteArray(0).toRequestBody(null))
-                        .header("Authorization", authHeader())
-                        .header("Dropbox-API-Arg", JSONObject().put("path", path).toString())
-                        .build()
-                    else -> Request.Builder()
-                        .url("${baseUrl()}/${path.trim('/')}")
-                        .header("Authorization", authHeader())
-                        .build()
+                    else -> {
+                        val url = "${baseUrl()}/${path.trim('/')}"
+                        Request.Builder().url(url).header("Authorization", authHeader()).build()
+                    }
                 }
-                val bytes = http.newCall(req).execute().use { resp ->
-                    if (!resp.isSuccessful) throw IllegalStateException("下載失敗 (HTTP ${resp.code})")
-                    resp.body?.bytes() ?: ByteArray(0)
-                }
+                val bytes = http.newCall(req).execute().use { it.body?.bytes() ?: ByteArray(0) }
                 ByteArrayInputStream(bytes)
             }
         }
@@ -840,71 +797,35 @@ class CloudAndWebDavVfsProvider(private val config: VfsMountConfig) : VfsProvide
                         super.close()
                         val data = toByteArray()
                         val req = when (protocol) {
-                            VfsProtocol.DROPBOX -> Request.Builder()
-                                .url("https://content.dropboxapi.com/2/files/upload")
-                                .post(data.toRequestBody("application/octet-stream".toMediaTypeOrNull()))
-                                .header("Authorization", authHeader())
-                                .header("Dropbox-API-Arg", JSONObject().put("path", path).put("mode", "overwrite").toString())
-                                .build()
-                            VfsProtocol.ONEDRIVE -> Request.Builder()
-                                .url("https://graph.microsoft.com/v1.0/me/drive/root:/${path.trim('/')}:/content")
-                                .put(data.toRequestBody("application/octet-stream".toMediaTypeOrNull()))
-                                .header("Authorization", authHeader())
-                                .build()
-                            else -> Request.Builder()
-                                .url("${baseUrl()}/${path.trim('/')}")
-                                .put(data.toRequestBody("application/octet-stream".toMediaTypeOrNull()))
-                                .header("Authorization", authHeader())
-                                .build()
+                            VfsProtocol.DROPBOX -> {
+                                val arg = JSONObject().put("path", path).put("mode", "overwrite").toString()
+                                Request.Builder()
+                                    .url("https://content.dropboxapi.com/2/files/upload")
+                                    .post(data.toRequestBody("application/octet-stream".toMediaTypeOrNull()))
+                                    .header("Authorization", authHeader())
+                                    .header("Dropbox-API-Arg", arg)
+                                    .build()
+                            }
+                            VfsProtocol.ONEDRIVE -> {
+                                val clean = path.trim('/')
+                                Request.Builder()
+                                    .url("https://graph.microsoft.com/v1.0/me/drive/root:/$clean:/content")
+                                    .put(data.toRequestBody("application/octet-stream".toMediaTypeOrNull()))
+                                    .header("Authorization", authHeader())
+                                    .build()
+                            }
+                            else -> {
+                                val url = "${baseUrl()}/${path.trim('/')}"
+                                Request.Builder()
+                                    .url(url)
+                                    .put(data.toRequestBody("application/octet-stream".toMediaTypeOrNull()))
+                                    .header("Authorization", authHeader())
+                                    .build()
+                            }
                         }
-                        http.newCall(req).execute().use { resp ->
-                            if (!resp.isSuccessful) throw IllegalStateException("上傳失敗 (HTTP ${resp.code})")
-                        }
+                        http.newCall(req).execute().close()
                     }
                 }
             }
         }
-
-    private fun signAwsV4(url: String, method: String, payload: ByteArray): Request {
-        val parsed = okhttp3.HttpUrl.Builder().let {
-            val u = java.net.URI(url)
-            val now = Date()
-            val amzDate = SimpleDateFormat("yyyyMMdd'T'HHmmss'Z'", Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }.format(now)
-            val dateStamp = amzDate.substring(0, 8)
-            val region = "us-east-1"
-            val service = "s3"
-            val payloadHash = sha256Hex(payload)
-            val canonicalUri = u.rawPath.ifBlank { "/" }
-            val canonicalQuery = u.rawQuery.orEmpty()
-            val host = if (u.port > 0) "${u.host}:${u.port}" else u.host
-            val canonicalHeaders = "host:$host\nx-amz-content-sha256:$payloadHash\nx-amz-date:$amzDate\n"
-            val signedHeaders = "host;x-amz-content-sha256;x-amz-date"
-            val canonicalRequest = "$method\n$canonicalUri\n$canonicalQuery\n$canonicalHeaders\n$signedHeaders\n$payloadHash"
-            val scope = "$dateStamp/$region/$service/aws4_request"
-            val stringToSign = "AWS4-HMAC-SHA256\n$amzDate\n$scope\n${sha256Hex(canonicalRequest.toByteArray())}"
-            val kDate = hmacSha256("AWS4${config.password}".toByteArray(), dateStamp)
-            val kRegion = hmacSha256(kDate, region)
-            val kService = hmacSha256(kRegion, service)
-            val kSigning = hmacSha256(kService, "aws4_request")
-            val sig = hmacSha256(kSigning, stringToSign).joinToString("") { "%02x".format(it) }
-            val auth = "AWS4-HMAC-SHA256 Credential=${config.username}/$scope, SignedHeaders=$signedHeaders, Signature=$sig"
-            Request.Builder()
-                .url(url)
-                .header("Host", host)
-                .header("x-amz-date", amzDate)
-                .header("x-amz-content-sha256", payloadHash)
-                .header("Authorization", auth)
-                .build()
-        }
-        return parsed
-    }
-
-    private fun sha256Hex(bytes: ByteArray): String =
-        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
-
-    private fun hmacSha256(key: ByteArray, data: String): ByteArray {
-        val mac = Mac.getInstance("HmacSHA256")
-        mac.init(SecretKeySpec(key, "HmacSHA256"))
-        return mac.doFinal(data.toByteArray(Charsets.UTF_8))
-    }
 }

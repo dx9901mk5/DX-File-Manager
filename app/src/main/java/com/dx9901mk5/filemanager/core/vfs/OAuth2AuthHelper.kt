@@ -1,0 +1,82 @@
+package com.dx9901mk5.filemanager.core.vfs
+
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import java.net.URLEncoder
+
+/**
+ * 統一 OAuth2 瀏覽器登入授權輔助器 (Redirect URI: dxfilemanager://oauth2redirect)
+ */
+object OAuth2AuthHelper {
+    const val REDIRECT_URI = "dxfilemanager://oauth2redirect"
+
+    private val _receivedToken = MutableStateFlow<String?>(null)
+    val receivedToken = _receivedToken.asStateFlow()
+
+    fun clearToken() {
+        _receivedToken.value = null
+    }
+
+    fun handleRedirectIntent(intent: Intent?) {
+        val data: Uri = intent?.data ?: return
+        if (data.scheme == "dxfilemanager" && data.host == "oauth2redirect") {
+            // 支援 fragment (#access_token=...) 與 query (?access_token=... 或 ?code=...)
+            val fragment = data.fragment.orEmpty()
+            val fragmentToken = fragment.split("&")
+                .mapNotNull {
+                    val kv = it.split("=", limit = 2)
+                    if (kv.size == 2) kv[0] to Uri.decode(kv[1]) else null
+                }
+                .toMap()["access_token"]
+
+            val queryToken = data.getQueryParameter("access_token")
+                ?: data.getQueryParameter("code")
+
+            val token = fragmentToken ?: queryToken
+            if (!token.isNullOrBlank()) {
+                _receivedToken.value = token
+            }
+        }
+    }
+
+    fun buildAuthorizeUrl(protocol: VfsProtocol, clientId: String): String? {
+        val cid = URLEncoder.encode(clientId.trim(), "UTF-8")
+        val redirect = URLEncoder.encode(REDIRECT_URI, "UTF-8")
+        return when (protocol) {
+            VfsProtocol.GOOGLE_DRIVE -> {
+                val scope = URLEncoder.encode("https://www.googleapis.com/auth/drive", "UTF-8")
+                "https://accounts.google.com/o/oauth2/v2/auth?client_id=$cid&redirect_uri=$redirect&response_type=token&scope=$scope"
+            }
+            VfsProtocol.DROPBOX -> {
+                "https://www.dropbox.com/oauth2/authorize?client_id=$cid&redirect_uri=$redirect&response_type=token"
+            }
+            VfsProtocol.ONEDRIVE -> {
+                val scope = URLEncoder.encode("Files.ReadWrite.All offline_access", "UTF-8")
+                "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=$cid&redirect_uri=$redirect&response_type=token&scope=$scope"
+            }
+            VfsProtocol.YANDEX -> {
+                "https://oauth.yandex.com/authorize?response_type=token&client_id=$cid&redirect_uri=$redirect"
+            }
+            VfsProtocol.BOX -> {
+                "https://account.box.com/api/oauth2/authorize?response_type=code&client_id=$cid&redirect_uri=$redirect"
+            }
+            VfsProtocol.PCLOUD -> {
+                "https://my.pcloud.com/oauth2/authorize?client_id=$cid&response_type=token&redirect_uri=$redirect"
+            }
+            else -> null
+        }
+    }
+
+    fun launchBrowserAuth(context: Context, protocol: VfsProtocol, clientId: String): Result<Unit> = runCatching {
+        require(clientId.isNotBlank()) { "請先填入該雲端平台的 OAuth Client ID（或直接貼上 Access Token）" }
+        val url = buildAuthorizeUrl(protocol, clientId)
+            ?: throw UnsupportedOperationException("${protocol.displayName} 不使用 OAuth2 瀏覽器授權")
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+    }
+}

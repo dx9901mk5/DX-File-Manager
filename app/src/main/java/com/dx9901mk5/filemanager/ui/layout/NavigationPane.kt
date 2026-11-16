@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
@@ -68,13 +69,11 @@ fun NavigationPane(
     onToggleDualPane: () -> Unit,
     onOpenLocalRoot: () -> Unit,
     onOpenCloudMount: (VfsMountConfig) -> Unit,
+    onRemoveCloudMount: (String) -> Unit,
     onOpenCloudWizard: () -> Unit,
     onOpenCategory: (FileCategory) -> Unit,
     onOpenBookmark: (String) -> Unit,
-    onToggleHidden: () -> Unit,
-    onOpenShortcuts: () -> Unit,
-    onOpenStorageAnalyzer: () -> Unit,
-    onOpenWebShare: () -> Unit
+    onOpenShortcuts: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         // 頂部工具列：首頁、主題切換、設定、分割畫面切換、快捷鍵
@@ -146,12 +145,30 @@ fun NavigationPane(
             }
 
             items(cloudMounts, key = { it.id }) { mount ->
-                NavRowItem(
-                    icon = Icons.Default.Cloud,
-                    label = mount.name,
-                    subtitle = mount.protocol.displayName,
-                    onClick = { onOpenCloudMount(mount) }
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        NavRowItem(
+                            icon = Icons.Default.Cloud,
+                            label = mount.name,
+                            subtitle = mount.protocol.displayName,
+                            onClick = { onOpenCloudMount(mount) }
+                        )
+                    }
+                    IconButton(
+                        onClick = { onRemoveCloudMount(mount.id) },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = "移除掛載",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(15.dp)
+                        )
+                    }
+                }
             }
 
             item {
@@ -199,23 +216,6 @@ fun NavigationPane(
             }
 
             item {
-                HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
-                SectionHeader("工具箱")
-                NavRowItem(
-                    icon = Icons.Default.PieChart,
-                    label = "DX 儲存空間分析器",
-                    onClick = onOpenStorageAnalyzer
-                )
-                NavRowItem(
-                    icon = Icons.Default.WifiTethering,
-                    label = "DX 區域網路網頁分享",
-                    onClick = onOpenWebShare
-                )
-                NavRowItem(
-                    icon = Icons.Default.VisibilityOff,
-                    label = "切換顯示隱藏資料夾",
-                    onClick = onToggleHidden
-                )
                 Spacer(Modifier.height(16.dp))
             }
         }

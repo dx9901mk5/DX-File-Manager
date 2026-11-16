@@ -31,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
+import com.dx9901mk5.filemanager.core.vfs.OAuth2AuthHelper
 import com.dx9901mk5.filemanager.core.vfs.VfsFile
 import com.dx9901mk5.filemanager.ui.FileManagerViewModel
 import com.dx9901mk5.filemanager.ui.dialogs.CloudMountWizardDialog
@@ -57,14 +58,13 @@ import java.io.File
 
 class MainActivity : ComponentActivity() {
     private val viewModel: FileManagerViewModel by viewModels()
-    private val pendingOAuthToken = mutableStateOf<String?>(null)
 
     @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         ensureStoragePermission()
-        handleOAuthIntent(intent)
+        OAuth2AuthHelper.handleRedirectIntent(intent)
 
         intent.getStringExtra("shortcut_path")?.let { path ->
             val target = File(path)
@@ -83,9 +83,7 @@ class MainActivity : ComponentActivity() {
                 DxFileManagerScreen(
                     viewModel = viewModel,
                     isExpandedScreen = isExpandedScreen,
-                    isLargeTablet = isLargeTablet,
-                    receivedOAuthToken = pendingOAuthToken.value,
-                    onConsumeOAuthToken = { pendingOAuthToken.value = null }
+                    isLargeTablet = isLargeTablet
                 )
             }
         }
@@ -93,22 +91,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        handleOAuthIntent(intent)
-    }
-
-    private fun handleOAuthIntent(intent: Intent?) {
-        val data = intent?.data ?: return
-        if (data.scheme == "com.dx9901mk5.filemanager" && data.host == "oauth2redirect") {
-            val fragment = data.fragment.orEmpty()
-            val tokenFromFragment = fragment.split("&")
-                .firstOrNull { it.startsWith("access_token=") }
-                ?.substringAfter("access_token=")
-            val tokenFromQuery = data.getQueryParameter("access_token") ?: data.getQueryParameter("code")
-            val token = tokenFromFragment ?: tokenFromQuery
-            if (!token.isNullOrBlank()) {
-                pendingOAuthToken.value = Uri.decode(token)
-            }
-        }
+        OAuth2AuthHelper.handleRedirectIntent(intent)
     }
 
     private fun ensureStoragePermission() {
@@ -127,9 +110,7 @@ class MainActivity : ComponentActivity() {
 private fun DxFileManagerScreen(
     viewModel: FileManagerViewModel,
     isExpandedScreen: Boolean,
-    isLargeTablet: Boolean,
-    receivedOAuthToken: String?,
-    onConsumeOAuthToken: () -> Unit
+    isLargeTablet: Boolean
 ) {
     val settings by viewModel.settings.collectAsState()
     val pane2State by viewModel.pane2State.collectAsState()
@@ -289,13 +270,11 @@ private fun DxFileManagerScreen(
                         )
                     },
                     onOpenCloudMount = { mount -> viewModel.openCloudMount(focusedPane, mount) },
+                    onRemoveCloudMount = { mountId -> viewModel.removeCloudMount(mountId) },
                     onOpenCloudWizard = { showCloudWizard = true },
                     onOpenCategory = { cat -> viewModel.openCategory(focusedPane, cat) },
                     onOpenBookmark = { path -> viewModel.navigateToPath(focusedPane, path, "local", "內部儲存空間") },
-                    onToggleHidden = { viewModel.setShowHiddenFiles(!settings.showHiddenFiles) },
-                    onOpenShortcuts = { showShortcutsDialog = true },
-                    onOpenStorageAnalyzer = { showStorageAnalyzer = true },
-                    onOpenWebShare = { showWebShare = true }
+                    onOpenShortcuts = { showShortcutsDialog = true }
                 )
             },
             pane2Content = { onCollapse ->
@@ -435,8 +414,6 @@ private fun DxFileManagerScreen(
 
         if (showCloudWizard) {
             CloudMountWizardDialog(
-                receivedOAuthToken = receivedOAuthToken,
-                onConsumeOAuthToken = onConsumeOAuthToken,
                 onMountCreated = { viewModel.saveCloudMount(it) },
                 onDismiss = { showCloudWizard = false }
             )
@@ -450,6 +427,8 @@ private fun DxFileManagerScreen(
                 onToggleShowHidden = { viewModel.setShowHiddenFiles(it) },
                 onToggleDarkTheme = { viewModel.setDarkTheme(it) },
                 onChangeLanguage = { viewModel.setLanguage(it) },
+                onOpenStorageAnalyzer = { showStorageAnalyzer = true },
+                onOpenWebShare = { showWebShare = true },
                 onInstallUpdateApk = { apk -> viewModel.installApkWithShizukuOrFallback(apk) },
                 onDismiss = { showSettingsDialog = false }
             )

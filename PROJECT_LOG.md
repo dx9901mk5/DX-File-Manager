@@ -32,17 +32,16 @@
   - 已使用 `SIGNING_KEY_BASE64` 固定簽名金鑰（SHA-256：`20:70:09:9D:5A:BD:A3:4C:B0:46:79:86:BA:A9:BE:A3:89:30:B3:06:E6:02:B0:A6:4F:43:97:D6:77:A3:C4:1F`）成功編譯並發布 Release（Run `#43822376934`）。
   - Release 頁面：https://github.com/dx9901mk5/DX-File-Manager/releases/tag/v1.0.3
   - 後續所有版本皆可直接覆蓋安裝更新。
-- **待統整確認變更（尚未發行 APK）**：
-  - 全面檢查並修復 14 種雲端與網路掛載連線：
-    - 補齊 `FtpVfsProvider`（`commons-net`）、`OneDrive` (Microsoft Graph)、`Dropbox`、`Box`、`pCloud`、`Yandex.Disk`、`Amazon S3` (AWS SigV4 簽章)、`OwnCloud / Nextcloud` 自動 `/remote.php/dav/files/<user>` 路徑解析、`Google Drive` 等真實 API 串接。
-    - 於 `CloudMountWizardDialog` 加入 OAuth2 網頁登入授權流程（搭配 `com.dx9901mk5.filemanager://oauth2redirect` 深層連結回傳 Token）與「測試並掛載」即時連線驗證機制。
-    - 移除掛載視窗最下方的「下載更多 / 外掛擴充」按鈕，並修正協定名稱截斷問題。
+- **v1.0.4** (`versionCode = 5`)：
   - 三區右上角補上專屬摺疊鈕，摺疊後頂部顯示顯眼金黃色圓形展開按鈕。
   - 手機直向預設僅顯示第 1、2 區（無第 3 區），打橫時自動顯示第 3 區。
   - 平板／摺疊預設三區全開，中間分隔線預設鎖定固定，需點擊左上角鎖頭按鈕才進入拖曳比例編輯模式。
   - 左上角配置 App 設定按鈕（內含「關於我」與「檢查更新」）。
   - 長壓進入選擇／選單改為 2 秒（`2000ms`）並加入震動提示，選單每個項目皆附帶對應圖示。
   - 第一區「圖片 / 影片 / 相片」整合為單一「相片與影片」入口，進入後上方提供「全部 / 照片 / 影片」子分類篩選。
+- **待確認變更（尚未發布 APK）**：
+  - 全面檢查並修復 14 種雲端/網路掛載：移除「下載更多 / 外掛擴充」按鈕；新增 `OAuth2AuthHelper` 瀏覽器登入授權回調 (`dxfilemanager://oauth2redirect`) 與「測試連線」驗證；補齊 `FTPClient` (commons-net)、Dropbox、OneDrive、Box、pCloud、Yandex、WebDAV/OwnCloud/Nextcloud、Amazon S3 真實 API 串接，並於第一區已掛載雲端旁加上移除按鈕 (`✕`)。
+  - 移除左下角「工具箱」區塊，將「DX 儲存空間分析器」與「DX 區域網路網頁分享」整合至設定頁面內。
 
 ---
 

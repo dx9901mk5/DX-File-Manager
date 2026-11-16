@@ -1,7 +1,5 @@
 package com.dx9901mk5.filemanager.ui.dialogs
 
-import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -10,7 +8,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -20,8 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Lan
-import androidx.compose.material.icons.filled.Login
-import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -33,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,23 +40,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.dx9901mk5.filemanager.core.vfs.CloudAndWebDavVfsProvider
-import com.dx9901mk5.filemanager.core.vfs.FtpVfsProvider
-import com.dx9901mk5.filemanager.core.vfs.SftpVfsProvider
-import com.dx9901mk5.filemanager.core.vfs.SmbVfsProvider
+import com.dx9901mk5.filemanager.core.vfs.OAuth2AuthHelper
 import com.dx9901mk5.filemanager.core.vfs.VfsMountConfig
 import com.dx9901mk5.filemanager.core.vfs.VfsProtocol
+import com.dx9901mk5.filemanager.core.vfs.VfsRegistry
 import kotlinx.coroutines.launch
-import java.net.URLEncoder
 import java.util.UUID
 
 /**
- * 14 種雲端與網路連線掛載精靈（支援 OAuth2 網頁登入授權 + 掛載前即時連線測試）
+ * 14 種雲端與網路連線掛載精靈（支援瀏覽器 OAuth2 登入與連線測試）
  */
 @Composable
 fun CloudMountWizardDialog(
-    receivedOAuthToken: String? = null,
-    onConsumeOAuthToken: () -> Unit = {},
     onMountCreated: (VfsMountConfig) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -78,13 +70,14 @@ fun CloudMountWizardDialog(
     var accessToken by remember { mutableStateOf("") }
 
     var testing by remember { mutableStateOf(false) }
-    var testStatus by remember { mutableStateOf<String?>(null) }
+    var testResultMsg by remember { mutableStateOf<String?>(null) }
 
-    LaunchedEffect(receivedOAuthToken) {
-        if (!receivedOAuthToken.isNullOrBlank()) {
-            accessToken = receivedOAuthToken
-            testStatus = "已接收 OAuth2 授權 Token，請點擊「測試並掛載」"
-            onConsumeOAuthToken()
+    val oauthToken by OAuth2AuthHelper.receivedToken.collectAsState()
+    LaunchedEffect(oauthToken) {
+        if (!oauthToken.isNullOrBlank()) {
+            accessToken = oauthToken!!
+            testResultMsg = "已從瀏覽器取得授權 Token，請點擊「測試連線」驗證"
+            OAuth2AuthHelper.clearToken()
         }
     }
 
@@ -103,32 +96,12 @@ fun CloudMountWizardDialog(
         )
     }
 
-    fun buildOAuthUrl(proto: VfsProtocol, cid: String): String {
-        val redirect = URLEncoder.encode("com.dx9901mk5.filemanager://oauth2redirect", "UTF-8")
-        val encodedCid = URLEncoder.encode(cid.trim(), "UTF-8")
-        return when (proto) {
-            VfsProtocol.GOOGLE_DRIVE ->
-                "https://accounts.google.com/o/oauth2/v2/auth?client_id=$encodedCid&redirect_uri=$redirect&response_type=token&scope=${URLEncoder.encode("https://www.googleapis.com/auth/drive", "UTF-8")}"
-            VfsProtocol.ONEDRIVE ->
-                "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=$encodedCid&redirect_uri=$redirect&response_type=token&scope=${URLEncoder.encode("Files.ReadWrite.All", "UTF-8")}"
-            VfsProtocol.DROPBOX ->
-                "https://www.dropbox.com/oauth2/authorize?client_id=$encodedCid&redirect_uri=$redirect&response_type=token"
-            VfsProtocol.BOX ->
-                "https://account.box.com/api/oauth2/authorize?client_id=$encodedCid&redirect_uri=$redirect&response_type=code"
-            VfsProtocol.PCLOUD ->
-                "https://my.pcloud.com/oauth2/authorize?client_id=$encodedCid&redirect_uri=$redirect&response_type=token"
-            VfsProtocol.YANDEX ->
-                "https://oauth.yandex.com/authorize?client_id=$encodedCid&redirect_uri=$redirect&response_type=token"
-            else -> ""
-        }
-    }
-
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
                 if (selectedProtocol == null) "網路連線指引 (14 種雲端 / LAN)"
-                else "連線設定：${selectedProtocol!!.displayName}"
+                else "設定 ${selectedProtocol!!.displayName}"
             )
         },
         text = {
@@ -137,7 +110,7 @@ fun CloudMountWizardDialog(
                     columns = GridCells.Fixed(2),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(360.dp),
+                        .height(340.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -151,25 +124,23 @@ fun CloudMountWizardDialog(
                                     selectedProtocol = proto
                                     displayName = proto.displayName
                                     port = if (proto.defaultPort > 0) proto.defaultPort.toString() else ""
-                                    testStatus = null
+                                    testResultMsg = null
                                 }
                         ) {
                             Row(
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 12.dp),
+                                modifier = Modifier.padding(10.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Icon(
                                     imageVector = if (proto.isCloud) Icons.Default.Cloud else Icons.Default.Lan,
                                     contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(20.dp)
+                                    tint = MaterialTheme.colorScheme.primary
                                 )
                                 Text(
                                     text = proto.displayName,
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 2,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
@@ -178,6 +149,14 @@ fun CloudMountWizardDialog(
                 }
             } else {
                 val proto = selectedProtocol!!
+                val supportsOAuthBrowser = proto in setOf(
+                    VfsProtocol.GOOGLE_DRIVE,
+                    VfsProtocol.DROPBOX,
+                    VfsProtocol.ONEDRIVE,
+                    VfsProtocol.YANDEX,
+                    VfsProtocol.BOX,
+                    VfsProtocol.PCLOUD
+                )
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -227,41 +206,34 @@ fun CloudMountWizardDialog(
                         )
                     }
                     if (proto.isCloud && proto != VfsProtocol.AMAZON_S3) {
-                        val oauthUrlSupported = proto in setOf(
-                            VfsProtocol.GOOGLE_DRIVE,
-                            VfsProtocol.ONEDRIVE,
-                            VfsProtocol.DROPBOX,
-                            VfsProtocol.BOX,
-                            VfsProtocol.PCLOUD,
-                            VfsProtocol.YANDEX
-                        )
-                        if (oauthUrlSupported) {
+                        if (supportsOAuthBrowser) {
                             OutlinedTextField(
                                 value = clientId,
                                 onValueChange = { clientId = it },
-                                label = { Text("OAuth2 Client ID (網頁登入用)") },
+                                label = { Text("OAuth Client ID (瀏覽器登入用)") },
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
                             )
                             OutlinedButton(
-                                enabled = clientId.isNotBlank(),
                                 onClick = {
-                                    val url = buildOAuthUrl(proto, clientId)
-                                    if (url.isNotEmpty()) {
-                                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                                    }
+                                    OAuth2AuthHelper.launchBrowserAuth(context, proto, clientId)
+                                        .onFailure { testResultMsg = it.message }
                                 },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Icon(Icons.Default.Login, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.size(6.dp))
-                                Text("前往網頁登入授權")
+                                Icon(Icons.Default.OpenInBrowser, contentDescription = null)
+                                Text("  開啟瀏覽器登入授權 (${proto.displayName})")
                             }
+                            Text(
+                                text = "Redirect URI: ${OAuth2AuthHelper.REDIRECT_URI}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                         OutlinedTextField(
                             value = accessToken,
                             onValueChange = { accessToken = it },
-                            label = { Text("Access Token (授權後自動填入或手動貼上)") },
+                            label = { Text("OAuth2 Access Token") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -269,24 +241,46 @@ fun CloudMountWizardDialog(
                         OutlinedTextField(
                             value = username,
                             onValueChange = { username = it },
-                            label = { Text(if (proto == VfsProtocol.AMAZON_S3) "Access Key" else "帳號") },
+                            label = { Text("帳號 / Access Key") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
                         OutlinedTextField(
                             value = password,
                             onValueChange = { password = it },
-                            label = { Text(if (proto == VfsProtocol.AMAZON_S3) "Secret Key" else "密碼") },
+                            label = { Text("密碼 / Secret Key") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
 
-                    testStatus?.let { msg ->
+                    Spacer(Modifier.height(4.dp))
+                    OutlinedButton(
+                        enabled = !testing,
+                        onClick = {
+                            testing = true
+                            testResultMsg = "正在測試連線..."
+                            val cfg = buildConfig()
+                            scope.launch {
+                                val reg = VfsRegistry().apply { registerMount(cfg) }
+                                val res = reg.getProvider(cfg.id).listFiles(cfg.rootPath, showHidden = false)
+                                testing = false
+                                testResultMsg = res.fold(
+                                    onSuccess = { list -> "連線成功！偵測到 ${list.size} 個項目" },
+                                    onFailure = { err -> "連線失敗：${err.message}" }
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(if (testing) "測試中..." else "測試連線")
+                    }
+
+                    testResultMsg?.let { msg ->
                         Text(
                             text = msg,
                             style = MaterialTheme.typography.bodySmall,
-                            color = if (msg.startsWith("✅")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                            color = if (msg.startsWith("連線成功")) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
                         )
                     }
                 }
@@ -295,44 +289,18 @@ fun CloudMountWizardDialog(
         confirmButton = {
             if (selectedProtocol != null) {
                 Button(
-                    enabled = !testing,
                     onClick = {
-                        val cfg = buildConfig()
-                        testing = true
-                        testStatus = "正在驗證連線與帳號權限..."
-                        scope.launch {
-                            val provider = when (cfg.protocol) {
-                                VfsProtocol.LAN_SMB -> SmbVfsProvider(cfg)
-                                VfsProtocol.FTP -> FtpVfsProvider(cfg)
-                                VfsProtocol.SFTP -> SftpVfsProvider(cfg)
-                                else -> CloudAndWebDavVfsProvider(cfg)
-                            }
-                            val res = provider.listFiles("/", showHidden = false)
-                            testing = false
-                            res.onSuccess { list ->
-                                testStatus = "✅ 連線成功（共 ${list.size} 個項目）"
-                                onMountCreated(cfg)
-                                onDismiss()
-                            }.onFailure { err ->
-                                testStatus = "連線失敗：${err.message ?: "請檢查帳號、Token 或網路設定"}"
-                            }
-                        }
+                        onMountCreated(buildConfig())
+                        onDismiss()
                     }
                 ) {
-                    Icon(Icons.Default.VerifiedUser, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.size(4.dp))
-                    Text(if (testing) "測試中..." else "測試並掛載")
+                    Text("掛載連線")
                 }
             }
         },
         dismissButton = {
             TextButton(onClick = {
-                if (selectedProtocol != null) {
-                    selectedProtocol = null
-                    testStatus = null
-                } else {
-                    onDismiss()
-                }
+                if (selectedProtocol != null) selectedProtocol = null else onDismiss()
             }) {
                 Text(if (selectedProtocol != null) "返回" else "取消")
             }
