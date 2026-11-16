@@ -436,6 +436,10 @@ fun FileExplorerPane(
                             findItemAtPosition = { localPos ->
                                 itemLocalBounds.entries.firstOrNull { (_, rect) -> rect.contains(localPos) }?.key
                             },
+                            onLongPressStationary = { filePath, _ ->
+                                onFocusPane()
+                                onShowContextMenu(filesByPath[filePath])
+                            },
                             onEmptySpaceLongPress = {
                                 if (state.mode == PaneMode.FILES) {
                                     onFocusPane()
@@ -475,7 +479,8 @@ fun FileExplorerPane(
                                     targetFolderPath = validFolder,
                                     didDrag = didDrag
                                 )
-                            }
+                            },
+                            onDragCancel = { dragController.resetDrag() }
                         )
                 ) {
                     when {
