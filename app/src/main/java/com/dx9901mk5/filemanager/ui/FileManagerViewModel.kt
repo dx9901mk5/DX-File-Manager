@@ -28,8 +28,10 @@ import com.dx9901mk5.filemanager.core.vfs.StorageSpaceInfo
 import com.dx9901mk5.filemanager.core.vfs.VfsFile
 import com.dx9901mk5.filemanager.core.vfs.VfsMountConfig
 import com.dx9901mk5.filemanager.core.vfs.VfsProtocol
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -603,7 +605,7 @@ class FileManagerViewModel(application: Application) : AndroidViewModel(applicat
     suspend fun organizeFilesWithPlan(paneIndex: Int, moves: List<AiMoveInstruction>): Result<Int> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val state = stateFlow(paneIndex).value
+                val state = if (paneIndex == 3) pane3State.value else pane2State.value
                 val provider = vfsRegistry.getProvider(state.mountId)
                 val byName = state.files.associateBy { it.name }
                 var movedCount = 0
