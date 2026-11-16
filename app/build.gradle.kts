@@ -20,8 +20,8 @@ android {
         applicationId = "com.dx9901mk5.filemanager"
         minSdk = 29
         targetSdk = 35
-        versionCode = 10
-        versionName = "1.0.9"
+        versionCode = 11
+        versionName = "1.0.10"
         base.archivesName.set("DX-File-Manager-v${versionName}")
 
         buildConfigField(
@@ -134,4 +134,5 @@ dependencies {
     implementation("commons-net:commons-net:3.11.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
 }

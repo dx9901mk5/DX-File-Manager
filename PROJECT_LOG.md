@@ -41,6 +41,9 @@
   - 第一區「圖片 / 影片 / 相片」整合為單一「相片與影片」入口，進入後上方提供「全部 / 照片 / 影片」子分類篩選。
 - **v1.0.5** (`versionCode = 6`)：
   - 完成雲端掛載修復、無邊界半圓展開鈕、手機直向第三分區、左上角反白工具列、根目錄固定比例、Shizuku 授權監聽與 2秒/3秒分段手勢。
+- **v1.0.10** (`versionCode = 11`)：
+  - 全面改版「新增雲端 / 網路掛載」精靈 (`CloudMountWizardSheet.kt`) 為 5 步驟網路連線指引（連線類型 → 顯示名稱 → 登入 → 總覽 → 連線），支援同平台掛載多重帳號。
+  - 整合 `play-services-auth` (`GoogleAuthUtil` + `AccountManager.newChooseAccountIntent`)，Google 雲端硬碟可直接呼叫系統 Google 帳戶選擇器登入授權，無需在主畫面手動輸入 Client ID；其餘雲端平台同步改為簡潔一鍵登入流程（進階 Token / Client ID 收納於折疊選單）。
 - **v1.0.9** (`versionCode = 10`)：
   - 修復 `TwoFingerStackGesture.kt` 因 `pointerInput(Unit)` 捕獲舊狀態閉包導致長壓 1.5 秒無法進入多選與拖曳狀態的問題，改用 `composed` + `rememberUpdatedState` 即時同步最新檔案列表與座標狀態。
 - **v1.0.8** (`versionCode = 9`)：

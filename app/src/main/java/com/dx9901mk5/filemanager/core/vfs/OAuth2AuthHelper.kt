@@ -1,17 +1,30 @@
 package com.dx9901mk5.filemanager.core.vfs
 
+import android.accounts.Account
+import android.accounts.AccountManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import com.google.android.gms.auth.GoogleAuthUtil
+import com.google.android.gms.auth.UserRecoverableAuthException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.withContext
 import java.net.URLEncoder
 
+sealed class GoogleTokenResult {
+    data class Success(val token: String, val accountName: String) : GoogleTokenResult()
+    data class Recoverable(val intent: Intent, val accountName: String) : GoogleTokenResult()
+    data class Error(val message: String) : GoogleTokenResult()
+}
+
 /**
- * 統一 OAuth2 瀏覽器登入授權輔助器 (Redirect URI: dxfilemanager://oauth2redirect)
+ * 統一 OAuth2 登入與系統 Google 帳戶授權輔助器 (Redirect URI: dxfilemanager://oauth2redirect)
  */
 object OAuth2AuthHelper {
     const val REDIRECT_URI = "dxfilemanager://oauth2redirect"
+    private const val GOOGLE_DRIVE_SCOPE = "oauth2:https://www.googleapis.com/auth/drive"
 
     private val _receivedToken = MutableStateFlow<String?>(null)
     val receivedToken = _receivedToken.asStateFlow()
@@ -20,10 +33,39 @@ object OAuth2AuthHelper {
         _receivedToken.value = null
     }
 
+    fun createGoogleAccountPickerIntent(): Intent {
+        return AccountManager.newChooseAccountIntent(
+            null,
+            null,
+            arrayOf("com.google"),
+            null,
+            null,
+            null,
+            null
+        )
+    }
+
+    suspend fun fetchGoogleDriveToken(context: Context, accountName: String): GoogleTokenResult =
+        withContext(Dispatchers.IO) {
+            try {
+                val account = Account(accountName, "com.google")
+                val token = GoogleAuthUtil.getToken(context, account, GOOGLE_DRIVE_SCOPE)
+                GoogleTokenResult.Success(token = token, accountName = accountName)
+            } catch (e: UserRecoverableAuthException) {
+                val intent = e.intent
+                if (intent != null) {
+                    GoogleTokenResult.Recoverable(intent = intent, accountName = accountName)
+                } else {
+                    GoogleTokenResult.Error(e.message ?: "需要使用者授權")
+                }
+            } catch (e: Exception) {
+                GoogleTokenResult.Error(e.message ?: "Google 帳戶授權失敗")
+            }
+        }
+
     fun handleRedirectIntent(intent: Intent?) {
         val data: Uri = intent?.data ?: return
         if (data.scheme == "dxfilemanager" && data.host == "oauth2redirect") {
-            // 支援 fragment (#access_token=...) 與 query (?access_token=... 或 ?code=...)
             val fragment = data.fragment.orEmpty()
             val fragmentToken = fragment.split("&")
                 .mapNotNull {
@@ -71,7 +113,7 @@ object OAuth2AuthHelper {
     }
 
     fun launchBrowserAuth(context: Context, protocol: VfsProtocol, clientId: String): Result<Unit> = runCatching {
-        require(clientId.isNotBlank()) { "請先填入該雲端平台的 OAuth Client ID（或直接貼上 Access Token）" }
+        require(clientId.isNotBlank()) { "請展開進階設定填入 OAuth Client ID，或直接貼上 Access Token" }
         val url = buildAuthorizeUrl(protocol, clientId)
             ?: throw UnsupportedOperationException("${protocol.displayName} 不使用 OAuth2 瀏覽器授權")
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
