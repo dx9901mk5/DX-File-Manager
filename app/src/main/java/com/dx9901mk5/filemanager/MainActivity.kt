@@ -1,6 +1,7 @@
 package com.dx9901mk5.filemanager
 
 import android.content.Intent
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -28,6 +29,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import com.dx9901mk5.filemanager.core.vfs.VfsFile
 import com.dx9901mk5.filemanager.ui.FileManagerViewModel
@@ -128,9 +130,14 @@ private fun DxFileManagerScreen(
     var passwordPrompt by remember { mutableStateOf<Triple<String, String, (String) -> Unit>?>(null) }
     var propertiesTarget by remember { mutableStateOf<VfsFile?>(null) }
 
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val showPane3 = isExpandedScreen || isLandscape
+    var isRatioEditMode by remember { mutableStateOf(false) }
+
     val pane1Expanded = if (isExpandedScreen) settings.pane1ExpandedTablet else settings.pane1ExpandedCompact
     val pane2Expanded = if (isExpandedScreen) settings.pane2ExpandedTablet else settings.pane2ExpandedCompact
-    val pane3Expanded = if (isExpandedScreen) settings.pane3ExpandedTablet else settings.pane3ExpandedCompact
+    val pane3Expanded = if (isExpandedScreen) settings.pane3ExpandedTablet else true
 
     fun activeFiles(paneIdx: Int): List<VfsFile> {
         val st = if (paneIdx == 2) pane2State else pane3State
@@ -220,6 +227,9 @@ private fun DxFileManagerScreen(
         ThreePaneScaffold(
             isExpandedScreen = isExpandedScreen,
             isLargeTablet = isLargeTablet,
+            showPane3 = showPane3,
+            isRatioEditMode = isRatioEditMode,
+            onToggleRatioEditMode = { isRatioEditMode = !isRatioEditMode },
             pane1Expanded = pane1Expanded,
             pane2Expanded = pane2Expanded,
             pane3Expanded = pane3Expanded,

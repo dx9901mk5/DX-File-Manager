@@ -27,8 +27,8 @@ data class DxSettingsState(
     val language: AppLanguage = AppLanguage.fromSystemOrCode(null),
     val bookmarks: List<String> = emptyList(),
     val cloudMounts: List<VfsMountConfig> = emptyList(),
-    // 記憶各分區上次展開或折疊狀態 (手機 Compact 與摺疊/平板 Expanded 分開記憶)
-    val pane1ExpandedCompact: Boolean = false,
+    // 記憶各分區上次展開或折疊狀態 (手機直向預設第1+2區、無第3區；平板/摺疊預設三區全開)
+    val pane1ExpandedCompact: Boolean = true,
     val pane2ExpandedCompact: Boolean = true,
     val pane3ExpandedCompact: Boolean = false,
     val pane1ExpandedTablet: Boolean = true,
@@ -67,7 +67,7 @@ class AppPreferences(private val context: Context) {
             language = AppLanguage.fromSystemOrCode(prefs[Keys.LANGUAGE]),
             bookmarks = (prefs[Keys.BOOKMARKS] ?: setOf(defaultDownloadPath)).toList().sorted(),
             cloudMounts = decodeMounts(prefs[Keys.CLOUD_MOUNTS_JSON]),
-            pane1ExpandedCompact = prefs[Keys.P1_COMPACT] ?: false,
+            pane1ExpandedCompact = prefs[Keys.P1_COMPACT] ?: true,
             pane2ExpandedCompact = prefs[Keys.P2_COMPACT] ?: true,
             pane3ExpandedCompact = prefs[Keys.P3_COMPACT] ?: false,
             pane1ExpandedTablet = prefs[Keys.P1_TABLET] ?: true,

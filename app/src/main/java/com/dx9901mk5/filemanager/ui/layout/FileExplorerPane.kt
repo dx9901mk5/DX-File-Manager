@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.BookmarkAdd
+import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteForever
@@ -71,6 +72,7 @@ import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -125,6 +127,7 @@ fun FileExplorerPane(
     var showSearchBar by remember { mutableStateOf(false) }
     var rubberBandRect by remember { mutableStateOf<Rect?>(null) }
     var listContainerRootOffset by remember { mutableStateOf(Offset.Zero) }
+    val haptic = LocalHapticFeedback.current
 
     val itemLocalBounds = remember { mutableStateMapOf<String, Rect>() }
     val filesByPath = remember(state.files) { state.files.associateBy { it.path } }
@@ -172,18 +175,10 @@ fun FileExplorerPane(
                             .padding(horizontal = 6.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(onClick = onCollapsePane, modifier = Modifier.size(34.dp)) {
-                            Icon(
-                                Icons.Default.Menu,
-                                contentDescription = "摺疊/收合面板",
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
                         Column(
                             modifier = Modifier
                                 .weight(1f)
-                                .padding(horizontal = 4.dp)
+                                .padding(horizontal = 8.dp)
                         ) {
                             Text(
                                 text = currentTitle,
@@ -200,12 +195,12 @@ fun FileExplorerPane(
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
-                        IconButton(onClick = { showSearchBar = !showSearchBar }, modifier = Modifier.size(32.dp)) {
+                        IconButton(onClick = { showSearchBar = !showSearchBar }, modifier = Modifier.size(30.dp)) {
                             Icon(
                                 Icons.Default.Search,
                                 contentDescription = "搜尋",
                                 tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(19.dp)
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                         // 清單列表 / 小圖示 / 大圖示 檢視切換按鈕
@@ -251,6 +246,15 @@ fun FileExplorerPane(
                                     modifier = Modifier.size(17.dp)
                                 )
                             }
+                        }
+                        // 右上角折疊按鈕
+                        IconButton(onClick = onCollapsePane, modifier = Modifier.size(32.dp)) {
+                            Icon(
+                                Icons.Default.ChevronLeft,
+                                contentDescription = "摺疊此面板",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
                     }
                 }
@@ -397,6 +401,7 @@ fun FileExplorerPane(
                             onMouseForward = onNavigateForward
                         )
                         .dxFileTouchGesture(
+                            hapticFeedback = haptic,
                             findItemAtPosition = { localPos ->
                                 itemLocalBounds.entries.firstOrNull { (_, rect) -> rect.contains(localPos) }?.key
                             },

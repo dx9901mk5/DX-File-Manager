@@ -4,6 +4,8 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.hapticfeedback.HapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerId
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
@@ -11,12 +13,13 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * 雙指堆疊觸控手勢：
- * 1. 第一指長壓不動滿 1000ms -> 彈出 11 項功能列表 (onLongPressStationary)
- * 2. 長壓期間微幅移動 (< 1000ms 內超過 touchSlop) -> 進入多選拖曳狀態 (onStartDragSelection)
+ * 1. 第一指長壓不動滿 2000ms (2秒) -> 震動提示並彈出功能/選擇選單 (onLongPressStationary)
+ * 2. 長壓期間微幅移動 (< 2000ms 內超過 touchSlop) -> 進入多選拖曳狀態 (onStartDragSelection)
  * 3. 第一指按住不放時，第二指點擊其他檔案 -> 觸發加入選取與卡片疊合動畫 (onSecondFingerTapItem)
  * 4. 跨區移動與空白處/目標資料夾放開 -> 彈出「複製或移動」詢問視窗 (onDropComplete)
  */
 fun Modifier.dxFileTouchGesture(
+    hapticFeedback: HapticFeedback? = null,
     findItemAtPosition: (Offset) -> String?,
     onLongPressStationary: (filePath: String, pressOffset: Offset) -> Unit,
     onEmptySpaceLongPress: (pressOffset: Offset) -> Unit = {},
@@ -34,8 +37,8 @@ fun Modifier.dxFileTouchGesture(
         val touchSlop = viewConfiguration.touchSlop
 
         if (touchedFile == null) {
-            // 空白處長壓：原地不動滿 650ms 跳出新增資料夾功能
-            val movedOrReleased = withTimeoutOrNull(650L) {
+            // 空白處長壓：原地不動滿 2000ms 震動提示並跳出新增資料夾功能
+            val movedOrReleased = withTimeoutOrNull(2000L) {
                 while (true) {
                     val event = awaitPointerEvent()
                     val primaryChange = event.changes.firstOrNull { it.id == primaryPointerId }
@@ -48,6 +51,7 @@ fun Modifier.dxFileTouchGesture(
                 true
             }
             if (movedOrReleased == null) {
+                hapticFeedback?.performHapticFeedback(HapticFeedbackType.LongPress)
                 onEmptySpaceLongPress(startPosition)
             }
             return@awaitEachGesture
@@ -55,7 +59,7 @@ fun Modifier.dxFileTouchGesture(
 
         var isDraggingMode = false
 
-        val movedSlightlyBeforeTimeout = withTimeoutOrNull(1000L) {
+        val movedSlightlyBeforeTimeout = withTimeoutOrNull(2000L) {
             while (true) {
                 val event = awaitPointerEvent()
                 val primaryChange = event.changes.firstOrNull { it.id == primaryPointerId }
@@ -72,7 +76,8 @@ fun Modifier.dxFileTouchGesture(
 
         when (movedSlightlyBeforeTimeout) {
             null -> {
-                // 滿 1000ms 且原地不動 -> 觸發功能選單
+                // 滿 2000ms (2秒) 且原地不動 -> 震動提示並進入選擇/功能選單
+                hapticFeedback?.performHapticFeedback(HapticFeedbackType.LongPress)
                 onLongPressStationary(touchedFile, startPosition)
                 return@awaitEachGesture
             }
