@@ -1,0 +1,3 @@
+-keep class com.dx9901mk5.filemanager.** { *; }
+-dontwarn org.bouncycastle.**
+-dontwarn com.hierynomus.**

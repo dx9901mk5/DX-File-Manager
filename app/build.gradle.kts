@@ -1,0 +1,142 @@
+import java.util.Properties
+
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.kapt")
+}
+
+val keystoreProperties = Properties().apply {
+    val propFile = rootProject.file("keystore.properties")
+    if (propFile.exists()) {
+        propFile.inputStream().use { load(it) }
+    }
+}
+
+android {
+    namespace = "com.dx9901mk5.filemanager"
+    compileSdk = 35
+
+    defaultConfig {
+        applicationId = "com.dx9901mk5.filemanager"
+        minSdk = 29
+        targetSdk = 35
+        versionCode = 1
+        versionName = "1.0.0"
+
+        buildConfigField(
+            "String",
+            "GITHUB_REPO_URL",
+            "\"https://github.com/dx9901mk5/DX-File-Manager\""
+        )
+        buildConfigField(
+            "String",
+            "GITHUB_API_LATEST",
+            "\"https://api.github.com/repos/dx9901mk5/DX-File-Manager/releases/latest\""
+        )
+    }
+
+    signingConfigs {
+        create("fixedRelease") {
+            val keystoreFile = file("release.keystore")
+            storeFile = keystoreFile
+            storePassword = keystoreProperties.getProperty("storePassword")
+                ?: System.getenv("KEY_STORE_PASSWORD")
+                ?: "dx9901mk5"
+            keyAlias = keystoreProperties.getProperty("keyAlias")
+                ?: System.getenv("KEY_ALIAS")
+                ?: "dx_key"
+            keyPassword = keystoreProperties.getProperty("keyPassword")
+                ?: System.getenv("KEY_PASSWORD")
+                ?: "dx9901mk5"
+        }
+    }
+
+    buildTypes {
+        debug {
+            if (file("release.keystore").exists()) {
+                signingConfig = signingConfigs.getByName("fixedRelease")
+            }
+        }
+        release {
+            isMinifyEnabled = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            if (file("release.keystore").exists()) {
+                signingConfig = signingConfigs.getByName("fixedRelease")
+            }
+        }
+    }
+
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
+
+    composeOptions {
+        kotlinCompilerExtensionVersion = "1.5.14"
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
+    packaging {
+        resources {
+            excludes += setOf(
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt",
+                "META-INF/INDEX.LIST"
+            )
+        }
+    }
+}
+
+dependencies {
+    val composeBom = platform("androidx.compose:compose-bom:2024.09.00")
+    implementation(composeBom)
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material3:material3-window-size-class")
+    implementation("androidx.compose.material:material-icons-extended")
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    debugImplementation("androidx.compose.ui:ui-tooling")
+
+    implementation("androidx.core:core-ktx:1.13.1")
+    implementation("androidx.activity:activity-compose:1.9.2")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
+
+    // Room (垃圾桶紀錄與書籤)
+    val roomVersion = "2.6.1"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    kapt("androidx.room:room-compiler:$roomVersion")
+
+    // Shizuku API (靜默安裝 APK)
+    val shizukuVersion = "13.1.5"
+    implementation("dev.rikka.shizuku:api:$shizukuVersion")
+    implementation("dev.rikka.shizuku:provider:$shizukuVersion")
+
+    // 壓縮與 AES 加密
+    implementation("net.lingala.zip4j:zip4j:2.11.5")
+    implementation("org.apache.commons:commons-compress:1.26.2")
+
+    // 網路與雲端協定 (SMB / SFTP / WebDAV / HTTP)
+    implementation("com.hierynomus:smbj:0.13.0")
+    implementation("com.github.mwiede:jsch:0.2.18")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+}
