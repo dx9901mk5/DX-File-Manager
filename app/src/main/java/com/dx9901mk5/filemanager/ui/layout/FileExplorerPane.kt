@@ -79,6 +79,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.dx9901mk5.filemanager.core.shizuku.InstalledAppInfo
 import com.dx9901mk5.filemanager.core.trash.TrashItemEntity
+import com.dx9901mk5.filemanager.core.vfs.FileCategory
 import com.dx9901mk5.filemanager.core.vfs.VfsFile
 import com.dx9901mk5.filemanager.ui.ExplorerPaneState
 import com.dx9901mk5.filemanager.ui.FileViewMode
@@ -118,6 +119,7 @@ fun FileExplorerPane(
     onCtrlWheelZoom: (Float) -> Unit,
     onAddBookmark: (String) -> Unit,
     onCreateNewFolderClick: () -> Unit,
+    onSwitchCategory: (FileCategory) -> Unit = {},
     onToggleAppSelection: (String) -> Unit,
     onToggleSystemApps: () -> Unit,
     onExportSelectedApps: () -> Unit,
@@ -321,6 +323,34 @@ fun FileExplorerPane(
                             .fillMaxWidth()
                             .padding(horizontal = 8.dp, vertical = 4.dp)
                     )
+                }
+
+                // 媒體專區（「相片與影片」）子分類切換列：全部 / 照片 / 影片
+                if (state.mode == PaneMode.CATEGORY &&
+                    state.activeCategory in setOf(FileCategory.MEDIA, FileCategory.IMAGES, FileCategory.VIDEOS)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterChip(
+                            selected = state.activeCategory == FileCategory.MEDIA,
+                            onClick = { onSwitchCategory(FileCategory.MEDIA) },
+                            label = { Text("全部") }
+                        )
+                        FilterChip(
+                            selected = state.activeCategory == FileCategory.IMAGES,
+                            onClick = { onSwitchCategory(FileCategory.IMAGES) },
+                            label = { Text("照片") }
+                        )
+                        FilterChip(
+                            selected = state.activeCategory == FileCategory.VIDEOS,
+                            onClick = { onSwitchCategory(FileCategory.VIDEOS) },
+                            label = { Text("影片") }
+                        )
+                    }
                 }
 
                 // 進入選擇狀態時，於上方區域顯示「全選」勾選選項與取消鈕

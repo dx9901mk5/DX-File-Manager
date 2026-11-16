@@ -165,14 +165,12 @@ fun NavigationPane(
             }
 
             val categories = listOf(
-                FileCategory.IMAGES to Icons.Default.Image,
-                FileCategory.VIDEOS to Icons.Default.VideoFile,
+                FileCategory.MEDIA to Icons.Default.PhotoLibrary,
                 FileCategory.AUDIO to Icons.Default.AudioFile,
                 FileCategory.DOCUMENTS to Icons.Default.Description,
                 FileCategory.APKS to Icons.Default.Android,
                 FileCategory.ARCHIVES to Icons.Default.Archive,
                 FileCategory.RECENT to Icons.Default.History,
-                FileCategory.PHOTOS to Icons.Default.PhotoLibrary,
                 FileCategory.APPS to Icons.Default.Android,
                 FileCategory.TRASH to Icons.Default.Delete
             )

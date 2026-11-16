@@ -135,7 +135,8 @@ class LocalVfsProvider : VfsProvider {
                     } else {
                         val ext = f.extension.lowercase()
                         val matches = when (category) {
-                            FileCategory.IMAGES, FileCategory.PHOTOS -> ext in imageExt
+                            FileCategory.MEDIA -> ext in imageExt || ext in videoExt
+                            FileCategory.IMAGES -> ext in imageExt
                             FileCategory.VIDEOS -> ext in videoExt
                             FileCategory.AUDIO -> ext in audioExt
                             FileCategory.DOCUMENTS -> ext in docExt

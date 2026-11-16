@@ -26,14 +26,14 @@ enum class VfsProtocol(
 }
 
 enum class FileCategory(val title: String) {
-    IMAGES("圖片"),
+    MEDIA("相片與影片"),
+    IMAGES("照片"),
     VIDEOS("影片"),
     AUDIO("音訊 / 音樂"),
     DOCUMENTS("文件"),
     APKS("安裝套件 (APK)"),
     ARCHIVES("壓縮檔"),
     RECENT("最近的檔案"),
-    PHOTOS("相片"),
     APPS("應用程式"),
     TRASH("垃圾桶")
 }

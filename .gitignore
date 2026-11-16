@@ -18,5 +18,6 @@ captures/
 *.keystore
 keystore.properties
 
-# Google Drive shortcut
+# Google Drive shortcut & temp screenshots
 *.gdoc
+臨時照片/
