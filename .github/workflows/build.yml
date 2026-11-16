@@ -27,7 +27,7 @@ jobs:
           SIGNING_KEY_BASE64: ${{ secrets.SIGNING_KEY_BASE64 }}
         run: |
           if [ -n "$SIGNING_KEY_BASE64" ]; then
-            echo "$SIGNING_KEY_BASE64" | base64 --decode > app/release.keystore
+            printf '%s' "$SIGNING_KEY_BASE64" | tr -d '[:space:]' | base64 -d > app/release.keystore
           else
             keytool -genkey -v -keystore app/release.keystore -alias dx_key -keyalg RSA -keysize 2048 -validity 10000 -storepass dx9901mk5 -keypass dx9901mk5 -dname "CN=dx9901mk5, OU=Dev, O=DX, L=Kaohsiung, S=TW, C=TW"
           fi
