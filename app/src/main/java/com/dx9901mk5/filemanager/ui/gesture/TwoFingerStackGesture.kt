@@ -4,7 +4,10 @@ import android.content.Context
 import android.view.View
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerId
@@ -29,12 +32,21 @@ fun Modifier.dxFileTouchGesture(
     onPrimaryFingerDrag: (currentOffset: Offset, hoveredFolderPath: String?) -> Unit,
     onDropComplete: (dropOffset: Offset, targetFolderPath: String?, didDrag: Boolean) -> Unit,
     onStationaryRelease: (initialFilePath: String, usedSecondFinger: Boolean) -> Unit
-): Modifier = this.pointerInput(Unit) {
+): Modifier = composed {
+    val currentFindItem by rememberUpdatedState(findItemAtPosition)
+    val currentOnEmptySpaceLongPress by rememberUpdatedState(onEmptySpaceLongPress)
+    val currentOnLongPressEnterMultiSelect by rememberUpdatedState(onLongPressEnterMultiSelect)
+    val currentOnSecondFingerTapItem by rememberUpdatedState(onSecondFingerTapItem)
+    val currentOnPrimaryFingerDrag by rememberUpdatedState(onPrimaryFingerDrag)
+    val currentOnDropComplete by rememberUpdatedState(onDropComplete)
+    val currentOnStationaryRelease by rememberUpdatedState(onStationaryRelease)
+
+    this.pointerInput(Unit) {
     awaitEachGesture {
         val firstDown = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
         val primaryPointerId: PointerId = firstDown.id
         val startPosition = firstDown.position
-        val touchedFile = findItemAtPosition(startPosition)
+        val touchedFile = currentFindItem(startPosition)
         val touchSlop = viewConfiguration.touchSlop
 
         // 第 1 階段：原地停住滿 1500ms (1.5 秒)
@@ -61,11 +73,11 @@ fun Modifier.dxFileTouchGesture(
         DxHaptics.strongVibrate(context, hapticView)
 
         if (touchedFile == null) {
-            onEmptySpaceLongPress(startPosition)
+            currentOnEmptySpaceLongPress(startPosition)
             return@awaitEachGesture
         }
 
-        onLongPressEnterMultiSelect(touchedFile, startPosition)
+        currentOnLongPressEnterMultiSelect(touchedFile, startPosition)
         var isHolding = true
         var didDragBeyondSlop = false
         var usedSecondFinger = false
@@ -79,11 +91,11 @@ fun Modifier.dxFileTouchGesture(
                 .filter { it.id != primaryPointerId && it.pressed && !it.previousPressed }
                 .forEach { secondFinger ->
                     secondFinger.consume()
-                    val secondTappedFile = findItemAtPosition(secondFinger.position)
+                    val secondTappedFile = currentFindItem(secondFinger.position)
                     if (secondTappedFile != null) {
                         usedSecondFinger = true
                         DxHaptics.lightVibrate(context, hapticView)
-                        onSecondFingerTapItem(secondTappedFile, secondFinger.position)
+                        currentOnSecondFingerTapItem(secondTappedFile, secondFinger.position)
                     }
                 }
 
@@ -91,10 +103,10 @@ fun Modifier.dxFileTouchGesture(
                 primaryChange?.consume()
                 val finalPos = primaryChange?.position ?: startPosition
                 if (didDragBeyondSlop) {
-                    val targetFolder = findItemAtPosition(finalPos)
-                    onDropComplete(finalPos, targetFolder, true)
+                    val targetFolder = currentFindItem(finalPos)
+                    currentOnDropComplete(finalPos, targetFolder, true)
                 } else {
-                    onStationaryRelease(touchedFile, usedSecondFinger)
+                    currentOnStationaryRelease(touchedFile, usedSecondFinger)
                 }
                 isHolding = false
             } else if (primaryChange.positionChange() != Offset.Zero) {
@@ -103,10 +115,11 @@ fun Modifier.dxFileTouchGesture(
                 }
                 if (didDragBeyondSlop) {
                     primaryChange.consume()
-                    val hoveredItem = findItemAtPosition(primaryChange.position)
-                    onPrimaryFingerDrag(primaryChange.position, hoveredItem)
+                    val hoveredItem = currentFindItem(primaryChange.position)
+                    currentOnPrimaryFingerDrag(primaryChange.position, hoveredItem)
                 }
             }
         }
     }
+}
 }
