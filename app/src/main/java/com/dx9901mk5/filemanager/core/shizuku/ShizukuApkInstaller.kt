@@ -60,8 +60,18 @@ object ShizukuApkInstaller {
         }
         try {
             val escapedPath = apkFile.absolutePath.replace("\"", "\\\"")
-            @Suppress("DEPRECATION")
-            val process = Shizuku.newProcess(arrayOf("sh", "-c", "pm install -r -d \"$escapedPath\""), null, null)
+            val newProcessMethod = Shizuku::class.java.getDeclaredMethod(
+                "newProcess",
+                Array<String>::class.java,
+                Array<String>::class.java,
+                String::class.java
+            ).apply { isAccessible = true }
+            val process = newProcessMethod.invoke(
+                null,
+                arrayOf("sh", "-c", "pm install -r -d \"$escapedPath\""),
+                null,
+                null
+            ) as Process
             val output = process.inputStream.bufferedReader().readText()
             val err = process.errorStream.bufferedReader().readText()
             val exitCode = process.waitFor()
