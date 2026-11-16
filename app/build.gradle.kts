@@ -22,7 +22,7 @@ android {
         targetSdk = 35
         versionCode = 6
         versionName = "1.0.5"
-        base.archivesName.set("DX-File-Manager")
+        base.archivesName.set("DX-File-Manager-v${versionName}")
 
         buildConfigField(
             "String",

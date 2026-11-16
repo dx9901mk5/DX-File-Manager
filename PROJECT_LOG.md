@@ -4,7 +4,7 @@
 - **本機專案路徑**：`D:\Google雲端硬碟\Antigravity\DX檔案管理器`
 - **GitHub 儲存庫**：https://github.com/dx9901mk5/DX-File-Manager
 - **Application ID**：`com.dx9901mk5.filemanager`
-- **APK 產出名稱**：`DX-File-Manager-release.apk`
+- **APK 產出名稱**：`DX-File-Manager-v<versionName>-release.apk`（自下一版起自動帶入版本號）
 
 ---
 
