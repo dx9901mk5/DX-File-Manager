@@ -16,6 +16,7 @@ class VfsRegistry {
         mountedProviders[config.id] = when (config.protocol) {
             VfsProtocol.LOCAL -> localProvider
             VfsProtocol.LAN_SMB -> SmbVfsProvider(config)
+            VfsProtocol.FTP -> FtpVfsProvider(config)
             VfsProtocol.SFTP -> SftpVfsProvider(config)
             else -> CloudAndWebDavVfsProvider(config)
         }

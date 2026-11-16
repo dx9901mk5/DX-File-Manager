@@ -128,9 +128,10 @@ dependencies {
     implementation("net.lingala.zip4j:zip4j:2.11.5")
     implementation("org.apache.commons:commons-compress:1.26.2")
 
-    // 網路與雲端協定 (SMB / SFTP / WebDAV / HTTP)
+    // 網路與雲端協定 (SMB / SFTP / FTP / WebDAV / HTTP)
     implementation("com.hierynomus:smbj:0.13.0")
     implementation("com.github.mwiede:jsch:0.2.18")
+    implementation("commons-net:commons-net:3.11.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }

@@ -57,12 +57,14 @@ import java.io.File
 
 class MainActivity : ComponentActivity() {
     private val viewModel: FileManagerViewModel by viewModels()
+    private val pendingOAuthToken = mutableStateOf<String?>(null)
 
     @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         ensureStoragePermission()
+        handleOAuthIntent(intent)
 
         intent.getStringExtra("shortcut_path")?.let { path ->
             val target = File(path)
@@ -81,8 +83,30 @@ class MainActivity : ComponentActivity() {
                 DxFileManagerScreen(
                     viewModel = viewModel,
                     isExpandedScreen = isExpandedScreen,
-                    isLargeTablet = isLargeTablet
+                    isLargeTablet = isLargeTablet,
+                    receivedOAuthToken = pendingOAuthToken.value,
+                    onConsumeOAuthToken = { pendingOAuthToken.value = null }
                 )
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleOAuthIntent(intent)
+    }
+
+    private fun handleOAuthIntent(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme == "com.dx9901mk5.filemanager" && data.host == "oauth2redirect") {
+            val fragment = data.fragment.orEmpty()
+            val tokenFromFragment = fragment.split("&")
+                .firstOrNull { it.startsWith("access_token=") }
+                ?.substringAfter("access_token=")
+            val tokenFromQuery = data.getQueryParameter("access_token") ?: data.getQueryParameter("code")
+            val token = tokenFromFragment ?: tokenFromQuery
+            if (!token.isNullOrBlank()) {
+                pendingOAuthToken.value = Uri.decode(token)
             }
         }
     }
@@ -103,7 +127,9 @@ class MainActivity : ComponentActivity() {
 private fun DxFileManagerScreen(
     viewModel: FileManagerViewModel,
     isExpandedScreen: Boolean,
-    isLargeTablet: Boolean
+    isLargeTablet: Boolean,
+    receivedOAuthToken: String?,
+    onConsumeOAuthToken: () -> Unit
 ) {
     val settings by viewModel.settings.collectAsState()
     val pane2State by viewModel.pane2State.collectAsState()
@@ -409,6 +435,8 @@ private fun DxFileManagerScreen(
 
         if (showCloudWizard) {
             CloudMountWizardDialog(
+                receivedOAuthToken = receivedOAuthToken,
+                onConsumeOAuthToken = onConsumeOAuthToken,
                 onMountCreated = { viewModel.saveCloudMount(it) },
                 onDismiss = { showCloudWizard = false }
             )
