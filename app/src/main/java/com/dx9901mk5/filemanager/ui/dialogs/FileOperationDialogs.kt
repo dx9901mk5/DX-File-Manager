@@ -133,16 +133,24 @@ fun FileContextMenuDialog(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            opt.icon,
-                            contentDescription = null,
+                            imageVector = opt.icon,
+                            contentDescription = opt.label,
                             tint = if (opt.action == ContextMenuAction.DELETE) {
                                 MaterialTheme.colorScheme.error
                             } else {
                                 MaterialTheme.colorScheme.primary
                             }
                         )
-                        Spacer(Modifier.width(12.dp))
-                        Text(opt.label, style = MaterialTheme.typography.bodyMedium)
+                        Spacer(Modifier.width(14.dp))
+                        Text(
+                            text = opt.label,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = if (opt.action == ContextMenuAction.DELETE) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            }
+                        )
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
                 }

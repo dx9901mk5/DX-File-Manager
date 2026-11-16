@@ -230,6 +230,7 @@ private fun DxFileManagerScreen(
             showPane3 = showPane3,
             isRatioEditMode = isRatioEditMode,
             onToggleRatioEditMode = { isRatioEditMode = !isRatioEditMode },
+            onOpenSettings = { showSettingsDialog = true },
             pane1Expanded = pane1Expanded,
             pane2Expanded = pane2Expanded,
             pane3Expanded = pane3Expanded,

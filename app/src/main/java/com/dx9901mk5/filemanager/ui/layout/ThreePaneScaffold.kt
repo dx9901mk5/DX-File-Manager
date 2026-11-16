@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -60,6 +61,7 @@ fun ThreePaneScaffold(
     showPane3: Boolean,
     isRatioEditMode: Boolean,
     onToggleRatioEditMode: () -> Unit,
+    onOpenSettings: () -> Unit,
     pane1Expanded: Boolean,
     pane2Expanded: Boolean,
     pane3Expanded: Boolean,
@@ -115,16 +117,27 @@ fun ThreePaneScaffold(
                                 .padding(horizontal = 4.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // 左上角：拖曳比例鎖定/編輯按鈕
+                            // 左上角：設定按鈕（含關於我與檢測更新）＋ 拖曳比例鎖定按鈕
+                            IconButton(
+                                onClick = onOpenSettings,
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = "設定與關於我",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                             IconButton(
                                 onClick = onToggleRatioEditMode,
-                                modifier = Modifier.size(32.dp)
+                                modifier = Modifier.size(30.dp)
                             ) {
                                 Icon(
                                     imageVector = if (isRatioEditMode) Icons.Default.LockOpen else Icons.Default.Lock,
                                     contentDescription = if (isRatioEditMode) "鎖定分區比例" else "編輯分區拖曳比例",
                                     tint = if (isRatioEditMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(17.dp)
                                 )
                             }
                             Text(
@@ -156,6 +169,7 @@ fun ThreePaneScaffold(
                         title = "根目錄",
                         isRatioEditMode = isRatioEditMode,
                         onToggleRatioEditMode = onToggleRatioEditMode,
+                        onOpenSettings = onOpenSettings,
                         onExpand = { onPaneExpandedChange(1, true) }
                     )
                 }
@@ -246,6 +260,7 @@ private fun CollapsedPaneBar(
     title: String,
     isRatioEditMode: Boolean? = null,
     onToggleRatioEditMode: (() -> Unit)? = null,
+    onOpenSettings: (() -> Unit)? = null,
     onExpand: () -> Unit
 ) {
     Column(
@@ -257,6 +272,20 @@ private fun CollapsedPaneBar(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top
     ) {
+        if (onOpenSettings != null) {
+            IconButton(
+                onClick = onOpenSettings,
+                modifier = Modifier.size(34.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "設定與關於我",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+        }
         if (isRatioEditMode != null && onToggleRatioEditMode != null) {
             IconButton(
                 onClick = onToggleRatioEditMode,
