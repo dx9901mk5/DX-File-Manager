@@ -29,11 +29,13 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Splitscreen
 import androidx.compose.material.icons.filled.VideoFile
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.WifiTethering
 import androidx.compose.material3.Badge
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -70,7 +72,9 @@ fun NavigationPane(
     onOpenCategory: (FileCategory) -> Unit,
     onOpenBookmark: (String) -> Unit,
     onToggleHidden: () -> Unit,
-    onOpenShortcuts: () -> Unit
+    onOpenShortcuts: () -> Unit,
+    onOpenStorageAnalyzer: () -> Unit,
+    onOpenWebShare: () -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         // 頂部工具列：首頁、主題切換、設定、分割畫面切換、快捷鍵
@@ -195,6 +199,16 @@ fun NavigationPane(
             item {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
                 SectionHeader("工具箱")
+                NavRowItem(
+                    icon = Icons.Default.PieChart,
+                    label = "DX 儲存空間分析器",
+                    onClick = onOpenStorageAnalyzer
+                )
+                NavRowItem(
+                    icon = Icons.Default.WifiTethering,
+                    label = "DX 區域網路網頁分享",
+                    onClick = onOpenWebShare
+                )
                 NavRowItem(
                     icon = Icons.Default.VisibilityOff,
                     label = "切換顯示隱藏資料夾",

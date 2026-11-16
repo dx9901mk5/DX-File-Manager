@@ -25,6 +25,8 @@ import com.dx9901mk5.filemanager.core.vfs.VfsFile
 import com.dx9901mk5.filemanager.ui.FileManagerViewModel
 import com.dx9901mk5.filemanager.ui.dialogs.CloudMountWizardDialog
 import com.dx9901mk5.filemanager.ui.dialogs.ContextMenuAction
+import com.dx9901mk5.filemanager.ui.dialogs.DxStorageAnalyzerDialog
+import com.dx9901mk5.filemanager.ui.dialogs.DxWebShareDialog
 import com.dx9901mk5.filemanager.ui.dialogs.FileContextMenuDialog
 import com.dx9901mk5.filemanager.ui.dialogs.FilePropertiesDialog
 import com.dx9901mk5.filemanager.ui.dialogs.NewFolderDialog
@@ -105,6 +107,8 @@ private fun DxFileManagerScreen(
     var showShortcutsDialog by remember { mutableStateOf(false) }
     var showCloudWizard by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
+    var showStorageAnalyzer by remember { mutableStateOf(false) }
+    var showWebShare by remember { mutableStateOf(false) }
     var showNewFolderForPane by remember { mutableStateOf<Int?>(null) }
 
     var contextMenuTarget by remember { mutableStateOf<Pair<Int, VfsFile?>?>(null) }
@@ -233,7 +237,9 @@ private fun DxFileManagerScreen(
                     onOpenCategory = { cat -> viewModel.openCategory(focusedPane, cat) },
                     onOpenBookmark = { path -> viewModel.navigateToPath(focusedPane, path, "local", "內部儲存空間") },
                     onToggleHidden = { viewModel.setShowHiddenFiles(!settings.showHiddenFiles) },
-                    onOpenShortcuts = { showShortcutsDialog = true }
+                    onOpenShortcuts = { showShortcutsDialog = true },
+                    onOpenStorageAnalyzer = { showStorageAnalyzer = true },
+                    onOpenWebShare = { showWebShare = true }
                 )
             },
             pane2Content = { onCollapse ->
@@ -383,6 +389,27 @@ private fun DxFileManagerScreen(
                 onToggleDarkTheme = { viewModel.setDarkTheme(it) },
                 onInstallUpdateApk = { apk -> viewModel.installApkWithShizukuOrFallback(apk) },
                 onDismiss = { showSettingsDialog = false }
+            )
+        }
+
+        if (showStorageAnalyzer) {
+            val activeState = if (focusedPane == 2) pane2State else pane3State
+            val dir = File(activeState.currentPath).takeIf { it.exists() && it.isDirectory }
+                ?: Environment.getExternalStorageDirectory()
+            DxStorageAnalyzerDialog(
+                targetDir = dir,
+                onNavigateToFolder = { path -> viewModel.navigateToPath(focusedPane, path) },
+                onDismiss = { showStorageAnalyzer = false }
+            )
+        }
+
+        if (showWebShare) {
+            val activeState = if (focusedPane == 2) pane2State else pane3State
+            val dir = File(activeState.currentPath).takeIf { it.exists() && it.isDirectory }
+                ?: Environment.getExternalStorageDirectory()
+            DxWebShareDialog(
+                shareRoot = dir,
+                onDismiss = { showWebShare = false }
             )
         }
     }
