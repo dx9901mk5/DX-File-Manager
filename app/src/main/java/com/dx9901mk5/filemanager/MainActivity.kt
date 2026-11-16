@@ -78,6 +78,7 @@ import androidx.compose.ui.unit.dp
 import com.dx9901mk5.filemanager.core.vfs.OAuth2AuthHelper
 import com.dx9901mk5.filemanager.core.vfs.VfsFile
 import com.dx9901mk5.filemanager.ui.FileManagerViewModel
+import com.dx9901mk5.filemanager.ui.dialogs.AiFileAssistantDialog
 import com.dx9901mk5.filemanager.ui.dialogs.CloudMountWizardDialog
 import com.dx9901mk5.filemanager.ui.dialogs.ContextMenuAction
 import com.dx9901mk5.filemanager.ui.dialogs.DxStorageAnalyzerDialog
@@ -197,6 +198,7 @@ private fun DxFileManagerScreen(
     var showShortcutsDialog by remember { mutableStateOf(false) }
     var showCloudWizard by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
+    var showAiAssistantDialog by remember { mutableStateOf(false) }
     var showStorageAnalyzer by remember { mutableStateOf(false) }
     var showWebShare by remember { mutableStateOf(false) }
     var showNewFolderForPane by remember { mutableStateOf<Int?>(null) }
@@ -225,7 +227,7 @@ private fun DxFileManagerScreen(
     LaunchedEffect(dragController.isDragging, dragController.hoveredFolderPaneIndex, dragController.hoveredFolderPath) {
         val paneIdx = dragController.hoveredFolderPaneIndex
         val folderPath = dragController.hoveredFolderPath
-        if (dragController.isDragging && paneIdx != null && folderPath != null) {
+        if (dragController.isDragging && (paneIdx == 2 || paneIdx == 3) && folderPath != null) {
             if (dragController.draggedFiles.none { it.path == folderPath }) {
                 delay(2000L)
                 if (dragController.isDragging &&
@@ -352,6 +354,7 @@ private fun DxFileManagerScreen(
             showPane3 = showPane3,
             isRatioEditMode = isRatioEditMode,
             onToggleRatioEditMode = { isRatioEditMode = !isRatioEditMode },
+            onOpenAiAssistant = { showAiAssistantDialog = true },
             onOpenSettings = { showSettingsDialog = true },
             pane1Expanded = pane1Expanded,
             pane2Expanded = pane2Expanded,
@@ -368,6 +371,8 @@ private fun DxFileManagerScreen(
                     cloudMounts = settings.cloudMounts,
                     bookmarks = settings.bookmarks,
                     trashCount = trashItems.size,
+                    showHiddenFiles = settings.showHiddenFiles,
+                    dragController = dragController,
                     onGoHome = {
                         viewModel.navigateToPath(
                             focusedPane,
@@ -390,7 +395,8 @@ private fun DxFileManagerScreen(
                     onRemoveCloudMount = { mountId -> viewModel.removeCloudMount(mountId) },
                     onOpenCloudWizard = { showCloudWizard = true },
                     onOpenCategory = { cat -> viewModel.openCategory(focusedPane, cat) },
-                    onOpenBookmark = { path -> viewModel.navigateToPath(focusedPane, path, "local", "內部儲存空間") }
+                    onOpenBookmark = { path -> viewModel.navigateToPath(focusedPane, path, "local", "內部儲存空間") },
+                    onRemoveBookmark = { path -> viewModel.removeBookmark(path) }
                 )
             },
             pane2Content = { onCollapse ->
@@ -414,8 +420,11 @@ private fun DxFileManagerScreen(
                     onClearSelection = { viewModel.clearSelection(2) },
                     onRubberBandSelect = { viewModel.setSelection(2, it) },
                     resolvePaneTarget = { idx ->
-                        val st = if (idx == 3) pane3State else pane2State
-                        st.mountId to st.currentPath
+                        when (idx) {
+                            1 -> "local" to Environment.getExternalStorageDirectory().absolutePath
+                            3 -> pane3State.mountId to pane3State.currentPath
+                            else -> pane2State.mountId to pane2State.currentPath
+                        }
                     },
                     onShowContextMenu = { file -> contextMenuTarget = 2 to file },
                     onSearchChange = { viewModel.updateSearchQuery(2, it) },
@@ -457,8 +466,11 @@ private fun DxFileManagerScreen(
                     onClearSelection = { viewModel.clearSelection(3) },
                     onRubberBandSelect = { viewModel.setSelection(3, it) },
                     resolvePaneTarget = { idx ->
-                        val st = if (idx == 2) pane2State else pane3State
-                        st.mountId to st.currentPath
+                        when (idx) {
+                            1 -> "local" to Environment.getExternalStorageDirectory().absolutePath
+                            2 -> pane2State.mountId to pane2State.currentPath
+                            else -> pane3State.mountId to pane3State.currentPath
+                        }
                     },
                     onShowContextMenu = { file -> contextMenuTarget = 3 to file },
                     onSearchChange = { viewModel.updateSearchQuery(3, it) },
@@ -623,11 +635,26 @@ private fun DxFileManagerScreen(
                 onToggleDarkTheme = { viewModel.setDarkTheme(it) },
                 onChangeDarkBackgroundStyle = { viewModel.setDarkBackgroundStyle(it) },
                 onChangeLanguage = { viewModel.setLanguage(it) },
+                onChangeAiProvider = { viewModel.setAiProvider(it) },
+                onSaveAiApiKey = { provider, key -> viewModel.setAiApiKey(provider, key) },
                 onOpenStorageAnalyzer = { showStorageAnalyzer = true },
                 onOpenWebShare = { showWebShare = true },
                 onOpenShortcuts = { showShortcutsDialog = true },
                 onInstallUpdateApk = { apk -> viewModel.installApkWithShizukuOrFallback(apk) },
                 onDismiss = { showSettingsDialog = false }
+            )
+        }
+
+        if (showAiAssistantDialog) {
+            val targetPaneIdx = if (focusedPane == 3 && pane3Expanded) 3 else 2
+            val targetState = if (targetPaneIdx == 3) pane3State else pane2State
+            AiFileAssistantDialog(
+                settings = settings,
+                paneState = targetState,
+                onSelectProvider = { viewModel.setAiProvider(it) },
+                onSaveApiKey = { provider, key -> viewModel.setAiApiKey(provider, key) },
+                onApplyOrganizeMoves = { moves -> viewModel.organizeFilesWithPlan(targetPaneIdx, moves) },
+                onDismiss = { showAiAssistantDialog = false }
             )
         }
 

@@ -21,9 +21,11 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -38,6 +40,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.dx9901mk5.filemanager.BuildConfig
+import com.dx9901mk5.filemanager.core.settings.AiProvider
 import com.dx9901mk5.filemanager.core.settings.AppLanguage
 import com.dx9901mk5.filemanager.core.settings.DarkBackgroundStyle
 import com.dx9901mk5.filemanager.core.settings.DxSettingsState
@@ -59,6 +62,8 @@ fun SettingsAndAboutDialog(
     onToggleDarkTheme: (Boolean) -> Unit,
     onChangeDarkBackgroundStyle: (DarkBackgroundStyle) -> Unit,
     onChangeLanguage: (AppLanguage) -> Unit,
+    onChangeAiProvider: (AiProvider) -> Unit,
+    onSaveAiApiKey: (AiProvider, String) -> Unit,
     onOpenStorageAnalyzer: () -> Unit,
     onOpenWebShare: () -> Unit,
     onOpenShortcuts: () -> Unit,
@@ -177,6 +182,53 @@ fun SettingsAndAboutDialog(
                             onClick = { onChangeLanguage(lang) },
                             label = { Text(lang.label) }
                         )
+                    }
+                }
+
+                HorizontalDivider()
+
+                Text("AI 檔案整理助理", style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    AiProvider.entries.forEach { provider ->
+                        FilterChip(
+                            selected = settings.aiProvider == provider,
+                            onClick = { onChangeAiProvider(provider) },
+                            label = {
+                                Text(if (provider == AiProvider.GEMINI) "Gemini (預設)" else provider.displayName)
+                            }
+                        )
+                    }
+                }
+                var aiKeyDraft by remember(settings.aiProvider, settings.currentAiApiKey) {
+                    mutableStateOf(settings.currentAiApiKey)
+                }
+                OutlinedTextField(
+                    value = aiKeyDraft,
+                    onValueChange = { aiKeyDraft = it },
+                    label = { Text("${settings.aiProvider.displayName} API Key") },
+                    visualTransformation = PasswordVisualTransformation(),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = { onSaveAiApiKey(settings.aiProvider, aiKeyDraft.trim()) },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("儲存金鑰")
+                    }
+                    if (settings.currentAiApiKey.isNotBlank()) {
+                        TextButton(
+                            onClick = {
+                                aiKeyDraft = ""
+                                onSaveAiApiKey(settings.aiProvider, "")
+                            }
+                        ) {
+                            Text("登出 / 清除")
+                        }
                     }
                 }
 

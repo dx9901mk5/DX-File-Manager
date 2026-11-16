@@ -29,6 +29,23 @@ enum class DarkBackgroundStyle(val key: String) {
     }
 }
 
+enum class AiProvider(
+    val id: String,
+    val displayName: String,
+    val defaultModel: String,
+    val keyHelpUrl: String
+) {
+    GEMINI("gemini", "Gemini", "gemini-2.5-flash", "https://aistudio.google.com/apikey"),
+    GPT("gpt", "GPT (OpenAI)", "gpt-4o-mini", "https://platform.openai.com/api-keys"),
+    CLAUDE("claude", "Claude", "claude-3-5-haiku-latest", "https://console.anthropic.com/settings/keys"),
+    GROK("grok", "Grok", "grok-2-latest", "https://console.x.ai/");
+
+    companion object {
+        fun fromId(id: String?): AiProvider =
+            entries.firstOrNull { it.id == id } ?: GEMINI
+    }
+}
+
 data class DxSettingsState(
     val recycleBinEnabled: Boolean = true,
     val useShizukuInstall: Boolean = false,
@@ -38,6 +55,8 @@ data class DxSettingsState(
     val language: AppLanguage = AppLanguage.fromSystemOrCode(null),
     val bookmarks: List<String> = emptyList(),
     val cloudMounts: List<VfsMountConfig> = emptyList(),
+    val aiProvider: AiProvider = AiProvider.GEMINI,
+    val aiApiKeys: Map<AiProvider, String> = emptyMap(),
     // 記憶各分區上次展開或折疊狀態 (手機直向預設第1+2區、無第3區；平板/摺疊預設三區全開)
     val pane1ExpandedCompact: Boolean = true,
     val pane2ExpandedCompact: Boolean = true,
@@ -45,7 +64,10 @@ data class DxSettingsState(
     val pane1ExpandedTablet: Boolean = true,
     val pane2ExpandedTablet: Boolean = true,
     val pane3ExpandedTablet: Boolean = true
-)
+) {
+    val currentAiApiKey: String
+        get() = aiApiKeys[aiProvider].orEmpty()
+}
 
 class AppPreferences(private val context: Context) {
 
@@ -58,6 +80,8 @@ class AppPreferences(private val context: Context) {
         val LANGUAGE = stringPreferencesKey("app_language")
         val BOOKMARKS = stringSetPreferencesKey("bookmarks")
         val CLOUD_MOUNTS_JSON = stringPreferencesKey("cloud_mounts_json")
+        val AI_PROVIDER = stringPreferencesKey("ai_provider")
+        val AI_KEYS_JSON = stringPreferencesKey("ai_keys_json")
 
         val P1_COMPACT = booleanPreferencesKey("pane1_expanded_compact")
         val P2_COMPACT = booleanPreferencesKey("pane2_expanded_compact")
@@ -80,6 +104,8 @@ class AppPreferences(private val context: Context) {
             language = AppLanguage.fromSystemOrCode(prefs[Keys.LANGUAGE]),
             bookmarks = (prefs[Keys.BOOKMARKS] ?: setOf(defaultDownloadPath)).toList().sorted(),
             cloudMounts = decodeMounts(prefs[Keys.CLOUD_MOUNTS_JSON]),
+            aiProvider = AiProvider.fromId(prefs[Keys.AI_PROVIDER]),
+            aiApiKeys = decodeAiKeys(prefs[Keys.AI_KEYS_JSON]),
             pane1ExpandedCompact = prefs[Keys.P1_COMPACT] ?: true,
             pane2ExpandedCompact = prefs[Keys.P2_COMPACT] ?: true,
             pane3ExpandedCompact = prefs[Keys.P3_COMPACT] ?: false,
@@ -136,9 +162,40 @@ class AppPreferences(private val context: Context) {
 
     suspend fun removeBookmark(path: String) {
         context.dxDataStore.edit { prefs ->
-            val current = prefs[Keys.BOOKMARKS] ?: emptySet()
+            val current = prefs[Keys.BOOKMARKS] ?: setOf(defaultDownloadPath)
             prefs[Keys.BOOKMARKS] = current - path
         }
+    }
+
+    suspend fun setAiProvider(provider: AiProvider) {
+        context.dxDataStore.edit { it[Keys.AI_PROVIDER] = provider.id }
+    }
+
+    suspend fun setAiApiKey(provider: AiProvider, apiKey: String) {
+        context.dxDataStore.edit { prefs ->
+            val map = decodeAiKeys(prefs[Keys.AI_KEYS_JSON]).toMutableMap()
+            if (apiKey.isBlank()) map.remove(provider) else map[provider] = apiKey.trim()
+            prefs[Keys.AI_KEYS_JSON] = encodeAiKeys(map)
+        }
+    }
+
+    private fun encodeAiKeys(keys: Map<AiProvider, String>): String {
+        val obj = JSONObject()
+        keys.forEach { (p, k) -> obj.put(p.id, k) }
+        return obj.toString()
+    }
+
+    private fun decodeAiKeys(raw: String?): Map<AiProvider, String> {
+        if (raw.isNullOrBlank()) return emptyMap()
+        return runCatching {
+            val obj = JSONObject(raw)
+            buildMap {
+                AiProvider.entries.forEach { p ->
+                    val v = obj.optString(p.id)
+                    if (v.isNotBlank()) put(p, v)
+                }
+            }
+        }.getOrDefault(emptyMap())
     }
 
     suspend fun saveCloudMount(config: VfsMountConfig) {

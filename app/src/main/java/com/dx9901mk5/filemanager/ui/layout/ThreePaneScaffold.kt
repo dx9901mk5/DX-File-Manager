@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DragHandle
@@ -72,6 +73,7 @@ fun ThreePaneScaffold(
     showPane3: Boolean,
     isRatioEditMode: Boolean,
     onToggleRatioEditMode: () -> Unit,
+    onOpenAiAssistant: () -> Unit = {},
     onOpenSettings: () -> Unit,
     pane1Expanded: Boolean,
     pane2Expanded: Boolean,
@@ -92,7 +94,7 @@ fun ThreePaneScaffold(
     var pane1Width by remember { mutableStateOf(150.dp) }
     var pane2Weight by remember { mutableFloatStateOf(0.5f) }
 
-    val effectivePane1Expanded = if (autoCollapseUnusedPaneOnDrag != null) autoCollapseUnusedPaneOnDrag == 1 else pane1Expanded
+    val effectivePane1Expanded = if (autoCollapseUnusedPaneOnDrag != null) (autoCollapseUnusedPaneOnDrag == 1 || pane1Expanded) else pane1Expanded
     val effectivePane2Expanded = if (autoCollapseUnusedPaneOnDrag != null) autoCollapseUnusedPaneOnDrag == 2 else pane2Expanded
     val effectivePane3Expanded = if (autoCollapseUnusedPaneOnDrag != null) autoCollapseUnusedPaneOnDrag == 3 else pane3Expanded
 
@@ -174,16 +176,30 @@ fun ThreePaneScaffold(
                                 .padding(horizontal = 4.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            IconButton(
-                                onClick = onToggleRatioEditMode,
-                                modifier = Modifier.size(30.dp)
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer,
+                                modifier = Modifier
+                                    .padding(end = 4.dp)
+                                    .clickable(onClick = onOpenAiAssistant)
                             ) {
-                                Icon(
-                                    imageVector = if (isRatioEditMode) Icons.Default.LockOpen else Icons.Default.Lock,
-                                    contentDescription = if (isRatioEditMode) "鎖定分區比例" else "編輯分區拖曳比例",
-                                    tint = if (isRatioEditMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(17.dp)
-                                )
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.AutoAwesome,
+                                        contentDescription = "AI 檔案分析與整理",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = "AI",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
                             }
                             Text(
                                 text = "根目錄",

@@ -13,8 +13,10 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.dx9901mk5.filemanager.DxFileManagerApp
 import com.dx9901mk5.filemanager.MainActivity
+import com.dx9901mk5.filemanager.core.ai.AiMoveInstruction
 import com.dx9901mk5.filemanager.core.archive.ArchiveAndCryptoManager
 import com.dx9901mk5.filemanager.core.notifications.TransferNotificationHelper
+import com.dx9901mk5.filemanager.core.settings.AiProvider
 import com.dx9901mk5.filemanager.core.settings.AppLanguage
 import com.dx9901mk5.filemanager.core.settings.DarkBackgroundStyle
 import com.dx9901mk5.filemanager.core.settings.DxSettingsState
@@ -594,6 +596,35 @@ class FileManagerViewModel(application: Application) : AndroidViewModel(applicat
     fun setDarkBackgroundStyle(style: DarkBackgroundStyle) = viewModelScope.launch { prefs.setDarkBackgroundStyle(style) }
     fun setLanguage(language: AppLanguage) = viewModelScope.launch { prefs.setLanguage(language) }
     fun addBookmark(path: String) = viewModelScope.launch { prefs.addBookmark(path); toast("已加入書籤") }
+    fun removeBookmark(path: String) = viewModelScope.launch { prefs.removeBookmark(path); toast("已移除書籤") }
+    fun setAiProvider(provider: AiProvider) = viewModelScope.launch { prefs.setAiProvider(provider) }
+    fun setAiApiKey(provider: AiProvider, key: String) = viewModelScope.launch { prefs.setAiApiKey(provider, key) }
+
+    suspend fun organizeFilesWithPlan(paneIndex: Int, moves: List<AiMoveInstruction>): Result<Int> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val state = stateFlow(paneIndex).value
+                val provider = vfsRegistry.getProvider(state.mountId)
+                val byName = state.files.associateBy { it.name }
+                var movedCount = 0
+                val createdFolders = mutableSetOf<String>()
+
+                for (mv in moves) {
+                    val src = byName[mv.fileName] ?: continue
+                    val safeFolder = mv.targetFolder.replace("/", "_").replace("\\", "_").trim()
+                    if (safeFolder.isEmpty()) continue
+                    val targetDirPath = state.currentPath.trimEnd('/') + "/" + safeFolder
+                    if (createdFolders.add(targetDirPath)) {
+                        provider.createDirectory(state.currentPath, safeFolder)
+                    }
+                    if (provider.move(src.path, targetDirPath).isSuccess) {
+                        movedCount++
+                    }
+                }
+                loadPane(paneIndex)
+                movedCount
+            }
+        }
 
     private fun toast(msg: String) {
         Toast.makeText(app, msg, Toast.LENGTH_SHORT).show()

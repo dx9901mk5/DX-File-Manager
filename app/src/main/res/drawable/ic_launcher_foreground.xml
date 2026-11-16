@@ -1,27 +1,60 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- 資料夾背板 (較深金黃) -->
+    <!-- 玻璃透明資料夾背板 -->
     <path
-        android:fillColor="#D99B00"
-        android:pathData="M22,30 L44,30 L50,36 L86,36 C88.2,36 90,37.8 90,40 L90,76 C90,78.2 88.2,80 86,80 L22,80 C19.8,80 18,78.2 18,76 L18,34 C18,31.8 19.8,30 22,30 Z" />
+        android:pathData="M22,30 L44,30 L50,36 L86,36 C88.2,36 90,37.8 90,40 L90,76 C90,78.2 88.2,80 86,80 L22,80 C19.8,80 18,78.2 18,76 L18,34 C18,31.8 19.8,30 22,30 Z"
+        android:strokeColor="#66FFFFFF"
+        android:strokeWidth="1.2">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="18"
+                android:startY="30"
+                android:endX="90"
+                android:endY="80"
+                android:type="linear">
+                <item android:color="#66FFFFFF" android:offset="0.0" />
+                <item android:color="#3393C5FD" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
 
-    <!-- 資料夾前景蓋板 (Windows 亮金黃) -->
+    <!-- 玻璃透明資料夾前景蓋板 (磨砂透光層) -->
     <path
-        android:fillColor="#FFC83D"
-        android:pathData="M18,41 L90,41 L90,76 C90,78.2 88.2,80 86,80 L22,80 C19.8,80 18,78.2 18,76 Z" />
+        android:pathData="M18,41 L90,41 L90,76 C90,78.2 88.2,80 86,80 L22,80 C19.8,80 18,78.2 18,76 Z"
+        android:strokeColor="#CCFFFFFF"
+        android:strokeWidth="1.4">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="20"
+                android:startY="41"
+                android:endX="88"
+                android:endY="80"
+                android:type="linear">
+                <item android:color="#7AFFFFFF" android:offset="0.0" />
+                <item android:color="#40E0F2FE" android:offset="0.45" />
+                <item android:color="#2EFFFFFF" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
 
-    <!-- 字母 D (黑底反差) -->
+    <!-- 頂部斜向玻璃高光條 -->
     <path
-        android:fillColor="#111111"
-        android:pathData="M31,49 L42,49 C49,49 53,53.5 53,60.5 C53,67.5 49,72 42,72 L31,72 Z M36.5,53.8 L36.5,67.2 L41.5,67.2 C45.5,67.2 47.5,64.8 47.5,60.5 C47.5,56.2 45.5,53.8 41.5,53.8 Z" />
+        android:fillColor="#4DFFFFFF"
+        android:pathData="M21,42.5 L87,42.5 L87,48 L21,48 Z" />
 
-    <!-- 字母 X (黑底反差) -->
+    <!-- 字母 D (透亮白玻璃反差) -->
     <path
-        android:fillColor="#111111"
-        android:pathData="M56.5,49 L62.5,49 L67,56.8 L71.5,49 L77.5,49 L70.2,60.3 L78,72 L72,72 L67,63.9 L62,72 L56,72 L63.8,60.3 Z" />
+        android:fillColor="#EEFFFFFF"
+        android:pathData="M31,50 L42,50 C49,50 53,54.3 53,61 C53,67.7 49,72 42,72 L31,72 Z M36.5,54.6 L36.5,67.4 L41.5,67.4 C45.5,67.4 47.5,65.1 47.5,61 C47.5,56.9 45.5,54.6 41.5,54.6 Z" />
+
+    <!-- 字母 X (透亮白玻璃反差) -->
+    <path
+        android:fillColor="#EEFFFFFF"
+        android:pathData="M56.5,50 L62.5,50 L67,57.4 L71.5,50 L77.5,50 L70.2,60.8 L78,72 L72,72 L67,64.2 L62,72 L56,72 L63.8,60.8 Z" />
 </vector>
