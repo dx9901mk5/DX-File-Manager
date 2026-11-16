@@ -44,7 +44,9 @@
 - **v1.0.6** (`versionCode = 7`)：
   - 修復 `TwoFingerStackGesture.kt` 誤用 `kotlinx.coroutines.withTimeoutOrNull` 導致進入多選時當機的問題，改用 `AwaitPointerEventScope` 內建 `withTimeoutOrNull` 並於 `PointerEventPass.Initial` 攔截第二指點擊。
   - 修復 `CrossPaneDragController.kt` 單一 `flyingCard` 覆蓋問題，改為 `mutableStateListOf<FlyingStackCard>` 支援連續多指點擊的卡片飛入疊合動畫。
-  - 產出 APK 檔名正式帶入版本號：`DX-File-Manager-v1.0.6-release.apk`。
+  - 產出 APK 檔名正式帶入版本號：`DX-File-Manager-v1.0.6-release.apk`（53,652,909 Bytes，固定簽名）。
+  - GitHub Actions Run：`#43837808033` (`success`)
+  - Release 頁面：https://github.com/dx9901mk5/DX-File-Manager/releases/tag/v1.0.6
   - 全面檢查並修復 14 種雲端/網路掛載：移除「下載更多 / 外掛擴充」按鈕；新增 `OAuth2AuthHelper` 瀏覽器登入授權回調 (`dxfilemanager://oauth2redirect`) 與「測試連線」驗證；補齊 `FTPClient` (commons-net)、Dropbox、OneDrive、Box、pCloud、Yandex、WebDAV/OwnCloud/Nextcloud、Amazon S3 真實 API 串接，並於第一區已掛載雲端旁加上移除按鈕 (`✕`)。
   - 移除左下角「工具箱」區塊，將「DX 儲存空間分析器」與「DX 區域網路網頁分享」整合至設定頁面內。
   - 摺疊後完全消除垂直邊界與側條，改為在左緣／右緣／頂部浮動顯示一個小半圓形金黃色展開按鈕；手機直向同步開放第三分區，預設為摺疊狀態並於右緣顯示半圓展開鈕。
