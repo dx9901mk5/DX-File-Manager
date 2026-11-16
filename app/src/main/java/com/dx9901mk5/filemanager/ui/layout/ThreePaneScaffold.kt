@@ -174,17 +174,6 @@ fun ThreePaneScaffold(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             IconButton(
-                                onClick = onOpenSettings,
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Settings,
-                                    contentDescription = "設定與關於我",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                            IconButton(
                                 onClick = onToggleRatioEditMode,
                                 modifier = Modifier.size(30.dp)
                             ) {

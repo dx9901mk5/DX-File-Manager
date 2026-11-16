@@ -41,15 +41,20 @@ class VfsRegistry {
         sourceFile: VfsFile,
         targetMountId: String,
         targetDirPath: String,
-        isMove: Boolean
+        isMove: Boolean,
+        onProgress: (bytesDelta: Long, currentFileName: String) -> Unit = { _, _ -> }
     ): Result<VfsFile> = withContext(Dispatchers.IO) {
         if (sourceMountId == targetMountId) {
             val provider = getProvider(sourceMountId)
-            return@withContext if (isMove) {
+            val result = if (isMove) {
                 provider.move(sourceFile.path, targetDirPath)
             } else {
                 provider.copy(sourceFile.path, targetDirPath)
             }
+            if (result.isSuccess) {
+                onProgress(sourceFile.size, sourceFile.name)
+            }
+            return@withContext result
         }
 
         runCatching {
@@ -65,14 +70,28 @@ class VfsRegistry {
                 val createdDir = dstProvider.createDirectory(targetDirPath, sourceFile.name).getOrThrow()
                 val children = srcProvider.listFiles(sourceFile.path, showHidden = true).getOrThrow()
                 for (child in children) {
-                    transferBetweenMounts(sourceMountId, child, targetMountId, createdDir.path, isMove).getOrThrow()
+                    transferBetweenMounts(
+                        sourceMountId,
+                        child,
+                        targetMountId,
+                        createdDir.path,
+                        isMove,
+                        onProgress
+                    ).getOrThrow()
                 }
                 if (isMove) srcProvider.delete(sourceFile.path).getOrThrow()
                 createdDir
             } else {
                 srcProvider.openInputStream(sourceFile.path).getOrThrow().use { input ->
                     dstProvider.openOutputStream(targetPath).getOrThrow().use { output ->
-                        input.copyTo(output, bufferSize = 64 * 1024)
+                        val buffer = ByteArray(64 * 1024)
+                        while (true) {
+                            val read = input.read(buffer)
+                            if (read <= 0) break
+                            output.write(buffer, 0, read)
+                            onProgress(read.toLong(), sourceFile.name)
+                        }
+                        output.flush()
                     }
                 }
                 if (isMove) srcProvider.delete(sourceFile.path).getOrThrow()

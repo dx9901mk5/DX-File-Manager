@@ -14,6 +14,7 @@ import androidx.lifecycle.viewModelScope
 import com.dx9901mk5.filemanager.DxFileManagerApp
 import com.dx9901mk5.filemanager.MainActivity
 import com.dx9901mk5.filemanager.core.archive.ArchiveAndCryptoManager
+import com.dx9901mk5.filemanager.core.notifications.TransferNotificationHelper
 import com.dx9901mk5.filemanager.core.settings.AppLanguage
 import com.dx9901mk5.filemanager.core.settings.DarkBackgroundStyle
 import com.dx9901mk5.filemanager.core.settings.DxSettingsState
@@ -289,13 +290,88 @@ class FileManagerViewModel(application: Application) : AndroidViewModel(applicat
         targetDirPath: String,
         isMove: Boolean
     ) {
+        if (files.isEmpty()) return
         viewModelScope.launch {
+            val notifier = TransferNotificationHelper(app)
+            val notificationId = TransferNotificationHelper.allocateNotificationId()
+            val isUpload = targetMountId != "local"
+            val isDownload = sourceMountId != "local" && targetMountId == "local"
+            val actionTitle = when {
+                isUpload -> "正在上傳檔案"
+                isDownload -> "正在下載檔案"
+                isMove -> "正在移動檔案"
+                else -> "正在複製檔案"
+            }
+            val doneTitle = when {
+                isUpload -> "上傳完成"
+                isDownload -> "下載完成"
+                isMove -> "移動完成"
+                else -> "複製完成"
+            }
+
+            val totalCount = files.size
+            val totalBytes = files.sumOf { if (it.isDirectory) 0L else it.size }
+            var transferredBytes = 0L
+            var lastNotifyTime = 0L
             var successCount = 0
-            files.forEach { f ->
-                val res = vfsRegistry.transferBetweenMounts(sourceMountId, f, targetMountId, targetDirPath, isMove)
+
+            notifier.showProgress(
+                notificationId = notificationId,
+                title = actionTitle,
+                currentFileName = files.first().name,
+                currentIndex = 0,
+                totalCount = totalCount,
+                bytesTransferred = 0L,
+                totalBytes = totalBytes,
+                isUpload = isUpload
+            )
+
+            files.forEachIndexed { idx, f ->
+                val currentIndex = idx + 1
+                notifier.showProgress(
+                    notificationId = notificationId,
+                    title = actionTitle,
+                    currentFileName = f.name,
+                    currentIndex = currentIndex,
+                    totalCount = totalCount,
+                    bytesTransferred = transferredBytes,
+                    totalBytes = totalBytes,
+                    isUpload = isUpload
+                )
+                val res = vfsRegistry.transferBetweenMounts(
+                    sourceMountId = sourceMountId,
+                    sourceFile = f,
+                    targetMountId = targetMountId,
+                    targetDirPath = targetDirPath,
+                    isMove = isMove
+                ) { delta, activeName ->
+                    transferredBytes += delta
+                    val now = System.currentTimeMillis()
+                    if (now - lastNotifyTime >= 250L) {
+                        lastNotifyTime = now
+                        notifier.showProgress(
+                            notificationId = notificationId,
+                            title = actionTitle,
+                            currentFileName = activeName,
+                            currentIndex = currentIndex,
+                            totalCount = totalCount,
+                            bytesTransferred = transferredBytes,
+                            totalBytes = totalBytes,
+                            isUpload = isUpload
+                        )
+                    }
+                }
                 if (res.isSuccess) successCount++
             }
-            toast("${if (isMove) "移動" else "複製"}完成：$successCount / ${files.size}")
+
+            val summary = "$doneTitle：$successCount / $totalCount 個項目"
+            notifier.showCompleted(
+                notificationId = notificationId,
+                title = doneTitle,
+                summary = summary,
+                isSuccess = successCount == totalCount
+            )
+            toast(summary)
             loadPane(2)
             loadPane(3)
             refreshStorageSpace()

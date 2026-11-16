@@ -149,13 +149,15 @@ fun FileExplorerPane(
     val filesByPath = remember(state.files) { state.files.associateBy { it.path } }
 
     val filteredFiles = remember(state.files, state.searchQuery) {
-        if (state.searchQuery.isBlank()) state.files
-        else state.files.filter { it.name.contains(state.searchQuery, ignoreCase = true) }
-    }
-
-    val groupedByMonth = remember(filteredFiles) {
-        val fmt = SimpleDateFormat("yyyy年 M月", Locale.getDefault())
-        filteredFiles.groupBy { fmt.format(Date(it.lastModified)) }
+        val base = if (state.searchQuery.isBlank()) {
+            state.files
+        } else {
+            state.files.filter { it.name.contains(state.searchQuery, ignoreCase = true) }
+        }
+        base.sortedWith(
+            compareByDescending<VfsFile> { it.isDirectory }
+                .thenBy { it.name.lowercase(Locale.getDefault()) }
+        )
     }
 
     Surface(
@@ -557,46 +559,36 @@ fun FileExplorerPane(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                groupedByMonth.forEach { (monthLabel, monthFiles) ->
-                                    item(key = "header_$monthLabel", span = { GridItemSpan(maxLineSpan) }) {
-                                        Text(
-                                            text = monthLabel,
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 4.dp)
-                                        )
-                                    }
-                                    gridItems(monthFiles, key = { it.path }) { file ->
-                                        val isSelected = file.path in state.selectedPaths
-                                        val isHoveredTarget = dragController.isDragging &&
-                                            file.isDirectory &&
-                                            dragController.hoveredFolderPath == file.path
-                                        val hoverScale by animateFloatAsState(
-                                            targetValue = if (isHoveredTarget) 1.15f else 1f,
-                                            label = "GridFolderHoverScale"
-                                        )
-                                        FileGridItem(
-                                            file = file,
-                                            isSelected = isSelected,
-                                            isHoveredTarget = isHoveredTarget,
-                                            iconSizeDp = gridIconDp,
-                                            modifier = Modifier
-                                                .scale(hoverScale)
-                                                .onGloballyPositioned { coords ->
-                                                    itemLocalBounds[file.path] = coords.boundsInParent()
+                                gridItems(filteredFiles, key = { it.path }) { file ->
+                                    val isSelected = file.path in state.selectedPaths
+                                    val isHoveredTarget = dragController.isDragging &&
+                                        file.isDirectory &&
+                                        dragController.hoveredFolderPath == file.path
+                                    val hoverScale by animateFloatAsState(
+                                        targetValue = if (isHoveredTarget) 1.15f else 1f,
+                                        label = "GridFolderHoverScale"
+                                    )
+                                    FileGridItem(
+                                        file = file,
+                                        isSelected = isSelected,
+                                        isHoveredTarget = isHoveredTarget,
+                                        iconSizeDp = gridIconDp,
+                                        modifier = Modifier
+                                            .scale(hoverScale)
+                                            .onGloballyPositioned { coords ->
+                                                itemLocalBounds[file.path] = coords.boundsInParent()
+                                            }
+                                            .clickable {
+                                                onFocusPane()
+                                                if (state.isMultiSelectMode) {
+                                                    onToggleSelect(file.path)
+                                                } else if (file.isDirectory) {
+                                                    onNavigateToPath(file.path)
+                                                } else {
+                                                    onOpenFile(file)
                                                 }
-                                                .clickable {
-                                                    onFocusPane()
-                                                    if (state.isMultiSelectMode) {
-                                                        onToggleSelect(file.path)
-                                                    } else if (file.isDirectory) {
-                                                        onNavigateToPath(file.path)
-                                                    } else {
-                                                        onOpenFile(file)
-                                                    }
-                                                }
-                                        )
-                                    }
+                                            }
+                                    )
                                 }
                             }
                         }
@@ -606,49 +598,39 @@ fun FileExplorerPane(
                                     .fillMaxSize()
                                     .dxVerticalOverscrollBounce()
                             ) {
-                                groupedByMonth.forEach { (monthLabel, monthFiles) ->
-                                    item(key = "header_$monthLabel") {
-                                        Text(
-                                            text = monthLabel,
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                                        )
-                                    }
-                                    items(monthFiles, key = { it.path }) { file ->
-                                        val isSelected = file.path in state.selectedPaths
-                                        val isHoveredTarget = dragController.isDragging &&
-                                            file.isDirectory &&
-                                            dragController.hoveredFolderPath == file.path
-                                        val hoverScale by animateFloatAsState(
-                                            targetValue = if (isHoveredTarget) 1.15f else 1f,
-                                            label = "FolderHoverScale"
-                                        )
+                                items(filteredFiles, key = { it.path }) { file ->
+                                    val isSelected = file.path in state.selectedPaths
+                                    val isHoveredTarget = dragController.isDragging &&
+                                        file.isDirectory &&
+                                        dragController.hoveredFolderPath == file.path
+                                    val hoverScale by animateFloatAsState(
+                                        targetValue = if (isHoveredTarget) 1.15f else 1f,
+                                        label = "FolderHoverScale"
+                                    )
 
-                                        FileRowItem(
-                                            file = file,
-                                            isSelected = isSelected,
-                                            isMultiSelectMode = state.isMultiSelectMode,
-                                            isHoveredTarget = isHoveredTarget,
-                                            iconScale = state.iconScale,
-                                            modifier = Modifier
-                                                .scale(hoverScale)
-                                                .onGloballyPositioned { coords ->
-                                                    val b = coords.boundsInParent()
-                                                    itemLocalBounds[file.path] = b
+                                    FileRowItem(
+                                        file = file,
+                                        isSelected = isSelected,
+                                        isMultiSelectMode = state.isMultiSelectMode,
+                                        isHoveredTarget = isHoveredTarget,
+                                        iconScale = state.iconScale,
+                                        modifier = Modifier
+                                            .scale(hoverScale)
+                                            .onGloballyPositioned { coords ->
+                                                val b = coords.boundsInParent()
+                                                itemLocalBounds[file.path] = b
+                                            }
+                                            .clickable {
+                                                onFocusPane()
+                                                if (state.isMultiSelectMode) {
+                                                    onToggleSelect(file.path)
+                                                } else if (file.isDirectory) {
+                                                    onNavigateToPath(file.path)
+                                                } else {
+                                                    onOpenFile(file)
                                                 }
-                                                .clickable {
-                                                    onFocusPane()
-                                                    if (state.isMultiSelectMode) {
-                                                        onToggleSelect(file.path)
-                                                    } else if (file.isDirectory) {
-                                                        onNavigateToPath(file.path)
-                                                    } else {
-                                                        onOpenFile(file)
-                                                    }
-                                                }
-                                        )
-                                    }
+                                            }
+                                    )
                                 }
                             }
                         }
