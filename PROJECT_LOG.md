@@ -11,8 +11,22 @@
 ## 1. 固定簽名資訊（覆蓋更新用）
 - **本機金鑰檔案**：`app/release.keystore`（已列入 `.gitignore`，不推上公開儲存庫）
 - **Key Alias**：`dx_key`
+- **SHA-1 指紋**：`11:7A:E5:A9:C7:6D:61:F3:7D:BD:9A:20:A2:39:02:06:E6:E2:0F:B1`
 - **SHA-256 指紋**：`20:70:09:9D:5A:BD:A3:4C:B0:46:79:86:BA:A9:BE:A3:89:30:B3:06:E6:02:B0:A6:4F:43:97:D6:77:A3:C4:1F`
 - **GitHub Actions Secret**：`SIGNING_KEY_BASE64`（需存放 `app/release.keystore` 之 3,616 字元 Base64 編碼）
+
+---
+
+## 1.5 Google Cloud OAuth 與 GitHub Pages 設定
+- **Google Cloud 專案**：`DX File Manager`（Project ID：`dx-file-manager-514912`）
+- **已啟用 API**：`Google Drive API`
+- **OAuth 同意畫面（Google Auth Platform）**：
+  - 使用者類型：外部（External），狀態：**實際運作中（In production）**
+  - 測試使用者名單：`dx9901mk5@gmail.com`
+  - 授權網域：`dx9901mk5.github.io`
+  - 首頁／條款連結：`https://dx9901mk5.github.io/DX-File-Manager/`（對應儲存庫 `docs/index.html`）
+  - 隱私權政策連結：`https://dx9901mk5.github.io/DX-File-Manager/privacy.html`（對應儲存庫 `docs/privacy.html`）
+- **Android OAuth 2.0 用戶端 ID**：`368366302108-fa6qt4rgrombf5uimu4cq3kqamcu9iic.apps.googleusercontent.com`（綁定套件 `com.dx9901mk5.filemanager` 與上述 SHA-1）
 
 ---
 
