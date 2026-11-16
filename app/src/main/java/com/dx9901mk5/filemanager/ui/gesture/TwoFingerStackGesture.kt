@@ -19,6 +19,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 fun Modifier.dxFileTouchGesture(
     findItemAtPosition: (Offset) -> String?,
     onLongPressStationary: (filePath: String, pressOffset: Offset) -> Unit,
+    onEmptySpaceLongPress: (pressOffset: Offset) -> Unit = {},
     onStartDragSelection: (initialFilePath: String, startOffset: Offset) -> Unit,
     onSecondFingerTapItem: (tappedFilePath: String, tapOffset: Offset) -> Unit,
     onPrimaryFingerDrag: (currentOffset: Offset, hoveredFolderPath: String?) -> Unit,
@@ -29,10 +30,30 @@ fun Modifier.dxFileTouchGesture(
         val firstDown = awaitFirstDown(requireUnconsumed = false)
         val primaryPointerId: PointerId = firstDown.id
         val startPosition = firstDown.position
-        val touchedFile = findItemAtPosition(startPosition) ?: return@awaitEachGesture
+        val touchedFile = findItemAtPosition(startPosition)
+        val touchSlop = viewConfiguration.touchSlop
+
+        if (touchedFile == null) {
+            // 空白處長壓：原地不動滿 650ms 跳出新增資料夾功能
+            val movedOrReleased = withTimeoutOrNull(650L) {
+                while (true) {
+                    val event = awaitPointerEvent()
+                    val primaryChange = event.changes.firstOrNull { it.id == primaryPointerId }
+                    if (primaryChange == null || !primaryChange.pressed) return@withTimeoutOrNull true
+                    if ((primaryChange.position - startPosition).getDistance() > touchSlop) {
+                        return@withTimeoutOrNull true
+                    }
+                }
+                @Suppress("UNREACHABLE_CODE")
+                true
+            }
+            if (movedOrReleased == null) {
+                onEmptySpaceLongPress(startPosition)
+            }
+            return@awaitEachGesture
+        }
 
         var isDraggingMode = false
-        val touchSlop = viewConfiguration.touchSlop
 
         val movedSlightlyBeforeTimeout = withTimeoutOrNull(1000L) {
             while (true) {

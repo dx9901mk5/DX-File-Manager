@@ -95,6 +95,8 @@ fun FileExplorerPane(
     onNavigateToPath: (String) -> Unit,
     onOpenFile: (VfsFile) -> Unit,
     onToggleSelect: (String) -> Unit,
+    onSelectAll: () -> Unit,
+    onClearSelection: () -> Unit,
     onRubberBandSelect: (Set<String>) -> Unit,
     onShowContextMenu: (VfsFile?) -> Unit,
     onSearchChange: (String) -> Unit,
@@ -198,6 +200,53 @@ fun FileExplorerPane(
                     )
                 }
 
+                // 進入選擇狀態時，於上方區域顯示「全選」勾選選項與取消鈕
+                if ((state.isMultiSelectMode || state.selectedPaths.isNotEmpty()) &&
+                    (state.mode == PaneMode.FILES || state.mode == PaneMode.CATEGORY)
+                ) {
+                    val allSelected = filteredFiles.isNotEmpty() &&
+                        filteredFiles.all { it.path in state.selectedPaths }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f))
+                            .clickable {
+                                onFocusPane()
+                                if (allSelected) onClearSelection() else onSelectAll()
+                            }
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = allSelected,
+                                onCheckedChange = { checked ->
+                                    onFocusPane()
+                                    if (checked) onSelectAll() else onClearSelection()
+                                },
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "全選 (${state.selectedPaths.size}/${filteredFiles.size})",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        IconButton(
+                            onClick = onClearSelection,
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "取消選取",
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+
                 HorizontalDivider()
 
                 // 主體內容區
@@ -235,6 +284,12 @@ fun FileExplorerPane(
                             onLongPressStationary = { filePath, _ ->
                                 onFocusPane()
                                 onShowContextMenu(filesByPath[filePath])
+                            },
+                            onEmptySpaceLongPress = {
+                                if (state.mode == PaneMode.FILES) {
+                                    onFocusPane()
+                                    onCreateNewFolderClick()
+                                }
                             },
                             onStartDragSelection = { initialPath, localOffset ->
                                 onFocusPane()
