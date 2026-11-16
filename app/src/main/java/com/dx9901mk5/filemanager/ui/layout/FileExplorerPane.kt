@@ -24,6 +24,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -38,6 +39,8 @@ import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.InsertDriveFile
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.RestoreFromTrash
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
@@ -145,16 +148,127 @@ fun FileExplorerPane(
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // 頂部麵包屑與工具列
+                val folderCount = remember(filteredFiles) { filteredFiles.count { it.isDirectory } }
+                val fileCount = remember(filteredFiles) { filteredFiles.count { !it.isDirectory } }
+                val currentTitle = remember(state.currentPath, state.mountName, state.mode) {
+                    if (state.mode == PaneMode.FILES) {
+                        state.currentPath.substringAfterLast('/').ifBlank { state.mountName }
+                    } else {
+                        state.mountName
+                    }
+                }
+
+                // 頂部圓角膠囊標題列（參照雙欄檔案管理器設計 + Windows 黃黑配色）
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 6.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = onCollapsePane, modifier = Modifier.size(34.dp)) {
+                            Icon(
+                                Icons.Default.Menu,
+                                contentDescription = "摺疊/收合面板",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(horizontal = 4.dp)
+                        ) {
+                            Text(
+                                text = currentTitle,
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Text(
+                                text = "$folderCount 個資料夾, $fileCount 個檔案",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        IconButton(onClick = { showSearchBar = !showSearchBar }, modifier = Modifier.size(32.dp)) {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = "搜尋",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(19.dp)
+                            )
+                        }
+                        // 清單列表 / 小圖示 / 大圖示 檢視切換按鈕
+                        IconButton(
+                            onClick = { onViewModeChange(FileViewMode.LIST) },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ViewList,
+                                contentDescription = "清單列表",
+                                tint = if (state.viewMode == FileViewMode.LIST) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        IconButton(
+                            onClick = { onViewModeChange(FileViewMode.SMALL_GRID) },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.GridView,
+                                contentDescription = "小圖示",
+                                tint = if (state.viewMode == FileViewMode.SMALL_GRID) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        IconButton(
+                            onClick = { onViewModeChange(FileViewMode.LARGE_GRID) },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.Apps,
+                                contentDescription = "大圖示",
+                                tint = if (state.viewMode == FileViewMode.LARGE_GRID) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        if (state.mode == PaneMode.FILES) {
+                            IconButton(onClick = { onAddBookmark(state.currentPath) }, modifier = Modifier.size(28.dp)) {
+                                Icon(
+                                    Icons.Default.BookmarkAdd,
+                                    contentDescription = "加入書籤",
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(17.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // 路徑麵包屑列
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                        .padding(horizontal = 6.dp, vertical = 4.dp),
+                        .padding(horizontal = 10.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = onNavigateUp, modifier = Modifier.size(34.dp)) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "上一層", modifier = Modifier.size(18.dp))
+                    IconButton(onClick = onNavigateUp, modifier = Modifier.size(28.dp)) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "上一層",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
                     }
                     Row(
                         modifier = Modifier
@@ -164,7 +278,7 @@ fun FileExplorerPane(
                     ) {
                         Text(
                             text = state.mountName,
-                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
                             color = MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(horizontal = 4.dp)
                         )
@@ -174,61 +288,22 @@ fun FileExplorerPane(
                             parts.forEach { seg ->
                                 acc += "/$seg"
                                 val target = acc
-                                Icon(Icons.Default.ChevronRight, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Icon(
+                                    Icons.Default.ChevronRight,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(14.dp)
+                                )
                                 Text(
                                     text = seg,
                                     style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier
                                         .clickable { onNavigateToPath(target) }
                                         .padding(horizontal = 4.dp, vertical = 2.dp)
                                 )
                             }
                         }
-                    }
-                    IconButton(onClick = { showSearchBar = !showSearchBar }, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Search, contentDescription = "搜尋", modifier = Modifier.size(18.dp))
-                    }
-                    // 清單列表 / 小圖示 / 大圖示 檢視切換按鈕
-                    IconButton(
-                        onClick = { onViewModeChange(FileViewMode.LIST) },
-                        modifier = Modifier.size(30.dp)
-                    ) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ViewList,
-                            contentDescription = "清單列表",
-                            tint = if (state.viewMode == FileViewMode.LIST) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    IconButton(
-                        onClick = { onViewModeChange(FileViewMode.SMALL_GRID) },
-                        modifier = Modifier.size(30.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.GridView,
-                            contentDescription = "小圖示",
-                            tint = if (state.viewMode == FileViewMode.SMALL_GRID) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    IconButton(
-                        onClick = { onViewModeChange(FileViewMode.LARGE_GRID) },
-                        modifier = Modifier.size(30.dp)
-                    ) {
-                        Icon(
-                            Icons.Default.Apps,
-                            contentDescription = "大圖示",
-                            tint = if (state.viewMode == FileViewMode.LARGE_GRID) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    if (state.mode == PaneMode.FILES) {
-                        IconButton(onClick = { onAddBookmark(state.currentPath) }, modifier = Modifier.size(30.dp)) {
-                            Icon(Icons.Default.BookmarkAdd, contentDescription = "加入書籤", modifier = Modifier.size(17.dp))
-                        }
-                    }
-                    IconButton(onClick = onCollapsePane, modifier = Modifier.size(32.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "摺疊此面板", modifier = Modifier.size(18.dp))
                     }
                 }
 
@@ -520,10 +595,13 @@ fun FileExplorerPane(
                         onFocusPane()
                         onCreateNewFolderClick()
                     },
+                    shape = CircleShape,
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(14.dp)
-                        .size(48.dp)
+                        .size(50.dp)
                 ) {
                     Icon(Icons.Default.Add, contentDescription = "新增資料夾")
                 }
@@ -588,41 +666,65 @@ private fun FileRowItem(
         isSelected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)
         else -> MaterialTheme.colorScheme.surface
     }
+    val timeText = remember(file.lastModified) {
+        SimpleDateFormat("yyyy年M月d日 a h:mm:ss", Locale.getDefault()).format(Date(file.lastModified))
+    }
     Row(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = 6.dp, vertical = 2.dp)
-            .background(bgColor, RoundedCornerShape(8.dp))
+            .background(bgColor, RoundedCornerShape(10.dp))
             .then(
-                if (isHoveredTarget) Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
+                if (isHoveredTarget) Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
                 else Modifier
             )
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+            .padding(horizontal = 8.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (isMultiSelectMode || isSelected) {
             Checkbox(checked = isSelected, onCheckedChange = null, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(8.dp))
         }
-        Icon(
-            imageVector = if (file.isDirectory) Icons.Default.Folder else Icons.Default.InsertDriveFile,
-            contentDescription = null,
-            tint = if (file.isDirectory) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size((24 * iconScale).dp)
-        )
-        Spacer(Modifier.width(10.dp))
+        Box(
+            modifier = Modifier
+                .size((40 * iconScale).dp)
+                .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = if (file.isDirectory) Icons.Default.Folder else Icons.Default.InsertDriveFile,
+                contentDescription = null,
+                tint = if (file.isDirectory) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size((22 * iconScale).dp)
+            )
+        }
+        Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = file.name,
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                color = MaterialTheme.colorScheme.onSurface,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
-            Text(
-                text = if (file.isDirectory) "資料夾" else formatFileSize(file.size),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Spacer(Modifier.height(2.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = if (file.isDirectory) "資料夾" else formatFileSize(file.size),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = timeText,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
     }
 }

@@ -67,9 +67,8 @@ fun ThreePaneScaffold(
     val minCollapsedWidth = 48.dp
     val density = LocalDensity.current
 
-    var pane1Width by remember(isLargeTablet) {
-        mutableStateOf(if (isLargeTablet) 280.dp else 230.dp)
-    }
+    var pane1WidthInitialized by remember { mutableStateOf(false) }
+    var pane1Width by remember { mutableStateOf(150.dp) }
     var pane2Weight by remember { mutableFloatStateOf(0.5f) }
 
     val effectivePane1Expanded = if (autoCollapseUnusedPaneOnDrag != null) autoCollapseUnusedPaneOnDrag == 1 else pane1Expanded
@@ -81,11 +80,17 @@ fun ThreePaneScaffold(
         label = "Pane1Width"
     )
 
-    Row(
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
+        // 第一分區預設寬度為第二、三分區的 1/3 (約佔總寬 1/7 ≈ 14.3%)
+        if (!pane1WidthInitialized) {
+            pane1Width = (maxWidth * 0.143f).coerceIn(116.dp, 185.dp)
+            pane1WidthInitialized = true
+        }
+        Row(modifier = Modifier.fillMaxSize()) {
         // 第一區：根目錄與側欄導覽
         Box(
             modifier = Modifier
@@ -136,8 +141,8 @@ fun ThreePaneScaffold(
             onDrag = { deltaPx ->
                 if (effectivePane1Expanded) {
                     val deltaDp = with(density) { deltaPx.toDp() }
-                    val maxW = if (isExpandedScreen) 420.dp else 280.dp
-                    pane1Width = (pane1Width + deltaDp).coerceIn(180.dp, maxW)
+                    val maxW = if (isExpandedScreen) 320.dp else 240.dp
+                    pane1Width = (pane1Width + deltaDp).coerceIn(100.dp, maxW)
                 }
             }
         )
@@ -200,6 +205,7 @@ fun ThreePaneScaffold(
                     }
                 }
             }
+        }
         }
     }
 }
