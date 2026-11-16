@@ -32,11 +32,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -61,7 +63,7 @@ class CrossPaneDragController {
     var activePaneIndexDuringDrag by mutableStateOf<Int?>(null)
     var hoveredExpandButtonPane by mutableStateOf<Int?>(null)
     var hoveredFolderPath by mutableStateOf<String?>(null)
-    var flyingCard by mutableStateOf<FlyingStackCard?>(null)
+    val flyingCards = mutableStateListOf<FlyingStackCard>()
 
     var pendingDropTarget by mutableStateOf<PendingDropRequest?>(null)
     var onRequestCrossPaneSwitch: ((targetPaneIndex: Int) -> Unit)? = null
@@ -91,10 +93,12 @@ class CrossPaneDragController {
     fun addSecondFingerFile(file: VfsFile, tapRootOffset: Offset) {
         if (draggedFiles.none { it.path == file.path }) {
             draggedFiles = draggedFiles + file
-            flyingCard = FlyingStackCard(
-                id = System.nanoTime(),
-                file = file,
-                startOffset = tapRootOffset
+            flyingCards.add(
+                FlyingStackCard(
+                    id = System.nanoTime(),
+                    file = file,
+                    startOffset = tapRootOffset
+                )
             )
         }
     }
@@ -158,7 +162,7 @@ class CrossPaneDragController {
         activePaneIndexDuringDrag = null
         hoveredExpandButtonPane = null
         hoveredFolderPath = null
-        flyingCard = null
+        flyingCards.clear()
     }
 }
 
@@ -178,19 +182,25 @@ fun DragAndDropOverlay(controller: CrossPaneDragController) {
     val leadFile = controller.draggedFiles.first()
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // 第二指點擊飛入第一指座標的卡片疊合動畫
-        controller.flyingCard?.let { card ->
+        // 第二指點擊飛入第一指座標的卡片疊合動畫（支援連續多指點擊同時飛行疊加）
+        controller.flyingCards.toList().forEach { card ->
             val animOffset = remember(card.id) { Animatable(card.startOffset, Offset.VectorConverter) }
+            val animScale = remember(card.id) { Animatable(1.05f) }
             LaunchedEffect(card.id) {
                 animOffset.animateTo(
                     targetValue = controller.pointerRootOffset,
-                    animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing)
+                    animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing)
                 )
-                controller.flyingCard = null
+                animScale.animateTo(
+                    targetValue = 0.85f,
+                    animationSpec = tween(durationMillis = 120)
+                )
+                controller.flyingCards.removeAll { it.id == card.id }
             }
             Surface(
                 modifier = Modifier
                     .offset { IntOffset(animOffset.value.x.roundToInt() - 60, animOffset.value.y.roundToInt() - 24) }
+                    .scale(animScale.value)
                     .shadow(8.dp, RoundedCornerShape(12.dp)),
                 shape = RoundedCornerShape(12.dp),
                 color = MaterialTheme.colorScheme.secondaryContainer
