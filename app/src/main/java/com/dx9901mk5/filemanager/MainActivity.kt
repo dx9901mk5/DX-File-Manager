@@ -139,12 +139,12 @@ private fun DxFileManagerScreen(
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val showPane3 = isExpandedScreen || isLandscape
+    val showPane3 = true
     var isRatioEditMode by remember { mutableStateOf(false) }
 
-    val pane1Expanded = if (isExpandedScreen) settings.pane1ExpandedTablet else settings.pane1ExpandedCompact
-    val pane2Expanded = if (isExpandedScreen) settings.pane2ExpandedTablet else settings.pane2ExpandedCompact
-    val pane3Expanded = if (isExpandedScreen) settings.pane3ExpandedTablet else true
+    val pane1Expanded = if (isExpandedScreen || isLandscape) settings.pane1ExpandedTablet else settings.pane1ExpandedCompact
+    val pane2Expanded = if (isExpandedScreen || isLandscape) settings.pane2ExpandedTablet else settings.pane2ExpandedCompact
+    val pane3Expanded = if (isExpandedScreen || isLandscape) settings.pane3ExpandedTablet else settings.pane3ExpandedCompact
 
     fun activeFiles(paneIdx: Int): List<VfsFile> {
         val st = if (paneIdx == 2) pane2State else pane3State

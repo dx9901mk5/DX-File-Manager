@@ -1,15 +1,12 @@
 package com.dx9901mk5.filemanager.ui.layout
 
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,12 +14,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DragHandle
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Settings
@@ -50,9 +47,9 @@ import androidx.compose.ui.unit.dp
 
 /**
  * 三區彈性容器 (Pane 1 / Pane 2 / Pane 3)：
- * - 手機直向預設只顯示第 1、2 區；打橫或平板/摺疊顯示第 1、2、3 區
- * - 中間比例預設鎖定，需點擊左上角「拖曳比例」按鈕才可拖曳調整
- * - 三區上方右側皆有摺疊按鈕，摺疊後頂部保留顯眼的展開按鈕
+ * - 任一區摺疊後完全消除邊界與側條，僅在螢幕邊緣保留一個小半圓形展開按鈕
+ * - 手機直向預設第 1+2 區展開、第 3 區摺疊（留右側半圓展開鈕）；平板/摺疊/橫向三區全開
+ * - 中間比例預設鎖定，需點擊左上角鎖頭按鈕才進入拖曳比例編輯模式
  */
 @Composable
 fun ThreePaneScaffold(
@@ -72,7 +69,6 @@ fun ThreePaneScaffold(
     pane2Content: @Composable (onCollapse: () -> Unit) -> Unit,
     pane3Content: @Composable (onCollapse: () -> Unit) -> Unit
 ) {
-    val minCollapsedWidth = 48.dp
     val density = LocalDensity.current
 
     var pane1WidthInitialized by remember { mutableStateOf(false) }
@@ -83,32 +79,28 @@ fun ThreePaneScaffold(
     val effectivePane2Expanded = if (autoCollapseUnusedPaneOnDrag != null) autoCollapseUnusedPaneOnDrag == 2 else pane2Expanded
     val effectivePane3Expanded = if (autoCollapseUnusedPaneOnDrag != null) autoCollapseUnusedPaneOnDrag == 3 else pane3Expanded
 
-    val animatedPane1Width by animateDpAsState(
-        targetValue = if (effectivePane1Expanded) pane1Width else minCollapsedWidth,
-        label = "Pane1Width"
-    )
-
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
     ) {
         if (!pane1WidthInitialized) {
-            pane1Width = (maxWidth * (if (showPane3) 0.143f else 0.30f)).coerceIn(116.dp, 200.dp)
+            pane1Width = (maxWidth * (if (isExpandedScreen) 0.143f else 0.30f)).coerceIn(116.dp, 200.dp)
             pane1WidthInitialized = true
         }
+
         Row(modifier = Modifier.fillMaxSize()) {
-            // 第一區：根目錄與側欄導覽
-            Box(
-                modifier = Modifier
-                    .width(animatedPane1Width)
-                    .fillMaxHeight()
-                    .onGloballyPositioned { coords ->
-                        val b = coords.boundsInRoot()
-                        onPaneBoundsChanged(1, b.left, b.right)
-                    }
-            ) {
-                if (effectivePane1Expanded) {
+            // 第一區：展開時顯示完整側欄；摺疊時完全隱藏（0dp，無邊界）
+            if (effectivePane1Expanded) {
+                Box(
+                    modifier = Modifier
+                        .width(pane1Width)
+                        .fillMaxHeight()
+                        .onGloballyPositioned { coords ->
+                            val b = coords.boundsInRoot()
+                            onPaneBoundsChanged(1, b.left, b.right)
+                        }
+                ) {
                     Column(Modifier.fillMaxSize()) {
                         Row(
                             modifier = Modifier
@@ -117,7 +109,6 @@ fun ThreePaneScaffold(
                                 .padding(horizontal = 4.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // 左上角：設定按鈕（含關於我與檢測更新）＋ 拖曳比例鎖定按鈕
                             IconButton(
                                 onClick = onOpenSettings,
                                 modifier = Modifier.size(32.dp)
@@ -150,7 +141,6 @@ fun ThreePaneScaffold(
                                     .weight(1f)
                                     .padding(horizontal = 2.dp)
                             )
-                            // 第一區右上角：摺疊按鈕
                             IconButton(
                                 onClick = { onPaneExpandedChange(1, false) },
                                 modifier = Modifier.size(32.dp)
@@ -164,28 +154,18 @@ fun ThreePaneScaffold(
                         }
                         pane1Content()
                     }
-                } else {
-                    CollapsedPaneBar(
-                        title = "根目錄",
-                        isRatioEditMode = isRatioEditMode,
-                        onToggleRatioEditMode = onToggleRatioEditMode,
-                        onOpenSettings = onOpenSettings,
-                        onExpand = { onPaneExpandedChange(1, true) }
-                    )
                 }
-            }
 
-            // 分隔線 1 (鎖定時固定為 2dp，開啟拖曳比例編輯時變為 18dp 可拖曳把手)
-            ResizableDivider(
-                editable = isRatioEditMode,
-                onDrag = { deltaPx ->
-                    if (effectivePane1Expanded) {
+                // 僅在第一區展開時才顯示分隔線 1
+                ResizableDivider(
+                    editable = isRatioEditMode,
+                    onDrag = { deltaPx ->
                         val deltaDp = with(density) { deltaPx.toDp() }
                         val maxW = if (isExpandedScreen) 320.dp else 240.dp
                         pane1Width = (pane1Width + deltaDp).coerceIn(100.dp, maxW)
                     }
-                }
-            )
+                )
+            }
 
             // 第二區與第三區容器
             BoxWithConstraints(
@@ -195,44 +175,40 @@ fun ThreePaneScaffold(
             ) {
                 val totalWidth = maxWidth
                 Row(Modifier.fillMaxSize()) {
-                    val pane2Modifier = when {
-                        !showPane3 -> Modifier.weight(1f)
-                        !effectivePane2Expanded -> Modifier.width(minCollapsedWidth)
-                        !effectivePane3Expanded -> Modifier.weight(1f)
-                        else -> Modifier.weight(pane2Weight.coerceIn(0.2f, 0.8f))
-                    }
-                    Box(
-                        modifier = pane2Modifier
-                            .fillMaxHeight()
-                            .onGloballyPositioned { coords ->
-                                val b = coords.boundsInRoot()
-                                onPaneBoundsChanged(2, b.left, b.right)
-                            }
-                    ) {
-                        if (!showPane3 || effectivePane2Expanded) {
-                            pane2Content {
-                                if (showPane3) onPaneExpandedChange(2, false)
-                            }
+                    if (effectivePane2Expanded) {
+                        val pane2Modifier = if (showPane3 && effectivePane3Expanded) {
+                            Modifier.weight(pane2Weight.coerceIn(0.2f, 0.8f))
                         } else {
-                            CollapsedPaneBar(title = "視窗 A", onExpand = { onPaneExpandedChange(2, true) })
+                            Modifier.weight(1f)
+                        }
+                        Box(
+                            modifier = pane2Modifier
+                                .fillMaxHeight()
+                                .onGloballyPositioned { coords ->
+                                    val b = coords.boundsInRoot()
+                                    onPaneBoundsChanged(2, b.left, b.right)
+                                }
+                        ) {
+                            pane2Content { onPaneExpandedChange(2, false) }
                         }
                     }
 
-                    if (showPane3) {
+                    // 僅在第二與第三區同時展開時才顯示分隔線 2
+                    if (showPane3 && effectivePane2Expanded && effectivePane3Expanded) {
                         ResizableDivider(
                             editable = isRatioEditMode,
                             onDrag = { deltaPx ->
-                                if (effectivePane2Expanded && effectivePane3Expanded) {
-                                    val totalPx = with(density) { totalWidth.toPx() }.coerceAtLeast(1f)
-                                    pane2Weight = (pane2Weight + (deltaPx / totalPx)).coerceIn(0.2f, 0.8f)
-                                }
+                                val totalPx = with(density) { totalWidth.toPx() }.coerceAtLeast(1f)
+                                pane2Weight = (pane2Weight + (deltaPx / totalPx)).coerceIn(0.2f, 0.8f)
                             }
                         )
+                    }
 
-                        val pane3Modifier = when {
-                            !effectivePane3Expanded -> Modifier.width(minCollapsedWidth)
-                            !effectivePane2Expanded -> Modifier.weight(1f)
-                            else -> Modifier.weight((1f - pane2Weight).coerceIn(0.2f, 0.8f))
+                    if (showPane3 && effectivePane3Expanded) {
+                        val pane3Modifier = if (effectivePane2Expanded) {
+                            Modifier.weight((1f - pane2Weight).coerceIn(0.2f, 0.8f))
+                        } else {
+                            Modifier.weight(1f)
                         }
                         Box(
                             modifier = pane3Modifier
@@ -242,89 +218,83 @@ fun ThreePaneScaffold(
                                     onPaneBoundsChanged(3, b.left, b.right)
                                 }
                         ) {
-                            if (effectivePane3Expanded) {
-                                pane3Content { onPaneExpandedChange(3, false) }
-                            } else {
-                                CollapsedPaneBar(title = "視窗 B", onExpand = { onPaneExpandedChange(3, true) })
-                            }
+                            pane3Content { onPaneExpandedChange(3, false) }
                         }
                     }
                 }
             }
         }
-    }
-}
 
-@Composable
-private fun CollapsedPaneBar(
-    title: String,
-    isRatioEditMode: Boolean? = null,
-    onToggleRatioEditMode: (() -> Unit)? = null,
-    onOpenSettings: (() -> Unit)? = null,
-    onExpand: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .clickable(onClick = onExpand)
-            .padding(vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Top
-    ) {
-        if (onOpenSettings != null) {
-            IconButton(
-                onClick = onOpenSettings,
-                modifier = Modifier.size(34.dp)
+        // 第一區摺疊後：左緣保留一個小半圓形展開按鈕（無整條邊界）
+        if (!effectivePane1Expanded) {
+            Surface(
+                shape = RoundedCornerShape(topEnd = 22.dp, bottomEnd = 22.dp),
+                color = MaterialTheme.colorScheme.primary,
+                shadowElevation = 6.dp,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(top = 56.dp)
+                    .width(26.dp)
+                    .height(48.dp)
+                    .clickable { onPaneExpandedChange(1, true) }
             ) {
-                Icon(
-                    imageVector = Icons.Default.Settings,
-                    contentDescription = "設定與關於我",
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = "展開第一區",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
-            Spacer(Modifier.height(4.dp))
         }
-        if (isRatioEditMode != null && onToggleRatioEditMode != null) {
-            IconButton(
-                onClick = onToggleRatioEditMode,
-                modifier = Modifier.size(34.dp)
+
+        // 第二區摺疊後：上方保留一個小半圓形展開按鈕
+        if (!effectivePane2Expanded) {
+            Surface(
+                shape = RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp),
+                color = MaterialTheme.colorScheme.primary,
+                shadowElevation = 6.dp,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .width(48.dp)
+                    .height(26.dp)
+                    .clickable { onPaneExpandedChange(2, true) }
             ) {
-                Icon(
-                    imageVector = if (isRatioEditMode) Icons.Default.LockOpen else Icons.Default.Lock,
-                    contentDescription = "切換拖曳比例",
-                    tint = if (isRatioEditMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-            Spacer(Modifier.height(6.dp))
-        }
-        Surface(
-            shape = CircleShape,
-            color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier
-                .size(36.dp)
-                .clickable(onClick = onExpand)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    Icons.Default.ChevronRight,
-                    contentDescription = "展開 $title",
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(22.dp)
-                )
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.ExpandMore,
+                        contentDescription = "展開視窗 A",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
-        Spacer(Modifier.height(18.dp))
-        Text(
-            text = title,
-            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.rotate(90f)
-        )
+
+        // 第三區摺疊後：右緣保留一個小半圓形展開按鈕（無整條邊界）
+        if (showPane3 && !effectivePane3Expanded) {
+            Surface(
+                shape = RoundedCornerShape(topStart = 22.dp, bottomStart = 22.dp),
+                color = MaterialTheme.colorScheme.primary,
+                shadowElevation = 6.dp,
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 56.dp)
+                    .width(26.dp)
+                    .height(48.dp)
+                    .clickable { onPaneExpandedChange(3, true) }
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Default.ChevronLeft,
+                        contentDescription = "展開視窗 B",
+                        tint = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
     }
 }
 
