@@ -109,3 +109,14 @@
 - 壓縮加密與垃圾桶：`ArchiveAndCryptoManager.kt`、`TrashDatabase.kt`、`TrashManager.kt`、`TrashCleanupWorker.kt`
 - Shizuku 與更新檢查：`ShizukuApkInstaller.kt`、`UpdateChecker.kt`
 - CI/CD 自動編譯發布：`.github/workflows/build.yml`
+
+---
+
+## 4. 待辦與進行中紀錄（接續對話用）
+- **最新已發布版本**：`v1.0.12` (`versionCode = 13`)，Release 頁面：https://github.com/dx9901mk5/DX-File-Manager/releases/tag/v1.0.12
+- **本機已修改（尚未打包發布為 `v1.0.13`）**：
+  - `CloudMountWizardSheet.kt`：雲端硬碟精簡為僅保留 **Google 雲端硬碟** 與 **OneDrive**（以及 6 種區網／自建協定：SMB、FTP、SFTP、WebDAV、OwnCloud/Nextcloud、Amazon S3），移除 Dropbox、Yandex、Box、pCloud、SugarSync、MediaFire。
+- **Google 雲端硬碟 OAuth 狀態**：
+  - 已完成 Google Cloud Console（`dx-file-manager-514912`）Android OAuth 用戶端建立與 GitHub Pages 品牌宣傳設定，目前為「實際運作中（In production）」（未經 Google CASA 驗證前上限 100 位使用者；解除上限需至驗證中心送審 + YouTube 示範影片 + CASA 評估）。
+- **OneDrive (Azure) 註冊待辦**：
+  - 帳號 `dx9901mk5@gmail.com` 因尚未建立 Microsoft Entra / Azure 租用戶，開啟 `entra.microsoft.com` 時出現租用戶錯誤；需改從 `https://portal.azure.com/` 登入建立免費租用戶後，建立「多租戶 + 個人 Microsoft 帳號」之應用程式註冊（Redirect URI：`dxfilemanager://oauth2redirect`，勾選 Access tokens 與 `Files.ReadWrite.All`），再將取得的 Client ID 寫入 `OAuth2AuthHelper.kt` 並發布 `v1.0.13`。

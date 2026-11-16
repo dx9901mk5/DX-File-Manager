@@ -77,7 +77,18 @@ fun CloudMountWizardDialog(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val protocols = remember { VfsProtocol.entries.filter { it != VfsProtocol.LOCAL } }
+    val protocols = remember {
+        listOf(
+            VfsProtocol.GOOGLE_DRIVE,
+            VfsProtocol.ONEDRIVE,
+            VfsProtocol.LAN_SMB,
+            VfsProtocol.FTP,
+            VfsProtocol.SFTP,
+            VfsProtocol.WEBDAV,
+            VfsProtocol.OWNCLOUD_NEXTCLOUD,
+            VfsProtocol.AMAZON_S3
+        )
+    }
 
     var step by remember { mutableIntStateOf(1) }
     var selectedProtocol by remember { mutableStateOf(VfsProtocol.GOOGLE_DRIVE) }
@@ -188,16 +199,7 @@ fun CloudMountWizardDialog(
         )
     }
 
-    val isOAuthCloud = selectedProtocol in setOf(
-        VfsProtocol.GOOGLE_DRIVE,
-        VfsProtocol.DROPBOX,
-        VfsProtocol.ONEDRIVE,
-        VfsProtocol.YANDEX,
-        VfsProtocol.BOX,
-        VfsProtocol.PCLOUD,
-        VfsProtocol.SUGARSYNC,
-        VfsProtocol.MEDIAFIRE
-    )
+    val isOAuthCloud = selectedProtocol == VfsProtocol.GOOGLE_DRIVE || selectedProtocol == VfsProtocol.ONEDRIVE
 
     val stepTitle = when (step) {
         1 -> "網路連線指引 — 連線類型"
