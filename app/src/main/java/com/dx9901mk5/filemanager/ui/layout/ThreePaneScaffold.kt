@@ -85,7 +85,8 @@ fun ThreePaneScaffold(
             .background(MaterialTheme.colorScheme.background)
     ) {
         if (!pane1WidthInitialized) {
-            pane1Width = (maxWidth * (if (isExpandedScreen) 0.143f else 0.30f)).coerceIn(116.dp, 200.dp)
+            // 根目錄固定比例（約 24%，介於 180dp ~ 240dp，不開放變更）
+            pane1Width = (maxWidth * 0.24f).coerceIn(180.dp, 240.dp)
             pane1WidthInitialized = true
         }
 
@@ -156,14 +157,10 @@ fun ThreePaneScaffold(
                     }
                 }
 
-                // 僅在第一區展開時才顯示分隔線 1
+                // 根目錄分隔線固定，不給予拖曳變更
                 ResizableDivider(
-                    editable = isRatioEditMode,
-                    onDrag = { deltaPx ->
-                        val deltaDp = with(density) { deltaPx.toDp() }
-                        val maxW = if (isExpandedScreen) 320.dp else 240.dp
-                        pane1Width = (pane1Width + deltaDp).coerceIn(100.dp, maxW)
-                    }
+                    editable = false,
+                    onDrag = {}
                 )
             }
 
