@@ -41,6 +41,11 @@
   - 第一區「圖片 / 影片 / 相片」整合為單一「相片與影片」入口，進入後上方提供「全部 / 照片 / 影片」子分類篩選。
 - **v1.0.5** (`versionCode = 6`)：
   - 完成雲端掛載修復、無邊界半圓展開鈕、手機直向第三分區、左上角反白工具列、根目錄固定比例、Shizuku 授權監聽與 2秒/3秒分段手勢。
+- **v1.0.11** (`versionCode = 12`)：
+  - 修復跨區拖曳切換分區時，來源分區因摺疊被移出組合樹而中斷 `pointerInput`、導致多選疊合動畫卡在角落且無法操作之問題（`ThreePaneScaffold.kt` 新增 `keepAliveSourcePane` 保留手勢存活、`TwoFingerStackGesture.kt` 加入 `finally` 安全重置、`CrossPaneDragController.kt` 防呆 `Offset.Zero` 並保證動畫卡片清理）。
+  - 放寬長壓 1.5 秒防抖容差（`1.8x touchSlop`）並於長壓/拖曳期間鎖定檔案點擊，確保滿 1.5 秒立即圈選第一個檔案並顯示底部操作選單排，不再誤觸開啟檔案。
+  - 有複製/剪下檔案時，於第二分區與第三分區頂部工具列同步顯示「貼上」膠囊按鈕。
+  - 修正 Google 雲端硬碟掛載精靈在系統 `GoogleAuthUtil` 未取得 Token 時誤判已登入之問題，於 Step 3 驗證 Token 有效性並於進階設定補齊 Google Drive 瀏覽器 OAuth Client ID 備援登入。
 - **v1.0.10** (`versionCode = 11`)：
   - 全面改版「新增雲端 / 網路掛載」精靈 (`CloudMountWizardSheet.kt`) 為 5 步驟網路連線指引（連線類型 → 顯示名稱 → 登入 → 總覽 → 連線），支援同平台掛載多重帳號。
   - 整合 `play-services-auth` (`GoogleAuthUtil` + `AccountManager.newChooseAccountIntent`)，Google 雲端硬碟可直接呼叫系統 Google 帳戶選擇器登入授權，無需在主畫面手動輸入 Client ID；其餘雲端平台同步改為簡潔一鍵登入流程（進階 Token / Client ID 收納於折疊選單）。

@@ -204,15 +204,19 @@ fun DragAndDropOverlay(controller: CrossPaneDragController) {
             val animOffset = remember(card.id) { Animatable(card.startOffset, Offset.VectorConverter) }
             val animScale = remember(card.id) { Animatable(1.05f) }
             LaunchedEffect(card.id) {
-                animOffset.animateTo(
-                    targetValue = controller.pointerRootOffset,
-                    animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing)
-                )
-                animScale.animateTo(
-                    targetValue = 0.85f,
-                    animationSpec = tween(durationMillis = 120)
-                )
-                controller.flyingCards.removeAll { it.id == card.id }
+                try {
+                    val target = controller.pointerRootOffset.takeIf { it != Offset.Zero } ?: card.startOffset
+                    animOffset.animateTo(
+                        targetValue = target,
+                        animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing)
+                    )
+                    animScale.animateTo(
+                        targetValue = 0.85f,
+                        animationSpec = tween(durationMillis = 100)
+                    )
+                } finally {
+                    controller.flyingCards.removeAll { it.id == card.id }
+                }
             }
             Surface(
                 modifier = Modifier
@@ -234,7 +238,7 @@ fun DragAndDropOverlay(controller: CrossPaneDragController) {
         }
 
         // 跟隨第一指的堆疊預覽卡片 + 右上角數量徽章
-        if (showFloating) {
+        if (showFloating && controller.pointerRootOffset != Offset.Zero) {
             val count = controller.draggedFiles.size
             val leadFile = controller.draggedFiles.first()
             Box(

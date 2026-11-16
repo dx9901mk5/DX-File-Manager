@@ -31,7 +31,8 @@ fun Modifier.dxFileTouchGesture(
     onSecondFingerTapItem: (tappedFilePath: String, tapOffset: Offset) -> Unit,
     onPrimaryFingerDrag: (currentOffset: Offset, hoveredFolderPath: String?) -> Unit,
     onDropComplete: (dropOffset: Offset, targetFolderPath: String?, didDrag: Boolean) -> Unit,
-    onStationaryRelease: (initialFilePath: String, usedSecondFinger: Boolean) -> Unit
+    onStationaryRelease: (initialFilePath: String, usedSecondFinger: Boolean) -> Unit,
+    onCancelDrag: () -> Unit = {}
 ): Modifier = composed {
     val currentFindItem by rememberUpdatedState(findItemAtPosition)
     val currentOnEmptySpaceLongPress by rememberUpdatedState(onEmptySpaceLongPress)
@@ -40,6 +41,7 @@ fun Modifier.dxFileTouchGesture(
     val currentOnPrimaryFingerDrag by rememberUpdatedState(onPrimaryFingerDrag)
     val currentOnDropComplete by rememberUpdatedState(onDropComplete)
     val currentOnStationaryRelease by rememberUpdatedState(onStationaryRelease)
+    val currentOnCancelDrag by rememberUpdatedState(onCancelDrag)
 
     this.pointerInput(Unit) {
     awaitEachGesture {
@@ -48,6 +50,7 @@ fun Modifier.dxFileTouchGesture(
         val startPosition = firstDown.position
         val touchedFile = currentFindItem(startPosition)
         val touchSlop = viewConfiguration.touchSlop
+        val holdSlop = touchSlop * 1.8f
 
         // 第 1 階段：原地停住滿 1500ms (1.5 秒)
         val movedOrReleasedBeforeHold = withTimeoutOrNull(1500L) {
@@ -57,7 +60,7 @@ fun Modifier.dxFileTouchGesture(
                 if (primaryChange == null || !primaryChange.pressed) {
                     return@withTimeoutOrNull true
                 }
-                if ((primaryChange.position - startPosition).getDistance() > touchSlop) {
+                if ((primaryChange.position - startPosition).getDistance() > holdSlop) {
                     return@withTimeoutOrNull true
                 }
             }
@@ -83,41 +86,47 @@ fun Modifier.dxFileTouchGesture(
         var usedSecondFinger = false
 
         // 第 2 階段：持續按住監聽第二指多選點擊、第一指挪動拖曳、或原地放開
-        while (isHolding) {
-            val event = awaitPointerEvent(PointerEventPass.Initial)
-            val primaryChange = event.changes.firstOrNull { it.id == primaryPointerId }
+        try {
+            while (isHolding) {
+                val event = awaitPointerEvent(PointerEventPass.Initial)
+                val primaryChange = event.changes.firstOrNull { it.id == primaryPointerId }
 
-            event.changes
-                .filter { it.id != primaryPointerId && it.pressed && !it.previousPressed }
-                .forEach { secondFinger ->
-                    secondFinger.consume()
-                    val secondTappedFile = currentFindItem(secondFinger.position)
-                    if (secondTappedFile != null) {
-                        usedSecondFinger = true
-                        DxHaptics.lightVibrate(context, hapticView)
-                        currentOnSecondFingerTapItem(secondTappedFile, secondFinger.position)
+                event.changes
+                    .filter { it.id != primaryPointerId && it.pressed && !it.previousPressed }
+                    .forEach { secondFinger ->
+                        secondFinger.consume()
+                        val secondTappedFile = currentFindItem(secondFinger.position)
+                        if (secondTappedFile != null) {
+                            usedSecondFinger = true
+                            DxHaptics.lightVibrate(context, hapticView)
+                            currentOnSecondFingerTapItem(secondTappedFile, secondFinger.position)
+                        }
+                    }
+
+                if (primaryChange == null || !primaryChange.pressed) {
+                    primaryChange?.consume()
+                    val finalPos = primaryChange?.position ?: startPosition
+                    isHolding = false
+                    if (didDragBeyondSlop) {
+                        val targetFolder = currentFindItem(finalPos)
+                        currentOnDropComplete(finalPos, targetFolder, true)
+                    } else {
+                        currentOnStationaryRelease(touchedFile, usedSecondFinger)
+                    }
+                } else if (primaryChange.positionChange() != Offset.Zero) {
+                    if (!didDragBeyondSlop && (primaryChange.position - startPosition).getDistance() > touchSlop) {
+                        didDragBeyondSlop = true
+                    }
+                    if (didDragBeyondSlop) {
+                        primaryChange.consume()
+                        val hoveredItem = currentFindItem(primaryChange.position)
+                        currentOnPrimaryFingerDrag(primaryChange.position, hoveredItem)
                     }
                 }
-
-            if (primaryChange == null || !primaryChange.pressed) {
-                primaryChange?.consume()
-                val finalPos = primaryChange?.position ?: startPosition
-                if (didDragBeyondSlop) {
-                    val targetFolder = currentFindItem(finalPos)
-                    currentOnDropComplete(finalPos, targetFolder, true)
-                } else {
-                    currentOnStationaryRelease(touchedFile, usedSecondFinger)
-                }
-                isHolding = false
-            } else if (primaryChange.positionChange() != Offset.Zero) {
-                if (!didDragBeyondSlop && (primaryChange.position - startPosition).getDistance() > touchSlop) {
-                    didDragBeyondSlop = true
-                }
-                if (didDragBeyondSlop) {
-                    primaryChange.consume()
-                    val hoveredItem = currentFindItem(primaryChange.position)
-                    currentOnPrimaryFingerDrag(primaryChange.position, hoveredItem)
-                }
+            }
+        } finally {
+            if (isHolding) {
+                currentOnCancelDrag()
             }
         }
     }

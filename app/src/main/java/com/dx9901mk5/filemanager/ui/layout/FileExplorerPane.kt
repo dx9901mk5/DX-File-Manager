@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentPaste
 import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.GridView
@@ -132,6 +133,9 @@ fun FileExplorerPane(
     onCtrlWheelZoom: (Float) -> Unit,
     onAddBookmark: (String) -> Unit,
     onCreateNewFolderClick: () -> Unit,
+    hasClipboard: Boolean = false,
+    clipboardCount: Int = 0,
+    onPasteClick: () -> Unit = {},
     onShowBottomActionBar: (prioritizeCreateOrCompress: Boolean) -> Unit = {},
     onHideBottomActionBar: () -> Unit = {},
     onSwitchCategory: (FileCategory) -> Unit = {},
@@ -259,6 +263,37 @@ fun FileExplorerPane(
                                 tint = if (state.viewMode == FileViewMode.LARGE_GRID) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(18.dp)
                             )
+                        }
+                        if (state.mode == PaneMode.FILES && hasClipboard) {
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .padding(end = 4.dp)
+                                    .clickable {
+                                        onFocusPane()
+                                        onPasteClick()
+                                    }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.ContentPaste,
+                                        contentDescription = "貼上",
+                                        tint = MaterialTheme.colorScheme.onPrimary,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Text(
+                                        text = if (clipboardCount > 1) "貼上($clipboardCount)" else "貼上",
+                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                        color = MaterialTheme.colorScheme.onPrimary,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
                         }
                         if (state.mode == PaneMode.FILES) {
                             IconButton(onClick = onCreateNewFolderClick, modifier = Modifier.size(28.dp)) {
@@ -515,9 +550,12 @@ fun FileExplorerPane(
                                     didDrag = didDrag
                                 )
                             },
-                            onStationaryRelease = { _, _ ->
+                            onStationaryRelease = { _, usedSecondFinger ->
                                 dragController.resetDrag()
-                                onShowBottomActionBar(true)
+                                onShowBottomActionBar(usedSecondFinger)
+                            },
+                            onCancelDrag = {
+                                dragController.resetDrag()
                             }
                         )
                 ) {
@@ -588,6 +626,7 @@ fun FileExplorerPane(
                                                 itemRootBounds[file.path] = coords.boundsInRoot()
                                             }
                                             .clickable {
+                                                if (dragController.isHolding || dragController.isDragging) return@clickable
                                                 onFocusPane()
                                                 if (state.isMultiSelectMode) {
                                                     onToggleSelect(file.path)
@@ -629,6 +668,7 @@ fun FileExplorerPane(
                                                 itemRootBounds[file.path] = coords.boundsInRoot()
                                             }
                                             .clickable {
+                                                if (dragController.isHolding || dragController.isDragging) return@clickable
                                                 onFocusPane()
                                                 if (state.isMultiSelectMode) {
                                                     onToggleSelect(file.path)

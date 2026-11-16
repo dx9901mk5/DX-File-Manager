@@ -150,11 +150,10 @@ fun CloudMountWizardDialog(
                             consentLauncher.launch(res.intent)
                         }
                         is GoogleTokenResult.Error -> {
-                            // 即使尚未設定 GCP OAuth Android Client，仍記錄已選帳戶並展開進階 Token 備援
-                            loggedInAccount = accountName
+                            loggedInAccount = null
                             username = accountName
                             authBusy = false
-                            statusMessage = "系統授權回應：${res.message}（可在下方進階貼上 Token）"
+                            statusMessage = res.message
                             showAdvancedAuth = true
                         }
                     }
@@ -369,14 +368,24 @@ fun CloudMountWizardDialog(
 
                             AnimatedVisibility(visible = showAdvancedAuth) {
                                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    if (selectedProtocol != VfsProtocol.GOOGLE_DRIVE) {
-                                        OutlinedTextField(
-                                            value = clientId,
-                                            onValueChange = { clientId = it },
-                                            label = { Text("OAuth Client ID（瀏覽器登入用）") },
-                                            singleLine = true,
+                                    OutlinedTextField(
+                                        value = clientId,
+                                        onValueChange = { clientId = it },
+                                        label = { Text("OAuth Client ID（瀏覽器登入用）") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    if (selectedProtocol == VfsProtocol.GOOGLE_DRIVE && clientId.isNotBlank()) {
+                                        OutlinedButton(
+                                            onClick = {
+                                                statusMessage = null
+                                                OAuth2AuthHelper.launchBrowserAuth(context, selectedProtocol, clientId)
+                                                    .onFailure { statusMessage = it.message }
+                                            },
                                             modifier = Modifier.fillMaxWidth()
-                                        )
+                                        ) {
+                                            Text("改用瀏覽器 OAuth 登入 Google 雲端硬碟")
+                                        }
                                     }
                                     OutlinedTextField(
                                         value = accessToken,
@@ -541,6 +550,12 @@ fun CloudMountWizardDialog(
                         if (step == 2 && displayName.isBlank()) {
                             displayName = selectedProtocol.displayName
                         }
+                        if (step == 3 && usesCloudOAuth && accessToken.isBlank()) {
+                            statusMessage = "尚未取得授權 Token，請先完成登入或展開進階設定貼上 Access Token"
+                            showAdvancedAuth = true
+                            return@Button
+                        }
+                        statusMessage = null
                         step++
                     }
                 ) {

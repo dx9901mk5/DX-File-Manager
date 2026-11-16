@@ -78,6 +78,7 @@ fun ThreePaneScaffold(
     pane3Expanded: Boolean,
     onPaneExpandedChange: (paneIndex: Int, expanded: Boolean) -> Unit,
     autoCollapseUnusedPaneOnDrag: Int?,
+    keepAliveSourcePane: Int? = null,
     hoveredExpandButtonPane: Int? = null,
     onExpandButtonBoundsChanged: (paneIndex: Int, rect: Rect?) -> Unit = { _, _ -> },
     onPaneBoundsChanged: (paneIndex: Int, leftX: Float, rightX: Float) -> Unit = { _, _, _ -> },
@@ -224,10 +225,10 @@ fun ThreePaneScaffold(
             ) {
                 val totalWidth = maxWidth
                 Row(Modifier.fillMaxSize()) {
-                    if (safeW2 > 0.005f) {
+                    if (safeW2 > 0.005f || keepAliveSourcePane == 2) {
+                        val pane2WidthMod = if (safeW2 > 0.005f) Modifier.weight(safeW2) else Modifier.width(0.dp)
                         Box(
-                            modifier = Modifier
-                                .weight(safeW2)
+                            modifier = pane2WidthMod
                                 .fillMaxHeight()
                                 .clipToBounds()
                                 .onGloballyPositioned { coords ->
@@ -252,10 +253,10 @@ fun ThreePaneScaffold(
                         )
                     }
 
-                    if (showPane3 && safeW3 > 0.005f) {
+                    if (showPane3 && (safeW3 > 0.005f || keepAliveSourcePane == 3)) {
+                        val pane3WidthMod = if (safeW3 > 0.005f) Modifier.weight(safeW3) else Modifier.width(0.dp)
                         Box(
-                            modifier = Modifier
-                                .weight(safeW3)
+                            modifier = pane3WidthMod
                                 .fillMaxHeight()
                                 .clipToBounds()
                                 .onGloballyPositioned { coords ->
