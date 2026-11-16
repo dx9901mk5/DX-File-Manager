@@ -1,3 +1,19 @@
 <resources>
-    <string name="app_name">DX檔案管理器</string>
+    <string name="app_name">DX File Manager</string>
+    <string name="nav_root_title">Root &amp; Navigation</string>
+    <string name="nav_storage_devices">Storage Devices</string>
+    <string name="nav_internal_storage">Internal Storage</string>
+    <string name="nav_add_cloud_mount">Add Cloud / Network Mount</string>
+    <string name="nav_categories">Categories &amp; Collections</string>
+    <string name="nav_bookmarks">Bookmarks</string>
+    <string name="nav_toolbox">Toolbox</string>
+    <string name="nav_storage_analyzer">DX Storage Analyzer</string>
+    <string name="nav_web_share">DX LAN WebShare</string>
+    <string name="nav_toggle_hidden">Toggle Hidden Folders</string>
+    <string name="select_all">Select All</string>
+    <string name="cancel">Cancel</string>
+    <string name="confirm">Confirm</string>
+    <string name="close">Close</string>
+    <string name="settings_about">Settings &amp; About</string>
+    <string name="language_setting">Language</string>
 </resources>

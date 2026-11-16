@@ -24,6 +24,7 @@ data class DxSettingsState(
     val useShizukuInstall: Boolean = false,
     val showHiddenFiles: Boolean = false,
     val darkTheme: Boolean = true,
+    val language: AppLanguage = AppLanguage.fromSystemOrCode(null),
     val bookmarks: List<String> = emptyList(),
     val cloudMounts: List<VfsMountConfig> = emptyList()
 )
@@ -35,6 +36,7 @@ class AppPreferences(private val context: Context) {
         val SHIZUKU_INSTALL = booleanPreferencesKey("use_shizuku_install")
         val SHOW_HIDDEN = booleanPreferencesKey("show_hidden_files")
         val DARK_THEME = booleanPreferencesKey("dark_theme")
+        val LANGUAGE = stringPreferencesKey("app_language")
         val BOOKMARKS = stringSetPreferencesKey("bookmarks")
         val CLOUD_MOUNTS_JSON = stringPreferencesKey("cloud_mounts_json")
     }
@@ -48,6 +50,7 @@ class AppPreferences(private val context: Context) {
             useShizukuInstall = prefs[Keys.SHIZUKU_INSTALL] ?: false,
             showHiddenFiles = prefs[Keys.SHOW_HIDDEN] ?: false,
             darkTheme = prefs[Keys.DARK_THEME] ?: true,
+            language = AppLanguage.fromSystemOrCode(prefs[Keys.LANGUAGE]),
             bookmarks = (prefs[Keys.BOOKMARKS] ?: setOf(defaultDownloadPath)).toList().sorted(),
             cloudMounts = decodeMounts(prefs[Keys.CLOUD_MOUNTS_JSON])
         )
@@ -67,6 +70,10 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setDarkTheme(dark: Boolean) {
         context.dxDataStore.edit { it[Keys.DARK_THEME] = dark }
+    }
+
+    suspend fun setLanguage(language: AppLanguage) {
+        context.dxDataStore.edit { it[Keys.LANGUAGE] = language.code }
     }
 
     suspend fun addBookmark(path: String) {

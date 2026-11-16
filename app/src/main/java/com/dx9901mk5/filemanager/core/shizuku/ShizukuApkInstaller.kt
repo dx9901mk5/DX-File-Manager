@@ -5,10 +5,10 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Environment
-import dev.rikka.shizuku.Shizuku
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.lingala.zip4j.ZipFile
+import rikka.shizuku.Shizuku
 import java.io.File
 
 data class InstalledAppInfo(

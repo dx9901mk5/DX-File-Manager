@@ -19,6 +19,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isBackPressed
+import androidx.compose.ui.input.pointer.isCtrlPressed as isPointerCtrlPressed
 import androidx.compose.ui.input.pointer.isForwardPressed
 import androidx.compose.ui.input.pointer.isPrimaryPressed
 import androidx.compose.ui.input.pointer.isSecondaryPressed
@@ -87,7 +88,7 @@ fun Modifier.dxMouseHandler(
                 }
 
                 PointerEventType.Scroll -> {
-                    if (event.keyboardModifiers.isCtrlPressed) {
+                    if (event.keyboardModifiers.isPointerCtrlPressed) {
                         val deltaY = change.scrollDelta.y
                         if (deltaY != 0f) {
                             change.consume()

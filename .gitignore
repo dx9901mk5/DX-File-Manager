@@ -15,6 +15,7 @@ captures/
 # Keep release.keystore if local, or ignore if managed via Secrets
 # Note: Per DX File Manager spec, release.keystore can be generated locally or via CI Secrets
 *.jks
+*.keystore
 keystore.properties
 
 # Google Drive shortcut

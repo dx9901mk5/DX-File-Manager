@@ -387,6 +387,7 @@ private fun DxFileManagerScreen(
                 onToggleShizukuInstall = { viewModel.setUseShizukuInstall(it) },
                 onToggleShowHidden = { viewModel.setShowHiddenFiles(it) },
                 onToggleDarkTheme = { viewModel.setDarkTheme(it) },
+                onChangeLanguage = { viewModel.setLanguage(it) },
                 onInstallUpdateApk = { apk -> viewModel.installApkWithShizukuOrFallback(apk) },
                 onDismiss = { showSettingsDialog = false }
             )

@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">DX文件管理器</string>
+    <string name="nav_root_title">根目录与导航</string>
+    <string name="nav_storage_devices">存储设备</string>
+    <string name="nav_internal_storage">内部存储空间</string>
+    <string name="nav_add_cloud_mount">添加云盘 / 网络挂载</string>
+    <string name="nav_categories">文件分类 &amp; 专区</string>
+    <string name="nav_bookmarks">书签</string>
+    <string name="nav_toolbox">工具箱</string>
+    <string name="nav_storage_analyzer">DX 存储空间分析器</string>
+    <string name="nav_web_share">DX 局域网网页分享</string>
+    <string name="nav_toggle_hidden">切换显示隐藏文件夹</string>
+    <string name="select_all">全选</string>
+    <string name="cancel">取消</string>
+    <string name="confirm">确定</string>
+    <string name="close">关闭</string>
+    <string name="settings_about">设置与关于</string>
+    <string name="language_setting">界面语言</string>
+</resources>

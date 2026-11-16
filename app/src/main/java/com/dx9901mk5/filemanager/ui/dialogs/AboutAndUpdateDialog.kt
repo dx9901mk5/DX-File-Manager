@@ -4,6 +4,8 @@ import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -31,13 +34,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.dx9901mk5.filemanager.BuildConfig
+import com.dx9901mk5.filemanager.core.settings.AppLanguage
 import com.dx9901mk5.filemanager.core.settings.DxSettingsState
+import com.dx9901mk5.filemanager.core.settings.dxStringsFor
 import com.dx9901mk5.filemanager.core.shizuku.ShizukuApkInstaller
 import com.dx9901mk5.filemanager.core.updater.ReleaseInfo
 import com.dx9901mk5.filemanager.core.updater.UpdateChecker
 import kotlinx.coroutines.launch
 import java.io.File
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsAndAboutDialog(
     settings: DxSettingsState,
@@ -45,11 +51,13 @@ fun SettingsAndAboutDialog(
     onToggleShizukuInstall: (Boolean) -> Unit,
     onToggleShowHidden: (Boolean) -> Unit,
     onToggleDarkTheme: (Boolean) -> Unit,
+    onChangeLanguage: (AppLanguage) -> Unit,
     onInstallUpdateApk: (File) -> Unit,
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val s = remember(settings.language) { dxStringsFor(settings.language) }
 
     var shizukuAvailable by remember { mutableStateOf(ShizukuApkInstaller.isShizukuAvailable()) }
     var shizukuReady by remember { mutableStateOf(ShizukuApkInstaller.isShizukuReady()) }
@@ -98,11 +106,24 @@ fun SettingsAndAboutDialog(
                     onCheckedChange = onToggleShowHidden
                 )
                 SettingSwitchRow(
-                    title = "深色主題 (Material 3)",
+                    title = s.darkThemeTitle,
                     subtitle = "關閉則切換為淺色模式",
                     checked = settings.darkTheme,
                     onCheckedChange = onToggleDarkTheme
                 )
+                Text(s.languageTitle, style = MaterialTheme.typography.bodyMedium)
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    AppLanguage.entries.forEach { lang ->
+                        FilterChip(
+                            selected = settings.language == lang,
+                            onClick = { onChangeLanguage(lang) },
+                            label = { Text(lang.label) }
+                        )
+                    }
+                }
 
                 HorizontalDivider()
 
