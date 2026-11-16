@@ -188,6 +188,17 @@ fun CloudMountWizardDialog(
         )
     }
 
+    val isOAuthCloud = selectedProtocol in setOf(
+        VfsProtocol.GOOGLE_DRIVE,
+        VfsProtocol.DROPBOX,
+        VfsProtocol.ONEDRIVE,
+        VfsProtocol.YANDEX,
+        VfsProtocol.BOX,
+        VfsProtocol.PCLOUD,
+        VfsProtocol.SUGARSYNC,
+        VfsProtocol.MEDIAFIRE
+    )
+
     val stepTitle = when (step) {
         1 -> "網路連線指引 — 連線類型"
         2 -> "網路連線指引 — 顯示名稱"
@@ -280,17 +291,6 @@ fun CloudMountWizardDialog(
 
                 // Step 3: 登入（依平台自動切換系統 Google 帳號選擇器 / 雲端登入 / 伺服器帳密）
                 3 -> {
-                    val isOAuthCloud = selectedProtocol in setOf(
-                        VfsProtocol.GOOGLE_DRIVE,
-                        VfsProtocol.DROPBOX,
-                        VfsProtocol.ONEDRIVE,
-                        VfsProtocol.YANDEX,
-                        VfsProtocol.BOX,
-                        VfsProtocol.PCLOUD,
-                        VfsProtocol.SUGARSYNC,
-                        VfsProtocol.MEDIAFIRE
-                    )
-
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -550,7 +550,7 @@ fun CloudMountWizardDialog(
                         if (step == 2 && displayName.isBlank()) {
                             displayName = selectedProtocol.displayName
                         }
-                        if (step == 3 && usesCloudOAuth && accessToken.isBlank()) {
+                        if (step == 3 && isOAuthCloud && accessToken.isBlank()) {
                             statusMessage = "尚未取得授權 Token，請先完成登入或展開進階設定貼上 Access Token"
                             showAdvancedAuth = true
                             return@Button
