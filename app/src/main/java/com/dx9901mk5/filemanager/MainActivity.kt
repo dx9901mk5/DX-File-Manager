@@ -258,7 +258,6 @@ private fun DxFileManagerScreen(
                             "內部儲存空間"
                         )
                     },
-                    onToggleTheme = { viewModel.setDarkTheme(!settings.darkTheme) },
                     onOpenSettings = { showSettingsDialog = true },
                     onToggleDualPane = { viewModel.setPaneExpanded(isExpandedScreen, 3, !pane3Expanded) },
                     onOpenLocalRoot = {
@@ -273,8 +272,7 @@ private fun DxFileManagerScreen(
                     onRemoveCloudMount = { mountId -> viewModel.removeCloudMount(mountId) },
                     onOpenCloudWizard = { showCloudWizard = true },
                     onOpenCategory = { cat -> viewModel.openCategory(focusedPane, cat) },
-                    onOpenBookmark = { path -> viewModel.navigateToPath(focusedPane, path, "local", "內部儲存空間") },
-                    onOpenShortcuts = { showShortcutsDialog = true }
+                    onOpenBookmark = { path -> viewModel.navigateToPath(focusedPane, path, "local", "內部儲存空間") }
                 )
             },
             pane2Content = { onCollapse ->
@@ -429,6 +427,7 @@ private fun DxFileManagerScreen(
                 onChangeLanguage = { viewModel.setLanguage(it) },
                 onOpenStorageAnalyzer = { showStorageAnalyzer = true },
                 onOpenWebShare = { showWebShare = true },
+                onOpenShortcuts = { showShortcutsDialog = true },
                 onInstallUpdateApk = { apk -> viewModel.installApkWithShizukuOrFallback(apk) },
                 onDismiss = { showSettingsDialog = false }
             )

@@ -22,21 +22,12 @@ import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Cloud
-import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.PhotoLibrary
-import androidx.compose.material.icons.filled.PieChart
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Smartphone
-import androidx.compose.material.icons.filled.Splitscreen
-import androidx.compose.material.icons.filled.VideoFile
-import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material.icons.filled.WifiTethering
 import androidx.compose.material3.Badge
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -64,7 +55,6 @@ fun NavigationPane(
     bookmarks: List<String>,
     trashCount: Int,
     onGoHome: () -> Unit,
-    onToggleTheme: () -> Unit,
     onOpenSettings: () -> Unit,
     onToggleDualPane: () -> Unit,
     onOpenLocalRoot: () -> Unit,
@@ -72,33 +62,44 @@ fun NavigationPane(
     onRemoveCloudMount: (String) -> Unit,
     onOpenCloudWizard: () -> Unit,
     onOpenCategory: (FileCategory) -> Unit,
-    onOpenBookmark: (String) -> Unit,
-    onOpenShortcuts: () -> Unit
+    onOpenBookmark: (String) -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        // 頂部工具列：首頁、主題切換、設定、分割畫面切換、快捷鍵
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 6.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            IconButton(onClick = onGoHome) {
-                Icon(Icons.Default.Home, contentDescription = "首頁")
+    Surface(
+        modifier = Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background,
+        contentColor = MaterialTheme.colorScheme.onBackground
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // 左上角工具列：最左邊為齒輪設定，接著房子首頁、雙欄切換（暗主題下反白顯示）
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 6.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.Start,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onOpenSettings) {
+                    Icon(
+                        Icons.Default.Settings,
+                        contentDescription = "設定與關於",
+                        tint = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+                IconButton(onClick = onGoHome) {
+                    Icon(
+                        Icons.Default.Home,
+                        contentDescription = "首頁",
+                        tint = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+                IconButton(onClick = onToggleDualPane) {
+                    Icon(
+                        Icons.Default.Splitscreen,
+                        contentDescription = "切換雙欄",
+                        tint = MaterialTheme.colorScheme.onBackground
+                    )
+                }
             }
-            IconButton(onClick = onToggleTheme) {
-                Icon(Icons.Default.DarkMode, contentDescription = "切換深淺主題")
-            }
-            IconButton(onClick = onToggleDualPane) {
-                Icon(Icons.Default.Splitscreen, contentDescription = "切換雙欄")
-            }
-            IconButton(onClick = onOpenShortcuts) {
-                Icon(Icons.Default.Keyboard, contentDescription = "快捷鍵指南")
-            }
-            IconButton(onClick = onOpenSettings) {
-                Icon(Icons.Default.Settings, contentDescription = "設定與關於")
-            }
-        }
 
         HorizontalDivider()
 
@@ -218,6 +219,7 @@ fun NavigationPane(
             item {
                 Spacer(Modifier.height(16.dp))
             }
+        }
         }
     }
 }

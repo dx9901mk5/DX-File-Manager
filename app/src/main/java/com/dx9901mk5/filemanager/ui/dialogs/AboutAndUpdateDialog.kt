@@ -54,6 +54,7 @@ fun SettingsAndAboutDialog(
     onChangeLanguage: (AppLanguage) -> Unit,
     onOpenStorageAnalyzer: () -> Unit,
     onOpenWebShare: () -> Unit,
+    onOpenShortcuts: () -> Unit,
     onInstallUpdateApk: (File) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -148,6 +149,15 @@ fun SettingsAndAboutDialog(
                     ) {
                         Text(s.webShare)
                     }
+                }
+                OutlinedButton(
+                    onClick = {
+                        onDismiss()
+                        onOpenShortcuts()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("鍵盤快捷鍵說明 (Ctrl + /)")
                 }
 
                 HorizontalDivider()
