@@ -59,10 +59,14 @@ import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSiz
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalView
+import com.dx9901mk5.filemanager.ui.gesture.DxHaptics
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -215,7 +219,35 @@ private fun DxFileManagerScreen(
     val pane3Expanded = if (isExpandedScreen || isLandscape) settings.pane3ExpandedTablet else settings.pane3ExpandedCompact
 
     val activityContext = LocalContext.current
+    val hapticView = LocalView.current
+
+    // 拖曳懸停於任一資料夾上方滿 2 秒（顯示放大鏡特效）-> 自動進入該資料夾，放開手指才詢問複製或移動
+    LaunchedEffect(dragController.isDragging, dragController.hoveredFolderPaneIndex, dragController.hoveredFolderPath) {
+        val paneIdx = dragController.hoveredFolderPaneIndex
+        val folderPath = dragController.hoveredFolderPath
+        if (dragController.isDragging && paneIdx != null && folderPath != null) {
+            if (dragController.draggedFiles.none { it.path == folderPath }) {
+                delay(2000L)
+                if (dragController.isDragging &&
+                    dragController.hoveredFolderPaneIndex == paneIdx &&
+                    dragController.hoveredFolderPath == folderPath
+                ) {
+                    DxHaptics.lightVibrate(activityContext, hapticView)
+                    viewModel.navigateToPath(paneIdx, folderPath)
+                    dragController.hoveredFolderPath = null
+                    dragController.hoveredFolderPaneIndex = null
+                }
+            }
+        }
+    }
+
     BackHandler(enabled = true) {
+        if (bottomActionBarState != null || pane2State.selectedPaths.isNotEmpty() || pane3State.selectedPaths.isNotEmpty()) {
+            bottomActionBarState = null
+            if (pane2State.selectedPaths.isNotEmpty()) viewModel.clearSelection(2)
+            if (pane3State.selectedPaths.isNotEmpty()) viewModel.clearSelection(3)
+            return@BackHandler
+        }
         val targetPane = when {
             focusedPane == 3 && pane3Expanded -> 3
             pane2Expanded -> 2

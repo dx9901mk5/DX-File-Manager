@@ -63,6 +63,7 @@ class CrossPaneDragController {
     var pointerRootOffset by mutableStateOf(Offset.Zero)
     var activePaneIndexDuringDrag by mutableStateOf<Int?>(null)
     var hoveredExpandButtonPane by mutableStateOf<Int?>(null)
+    var hoveredFolderPaneIndex by mutableStateOf<Int?>(null)
     var hoveredFolderPath by mutableStateOf<String?>(null)
     val flyingCards = mutableStateListOf<FlyingStackCard>()
 
@@ -71,6 +72,16 @@ class CrossPaneDragController {
 
     private val paneBounds = mutableMapOf<Int, Pair<Float, Float>>()
     private val expandButtonBounds = mutableMapOf<Int, Rect>()
+    private val folderBoundsByPane = mutableMapOf<Int, MutableMap<String, Rect>>()
+
+    fun updateFolderBounds(paneIndex: Int, path: String, rect: Rect?) {
+        val map = folderBoundsByPane.getOrPut(paneIndex) { mutableMapOf() }
+        if (rect == null) map.remove(path) else map[path] = rect
+    }
+
+    fun clearFolderBounds(paneIndex: Int) {
+        folderBoundsByPane[paneIndex]?.clear()
+    }
 
     fun updatePaneBounds(paneIndex: Int, leftX: Float, rightX: Float) {
         paneBounds[paneIndex] = leftX to rightX
@@ -89,6 +100,7 @@ class CrossPaneDragController {
         pointerRootOffset = rootOffset
         activePaneIndexDuringDrag = null
         hoveredExpandButtonPane = null
+        hoveredFolderPaneIndex = null
         hoveredFolderPath = null
     }
 
@@ -100,6 +112,7 @@ class CrossPaneDragController {
         pointerRootOffset = rootOffset
         activePaneIndexDuringDrag = paneIndex
         hoveredExpandButtonPane = null
+        hoveredFolderPaneIndex = null
         hoveredFolderPath = null
     }
 
@@ -116,13 +129,12 @@ class CrossPaneDragController {
         }
     }
 
-    fun updateDrag(rootOffset: Offset, hoveredFolder: String?) {
+    fun updateDrag(rootOffset: Offset, hoveredFolder: String? = null) {
         if (!isDragging) {
             isDragging = true
             activePaneIndexDuringDrag = sourcePaneIndex
         }
         pointerRootOffset = rootOffset
-        hoveredFolderPath = hoveredFolder
 
         // 偵測手指是否拖曳到各分區的半圓形展開按鈕上
         val hitExpandPane = expandButtonBounds.entries.firstOrNull { (_, r) ->
@@ -135,6 +147,8 @@ class CrossPaneDragController {
                 activePaneIndexDuringDrag = hitExpandPane
                 onRequestCrossPaneSwitch?.invoke(hitExpandPane)
             }
+            hoveredFolderPaneIndex = null
+            hoveredFolderPath = null
             return
         } else {
             hoveredExpandButtonPane = null
@@ -146,6 +160,19 @@ class CrossPaneDragController {
         if (detectedPane != null) {
             activePaneIndexDuringDrag = detectedPane
         }
+
+        val targetPane = detectedPane ?: activePaneIndexDuringDrag ?: sourcePaneIndex
+        val crossPaneFolder = folderBoundsByPane[targetPane]
+            ?.entries
+            ?.firstOrNull { (path, rect) ->
+                rect.contains(rootOffset) && draggedFiles.none { it.path == path }
+            }
+            ?.key
+        val resolvedFolder = crossPaneFolder ?: hoveredFolder?.takeIf { path ->
+            targetPane == sourcePaneIndex && draggedFiles.none { it.path == path }
+        }
+        hoveredFolderPath = resolvedFolder
+        hoveredFolderPaneIndex = if (resolvedFolder != null) targetPane else null
     }
 
     fun finishDrag(
@@ -156,12 +183,16 @@ class CrossPaneDragController {
     ) {
         val dropPane = activePaneIndexDuringDrag ?: fallbackPaneIndex
         val (targetMountId, defaultDirPath) = resolveTarget(dropPane)
-        val finalDir = if (dropPane == fallbackPaneIndex && targetFolderPath != null) {
-            targetFolderPath
-        } else {
-            defaultDirPath
+        val activeHoveredFolder = hoveredFolderPath?.takeIf {
+            hoveredFolderPaneIndex == dropPane && draggedFiles.none { f -> f.path == it }
         }
-        val shouldPrompt = didDrag || dropPane != sourcePaneIndex || (targetFolderPath != null && draggedFiles.none { it.path == targetFolderPath })
+        val finalDir = activeHoveredFolder
+            ?: if (dropPane == fallbackPaneIndex && targetFolderPath != null && draggedFiles.none { it.path == targetFolderPath }) {
+                targetFolderPath
+            } else {
+                defaultDirPath
+            }
+        val shouldPrompt = didDrag || dropPane != sourcePaneIndex || (finalDir != defaultDirPath)
         if (isDragging && draggedFiles.isNotEmpty() && shouldPrompt) {
             pendingDropTarget = PendingDropRequest(
                 files = draggedFiles,
@@ -179,6 +210,7 @@ class CrossPaneDragController {
         isDragging = false
         activePaneIndexDuringDrag = null
         hoveredExpandButtonPane = null
+        hoveredFolderPaneIndex = null
         hoveredFolderPath = null
         flyingCards.clear()
     }

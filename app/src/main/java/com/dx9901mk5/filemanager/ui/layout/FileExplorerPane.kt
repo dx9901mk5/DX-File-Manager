@@ -154,6 +154,7 @@ fun FileExplorerPane(
     val itemRootBounds = remember { mutableStateMapOf<String, Rect>() }
     LaunchedEffect(state.currentPath, state.viewMode, state.mode) {
         itemRootBounds.clear()
+        dragController.clearFolderBounds(state.paneIndex)
     }
     val filesByPath = remember(state.files) { state.files.associateBy { it.path } }
 
@@ -610,6 +611,7 @@ fun FileExplorerPane(
                                     val isSelected = file.path in state.selectedPaths
                                     val isHoveredTarget = dragController.isDragging &&
                                         file.isDirectory &&
+                                        dragController.hoveredFolderPaneIndex == state.paneIndex &&
                                         dragController.hoveredFolderPath == file.path
                                     val hoverScale by animateFloatAsState(
                                         targetValue = if (isHoveredTarget) 1.15f else 1f,
@@ -623,7 +625,11 @@ fun FileExplorerPane(
                                         modifier = Modifier
                                             .scale(hoverScale)
                                             .onGloballyPositioned { coords ->
-                                                itemRootBounds[file.path] = coords.boundsInRoot()
+                                                val b = coords.boundsInRoot()
+                                                itemRootBounds[file.path] = b
+                                                if (file.isDirectory) {
+                                                    dragController.updateFolderBounds(state.paneIndex, file.path, b)
+                                                }
                                             }
                                             .clickable {
                                                 if (dragController.isHolding || dragController.isDragging) return@clickable
@@ -650,6 +656,7 @@ fun FileExplorerPane(
                                     val isSelected = file.path in state.selectedPaths
                                     val isHoveredTarget = dragController.isDragging &&
                                         file.isDirectory &&
+                                        dragController.hoveredFolderPaneIndex == state.paneIndex &&
                                         dragController.hoveredFolderPath == file.path
                                     val hoverScale by animateFloatAsState(
                                         targetValue = if (isHoveredTarget) 1.15f else 1f,
@@ -665,7 +672,11 @@ fun FileExplorerPane(
                                         modifier = Modifier
                                             .scale(hoverScale)
                                             .onGloballyPositioned { coords ->
-                                                itemRootBounds[file.path] = coords.boundsInRoot()
+                                                val b = coords.boundsInRoot()
+                                                itemRootBounds[file.path] = b
+                                                if (file.isDirectory) {
+                                                    dragController.updateFolderBounds(state.paneIndex, file.path, b)
+                                                }
                                             }
                                             .clickable {
                                                 if (dragController.isHolding || dragController.isDragging) return@clickable
@@ -851,18 +862,8 @@ private fun FileRowItem(
 
 @Composable
 private fun FolderMagnifierBadge(visible: Boolean) {
-    var pulseActive by remember { mutableStateOf(false) }
-    LaunchedEffect(visible) {
-        if (visible) {
-            pulseActive = true
-            kotlinx.coroutines.delay(750L)
-            pulseActive = false
-        } else {
-            pulseActive = false
-        }
-    }
     AnimatedVisibility(
-        visible = pulseActive,
+        visible = visible,
         enter = scaleIn(
             spring(
                 dampingRatio = Spring.DampingRatioMediumBouncy,
