@@ -6,10 +6,10 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- 玻璃透明資料夾背板 -->
+    <!-- 半透明金黃玻璃資料夾背板 -->
     <path
         android:pathData="M22,30 L44,30 L50,36 L86,36 C88.2,36 90,37.8 90,40 L90,76 C90,78.2 88.2,80 86,80 L22,80 C19.8,80 18,78.2 18,76 L18,34 C18,31.8 19.8,30 22,30 Z"
-        android:strokeColor="#66FFFFFF"
+        android:strokeColor="#99FFE58F"
         android:strokeWidth="1.2">
         <aapt:attr name="android:fillColor">
             <gradient
@@ -18,16 +18,16 @@
                 android:endX="90"
                 android:endY="80"
                 android:type="linear">
-                <item android:color="#66FFFFFF" android:offset="0.0" />
-                <item android:color="#3393C5FD" android:offset="1.0" />
+                <item android:color="#99FFB300" android:offset="0.0" />
+                <item android:color="#55D97706" android:offset="1.0" />
             </gradient>
         </aapt:attr>
     </path>
 
-    <!-- 玻璃透明資料夾前景蓋板 (磨砂透光層) -->
+    <!-- 半透明磨砂金黃玻璃前景蓋板 -->
     <path
         android:pathData="M18,41 L90,41 L90,76 C90,78.2 88.2,80 86,80 L22,80 C19.8,80 18,78.2 18,76 Z"
-        android:strokeColor="#CCFFFFFF"
+        android:strokeColor="#CCFFF3C4"
         android:strokeWidth="1.4">
         <aapt:attr name="android:fillColor">
             <gradient
@@ -36,25 +36,32 @@
                 android:endX="88"
                 android:endY="80"
                 android:type="linear">
-                <item android:color="#7AFFFFFF" android:offset="0.0" />
-                <item android:color="#40E0F2FE" android:offset="0.45" />
-                <item android:color="#2EFFFFFF" android:offset="1.0" />
+                <item android:color="#B8FFD54F" android:offset="0.0" />
+                <item android:color="#78FFC83D" android:offset="0.5" />
+                <item android:color="#55F59E0B" android:offset="1.0" />
             </gradient>
         </aapt:attr>
     </path>
 
-    <!-- 頂部斜向玻璃高光條 -->
+    <!-- 頂部玻璃反光高光條 -->
     <path
         android:fillColor="#4DFFFFFF"
-        android:pathData="M21,42.5 L87,42.5 L87,48 L21,48 Z" />
+        android:pathData="M21,42.5 L87,42.5 L87,47.5 L21,47.5 Z" />
 
-    <!-- 字母 D (透亮白玻璃反差) -->
+    <!-- 字母 D -->
     <path
-        android:fillColor="#EEFFFFFF"
-        android:pathData="M31,50 L42,50 C49,50 53,54.3 53,61 C53,67.7 49,72 42,72 L31,72 Z M36.5,54.6 L36.5,67.4 L41.5,67.4 C45.5,67.4 47.5,65.1 47.5,61 C47.5,56.9 45.5,54.6 41.5,54.6 Z" />
+        android:fillColor="#F5FFFFFF"
+        android:pathData="M24.5,51 L33.5,51 C39.2,51 42.5,54.8 42.5,60.5 C42.5,66.2 39.2,70 33.5,70 L24.5,70 Z M29,55 L29,66 L33.2,66 C36.4,66 38,64 38,60.5 C38,57 36.4,55 33.2,55 Z" />
 
-    <!-- 字母 X (透亮白玻璃反差) -->
+    <!-- 字母 X -->
     <path
-        android:fillColor="#EEFFFFFF"
-        android:pathData="M56.5,50 L62.5,50 L67,57.4 L71.5,50 L77.5,50 L70.2,60.8 L78,72 L72,72 L67,64.2 L62,72 L56,72 L63.8,60.8 Z" />
+        android:fillColor="#F5FFFFFF"
+        android:pathData="M45,51 L50,51 L53.8,57.2 L57.6,51 L62.6,51 L56.5,60.3 L63,70 L58,70 L53.8,63.3 L49.6,70 L44.6,70 L51.1,60.3 Z" />
+
+    <!-- 閃電標誌 (亮白金邊) -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:strokeColor="#FFFFE082"
+        android:strokeWidth="0.9"
+        android:pathData="M75.5,47.5 L66,61 L72.5,61 L69,73.5 L81.5,58.5 L74.5,58.5 Z" />
 </vector>

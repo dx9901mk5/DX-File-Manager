@@ -38,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
@@ -47,12 +48,22 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.dx9901mk5.filemanager.core.vfs.VfsFile
+import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
 data class FlyingStackCard(
     val id: Long,
     val file: VfsFile,
     val startOffset: Offset
+)
+
+data class DropIntoFolderCard(
+    val id: Long,
+    val file: VfsFile,
+    val startOffset: Offset,
+    val targetOffset: Offset,
+    val delayMs: Long,
+    val moveDurationMs: Long
 )
 
 class CrossPaneDragController {
@@ -66,6 +77,7 @@ class CrossPaneDragController {
     var hoveredFolderPaneIndex by mutableStateOf<Int?>(null)
     var hoveredFolderPath by mutableStateOf<String?>(null)
     val flyingCards = mutableStateListOf<FlyingStackCard>()
+    val dropIntoFolderCards = mutableStateListOf<DropIntoFolderCard>()
 
     var pendingDropTarget by mutableStateOf<PendingDropRequest?>(null)
     var onRequestCrossPaneSwitch: ((targetPaneIndex: Int) -> Unit)? = null
@@ -192,17 +204,45 @@ class CrossPaneDragController {
             } else {
                 defaultDirPath
             }
-        val shouldPrompt = didDrag || dropPane != sourcePaneIndex || (finalDir != defaultDirPath)
+        val shouldPrompt = dropPane != sourcePaneIndex || (finalDir != defaultDirPath)
         if (isDragging && draggedFiles.isNotEmpty() && shouldPrompt) {
+            val targetCenter = folderBoundsByPane[dropPane]?.get(finalDir)?.center ?: pointerRootOffset
             pendingDropTarget = PendingDropRequest(
                 files = draggedFiles,
                 sourcePaneIndex = sourcePaneIndex,
                 targetPaneIndex = dropPane,
                 targetMountId = targetMountId,
-                targetDirPath = finalDir
+                targetDirPath = finalDir,
+                dropRootOffset = pointerRootOffset,
+                targetFolderCenterOffset = targetCenter
             )
         }
         resetDrag()
+    }
+
+    fun playDropIntoFolderAnimation(request: PendingDropRequest) {
+        val list = request.files
+        if (list.isEmpty()) return
+        val start = request.dropRootOffset.takeIf { it != Offset.Zero } ?: request.targetFolderCenterOffset
+        val target = request.targetFolderCenterOffset.takeIf { it != Offset.Zero } ?: start
+        // 總動畫時長約 2 秒（2000ms）：依序將疊圖檔案丟入目標資料夾
+        val totalWindowMs = 2000L
+        val count = list.size.coerceAtLeast(1)
+        val stepDelay = if (count > 1) (1000L / (count - 1)).coerceAtMost(280L) else 0L
+        val moveDur = (totalWindowMs - stepDelay * (count - 1)).coerceIn(800L, 1800L)
+        val baseId = System.nanoTime()
+        list.forEachIndexed { idx, f ->
+            dropIntoFolderCards.add(
+                DropIntoFolderCard(
+                    id = baseId + idx,
+                    file = f,
+                    startOffset = start + Offset((idx * 4).toFloat(), (idx * 4).toFloat()),
+                    targetOffset = target,
+                    delayMs = idx * stepDelay,
+                    moveDurationMs = moveDur
+                )
+            )
+        }
     }
 
     fun resetDrag() {
@@ -221,30 +261,33 @@ data class PendingDropRequest(
     val sourcePaneIndex: Int,
     val targetPaneIndex: Int,
     val targetMountId: String,
-    val targetDirPath: String
+    val targetDirPath: String,
+    val dropRootOffset: Offset = Offset.Zero,
+    val targetFolderCenterOffset: Offset = Offset.Zero
 )
 
 @Composable
 fun DragAndDropOverlay(controller: CrossPaneDragController) {
     val showFlying = controller.flyingCards.isNotEmpty()
     val showFloating = controller.isDragging && controller.draggedFiles.isNotEmpty()
-    if (!showFlying && !showFloating) return
+    val showDropIntoFolder = controller.dropIntoFolderCards.isNotEmpty()
+    if (!showFlying && !showFloating && !showDropIntoFolder) return
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // 第二指點擊飛入第一指座標的卡片疊合動畫（支援連續多指點擊同時飛行疊加）
+        // 第二指點擊 / 下滑連選飛入第一指座標的卡片疊合動畫（約 1 秒過渡特效）
         controller.flyingCards.toList().forEach { card ->
             val animOffset = remember(card.id) { Animatable(card.startOffset, Offset.VectorConverter) }
-            val animScale = remember(card.id) { Animatable(1.05f) }
+            val animScale = remember(card.id) { Animatable(1.08f) }
             LaunchedEffect(card.id) {
                 try {
                     val target = controller.pointerRootOffset.takeIf { it != Offset.Zero } ?: card.startOffset
                     animOffset.animateTo(
                         targetValue = target,
-                        animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing)
+                        animationSpec = tween(durationMillis = 720, easing = FastOutSlowInEasing)
                     )
                     animScale.animateTo(
                         targetValue = 0.85f,
-                        animationSpec = tween(durationMillis = 100)
+                        animationSpec = tween(durationMillis = 280)
                     )
                 } finally {
                     controller.flyingCards.removeAll { it.id == card.id }
@@ -326,6 +369,55 @@ fun DragAndDropOverlay(controller: CrossPaneDragController) {
                     Text(
                         text = count.toString(),
                         style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+                    )
+                }
+            }
+        }
+
+        // 確認複製或移動後：疊圖的檔案依序丟入目標資料夾內的過渡動畫（約 2 秒）
+        controller.dropIntoFolderCards.toList().forEach { card ->
+            val animOffset = remember(card.id) { Animatable(card.startOffset, Offset.VectorConverter) }
+            val animScale = remember(card.id) { Animatable(1f) }
+            val animAlpha = remember(card.id) { Animatable(1f) }
+            LaunchedEffect(card.id) {
+                try {
+                    if (card.delayMs > 0L) delay(card.delayMs)
+                    animOffset.animateTo(
+                        targetValue = card.targetOffset,
+                        animationSpec = tween(durationMillis = card.moveDurationMs.toInt(), easing = FastOutSlowInEasing)
+                    )
+                    animScale.animateTo(0.25f, animationSpec = tween(durationMillis = 220))
+                    animAlpha.animateTo(0f, animationSpec = tween(durationMillis = 180))
+                } finally {
+                    controller.dropIntoFolderCards.removeAll { it.id == card.id }
+                }
+            }
+            Surface(
+                modifier = Modifier
+                    .offset { IntOffset(animOffset.value.x.roundToInt() - 60, animOffset.value.y.roundToInt() - 22) }
+                    .scale(animScale.value)
+                    .alpha(animAlpha.value)
+                    .shadow(10.dp, RoundedCornerShape(12.dp)),
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.InsertDriveFile,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = card.file.name,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
             }

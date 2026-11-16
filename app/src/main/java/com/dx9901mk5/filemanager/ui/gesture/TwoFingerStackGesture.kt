@@ -29,6 +29,7 @@ fun Modifier.dxFileTouchGesture(
     onEmptySpaceLongPress: (pressOffset: Offset) -> Unit = {},
     onLongPressEnterMultiSelect: (initialFilePath: String, startOffset: Offset) -> Unit,
     onSecondFingerTapItem: (tappedFilePath: String, tapOffset: Offset) -> Unit,
+    onSweepSelectItem: (sweptFilePath: String, sweepOffset: Offset) -> Unit = { _, _ -> },
     onPrimaryFingerDrag: (currentOffset: Offset, hoveredFolderPath: String?) -> Unit,
     onDropComplete: (dropOffset: Offset, targetFolderPath: String?, didDrag: Boolean) -> Unit,
     onStationaryRelease: (initialFilePath: String, usedSecondFinger: Boolean) -> Unit,
@@ -38,6 +39,7 @@ fun Modifier.dxFileTouchGesture(
     val currentOnEmptySpaceLongPress by rememberUpdatedState(onEmptySpaceLongPress)
     val currentOnLongPressEnterMultiSelect by rememberUpdatedState(onLongPressEnterMultiSelect)
     val currentOnSecondFingerTapItem by rememberUpdatedState(onSecondFingerTapItem)
+    val currentOnSweepSelectItem by rememberUpdatedState(onSweepSelectItem)
     val currentOnPrimaryFingerDrag by rememberUpdatedState(onPrimaryFingerDrag)
     val currentOnDropComplete by rememberUpdatedState(onDropComplete)
     val currentOnStationaryRelease by rememberUpdatedState(onStationaryRelease)
@@ -84,6 +86,7 @@ fun Modifier.dxFileTouchGesture(
         var isHolding = true
         var didDragBeyondSlop = false
         var usedSecondFinger = false
+        val visitedInSweep = mutableSetOf(touchedFile)
 
         // 第 2 階段：持續按住監聽第二指多選點擊、第一指挪動拖曳、或原地放開
         try {
@@ -120,6 +123,10 @@ fun Modifier.dxFileTouchGesture(
                     if (didDragBeyondSlop) {
                         primaryChange.consume()
                         val hoveredItem = currentFindItem(primaryChange.position)
+                        if (hoveredItem != null && visitedInSweep.add(hoveredItem)) {
+                            DxHaptics.lightVibrate(context, hapticView)
+                            currentOnSweepSelectItem(hoveredItem, primaryChange.position)
+                        }
                         currentOnPrimaryFingerDrag(primaryChange.position, hoveredItem)
                     }
                 }

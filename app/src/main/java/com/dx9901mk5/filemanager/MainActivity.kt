@@ -563,10 +563,12 @@ private fun DxFileManagerScreen(
             CopyOrMoveDialog(
                 request = req,
                 onCopy = {
+                    dragController.playDropIntoFolderAnimation(req)
                     viewModel.performTransfer(srcMount, req.files, req.targetMountId, req.targetDirPath, isMove = false)
                     dragController.pendingDropTarget = null
                 },
                 onMove = {
+                    dragController.playDropIntoFolderAnimation(req)
                     viewModel.performTransfer(srcMount, req.files, req.targetMountId, req.targetDirPath, isMove = true)
                     dragController.pendingDropTarget = null
                 },

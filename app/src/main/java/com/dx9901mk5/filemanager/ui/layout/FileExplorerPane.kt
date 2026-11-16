@@ -534,6 +534,16 @@ fun FileExplorerPane(
                                     tapRootOffset = listContainerRootOffset + localOffset
                                 )
                             },
+                            onSweepSelectItem = { sweptPath, localOffset ->
+                                val file = filesByPath[sweptPath] ?: return@dxFileTouchGesture
+                                if (sweptPath !in state.selectedPaths) {
+                                    onToggleSelect(sweptPath)
+                                }
+                                dragController.addSecondFingerFile(
+                                    file = file,
+                                    tapRootOffset = listContainerRootOffset + localOffset
+                                )
+                            },
                             onPrimaryFingerDrag = { localOffset, hoveredPath ->
                                 onHideBottomActionBar()
                                 val hoveredFolder = hoveredPath?.takeIf { filesByPath[it]?.isDirectory == true }
@@ -550,6 +560,9 @@ fun FileExplorerPane(
                                     targetFolderPath = validFolder,
                                     didDrag = didDrag
                                 )
+                                if (dragController.pendingDropTarget == null) {
+                                    onShowBottomActionBar(true)
+                                }
                             },
                             onStationaryRelease = { _, usedSecondFinger ->
                                 dragController.resetDrag()
