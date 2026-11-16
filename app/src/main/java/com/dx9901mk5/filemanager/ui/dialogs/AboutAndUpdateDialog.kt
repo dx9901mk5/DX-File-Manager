@@ -1,6 +1,7 @@
 package com.dx9901mk5.filemanager.ui.dialogs
 
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -11,6 +12,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
@@ -22,6 +25,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +45,7 @@ import com.dx9901mk5.filemanager.core.shizuku.ShizukuApkInstaller
 import com.dx9901mk5.filemanager.core.updater.ReleaseInfo
 import com.dx9901mk5.filemanager.core.updater.UpdateChecker
 import kotlinx.coroutines.launch
+import rikka.shizuku.Shizuku
 import java.io.File
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -64,6 +69,23 @@ fun SettingsAndAboutDialog(
 
     var shizukuAvailable by remember { mutableStateOf(ShizukuApkInstaller.isShizukuAvailable()) }
     var shizukuReady by remember { mutableStateOf(ShizukuApkInstaller.isShizukuReady()) }
+    var shizukuStatusMsg by remember { mutableStateOf<String?>(null) }
+
+    DisposableEffect(Unit) {
+        val listener = Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
+            if (requestCode == ShizukuApkInstaller.SHIZUKU_REQUEST_CODE) {
+                val granted = grantResult == PackageManager.PERMISSION_GRANTED
+                shizukuAvailable = ShizukuApkInstaller.isShizukuAvailable()
+                shizukuReady = granted
+                onToggleShizukuInstall(granted)
+                shizukuStatusMsg = if (granted) "Shizuku 授權成功" else "Shizuku 授權遭拒絕"
+            }
+        }
+        runCatching { Shizuku.addRequestPermissionResultListener(listener) }
+        onDispose {
+            runCatching { Shizuku.removeRequestPermissionResultListener(listener) }
+        }
+    }
 
     var checkingUpdate by remember { mutableStateOf(false) }
     var releaseInfo by remember { mutableStateOf<ReleaseInfo?>(null) }
@@ -76,7 +98,9 @@ fun SettingsAndAboutDialog(
         title = { Text("設定與關於我") },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 SettingSwitchRow(
@@ -86,20 +110,28 @@ fun SettingsAndAboutDialog(
                     onCheckedChange = onToggleRecycleBin
                 )
                 SettingSwitchRow(
-                    title = "使用 Shizuku 靜默安裝 APK",
-                    subtitle = when {
+                    title = s.shizukuTitle,
+                    subtitle = shizukuStatusMsg ?: when {
                         shizukuReady -> "Shizuku 已授權就緒"
-                        shizukuAvailable -> "偵測到 Shizuku，請點擊授權"
-                        else -> "未偵測到 Shizuku 服務"
+                        shizukuAvailable -> "偵測到 Shizuku，開啟開關將要求授權"
+                        else -> "未偵測到 Shizuku 服務（請先啟動 Shizuku）"
                     },
-                    checked = settings.useShizukuInstall,
+                    checked = settings.useShizukuInstall && shizukuReady,
                     onCheckedChange = { checked ->
-                        if (checked && !ShizukuApkInstaller.isShizukuReady()) {
-                            ShizukuApkInstaller.requestShizukuPermission()
-                        }
                         shizukuAvailable = ShizukuApkInstaller.isShizukuAvailable()
                         shizukuReady = ShizukuApkInstaller.isShizukuReady()
-                        onToggleShizukuInstall(checked)
+                        if (!checked) {
+                            onToggleShizukuInstall(false)
+                            shizukuStatusMsg = null
+                        } else if (!shizukuAvailable) {
+                            onToggleShizukuInstall(false)
+                            shizukuStatusMsg = "請先啟動 Shizuku 服務後再開啟此開關"
+                        } else if (!shizukuReady) {
+                            ShizukuApkInstaller.requestShizukuPermission()
+                            shizukuStatusMsg = "正在向 Shizuku 請求授權..."
+                        } else {
+                            onToggleShizukuInstall(true)
+                        }
                     }
                 )
                 SettingSwitchRow(
