@@ -50,6 +50,7 @@ import com.dx9901mk5.filemanager.core.vfs.FileCategory
 import com.dx9901mk5.filemanager.core.vfs.StorageSpaceInfo
 import com.dx9901mk5.filemanager.core.vfs.VfsMountConfig
 import com.dx9901mk5.filemanager.ui.dialogs.formatFileSize
+import com.dx9901mk5.filemanager.ui.gesture.dxVerticalOverscrollBounce
 
 @Composable
 fun NavigationPane(
