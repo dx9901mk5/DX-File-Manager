@@ -169,6 +169,14 @@ class FileManagerViewModel(application: Application) : AndroidViewModel(applicat
         loadPane(paneIndex)
     }
 
+    fun canNavigateUp(paneIndex: Int): Boolean {
+        val cur = getPaneFlow(paneIndex).value
+        if (cur.mode != PaneMode.FILES) return true
+        if (cur.mountId == "local" && (cur.currentPath == rootPath || cur.currentPath.isBlank())) return false
+        if (cur.mountId != "local" && (cur.currentPath == "/" || cur.currentPath.isBlank())) return false
+        return File(cur.currentPath).parent != null
+    }
+
     fun navigateUp(paneIndex: Int) {
         val flow = getPaneFlow(paneIndex)
         val cur = flow.value

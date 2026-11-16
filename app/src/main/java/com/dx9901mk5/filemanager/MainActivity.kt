@@ -1,6 +1,7 @@
 package com.dx9901mk5.filemanager
 
 import android.Manifest
+import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
@@ -10,6 +11,7 @@ import android.os.Bundle
 import android.os.Environment
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -46,10 +48,13 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DriveFileMove
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
@@ -63,6 +68,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.dx9901mk5.filemanager.core.vfs.OAuth2AuthHelper
@@ -190,6 +196,7 @@ private fun DxFileManagerScreen(
     var showStorageAnalyzer by remember { mutableStateOf(false) }
     var showWebShare by remember { mutableStateOf(false) }
     var showNewFolderForPane by remember { mutableStateOf<Int?>(null) }
+    var showExitConfirmDialog by remember { mutableStateOf(false) }
     // Pair(paneIndex, prioritizeCreateOrCompress)
     var bottomActionBarState by remember { mutableStateOf<Pair<Int, Boolean>?>(null) }
 
@@ -206,6 +213,21 @@ private fun DxFileManagerScreen(
     val pane1Expanded = if (isExpandedScreen || isLandscape) settings.pane1ExpandedTablet else settings.pane1ExpandedCompact
     val pane2Expanded = if (isExpandedScreen || isLandscape) settings.pane2ExpandedTablet else settings.pane2ExpandedCompact
     val pane3Expanded = if (isExpandedScreen || isLandscape) settings.pane3ExpandedTablet else settings.pane3ExpandedCompact
+
+    val activityContext = LocalContext.current
+    BackHandler(enabled = true) {
+        val targetPane = when {
+            focusedPane == 3 && pane3Expanded -> 3
+            pane2Expanded -> 2
+            pane3Expanded -> 3
+            else -> focusedPane
+        }
+        if (viewModel.canNavigateUp(targetPane)) {
+            viewModel.navigateUp(targetPane)
+        } else {
+            showExitConfirmDialog = true
+        }
+    }
 
     fun activeFiles(paneIdx: Int): List<VfsFile> {
         val st = if (paneIdx == 2) pane2State else pane3State
@@ -588,6 +610,27 @@ private fun DxFileManagerScreen(
             DxWebShareDialog(
                 shareRoot = dir,
                 onDismiss = { showWebShare = false }
+            )
+        }
+
+        if (showExitConfirmDialog) {
+            AlertDialog(
+                onDismissRequest = { showExitConfirmDialog = false },
+                title = { Text("退出應用程式") },
+                text = { Text("目前已在根目錄，確定要退出 DX檔案管理器 嗎？") },
+                confirmButton = {
+                    Button(onClick = {
+                        showExitConfirmDialog = false
+                        (activityContext as? Activity)?.finish()
+                    }) {
+                        Text("退出")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showExitConfirmDialog = false }) {
+                        Text("取消")
+                    }
+                }
             )
         }
     }

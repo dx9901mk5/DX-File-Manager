@@ -1,6 +1,7 @@
 package com.dx9901mk5.filemanager.ui.gesture
 
 import android.content.Context
+import android.view.View
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.Modifier
@@ -20,6 +21,7 @@ import androidx.compose.ui.input.pointer.positionChange
  */
 fun Modifier.dxFileTouchGesture(
     context: Context,
+    hapticView: View? = null,
     findItemAtPosition: (Offset) -> String?,
     onEmptySpaceLongPress: (pressOffset: Offset) -> Unit = {},
     onLongPressEnterMultiSelect: (initialFilePath: String, startOffset: Offset) -> Unit,
@@ -29,7 +31,7 @@ fun Modifier.dxFileTouchGesture(
     onStationaryRelease: (initialFilePath: String, usedSecondFinger: Boolean) -> Unit
 ): Modifier = this.pointerInput(Unit) {
     awaitEachGesture {
-        val firstDown = awaitFirstDown(requireUnconsumed = false)
+        val firstDown = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
         val primaryPointerId: PointerId = firstDown.id
         val startPosition = firstDown.position
         val touchedFile = findItemAtPosition(startPosition)
@@ -56,7 +58,7 @@ fun Modifier.dxFileTouchGesture(
         }
 
         // 滿 1.5 秒 -> 大振動並進入多選狀態
-        DxHaptics.strongVibrate(context)
+        DxHaptics.strongVibrate(context, hapticView)
 
         if (touchedFile == null) {
             onEmptySpaceLongPress(startPosition)
@@ -80,12 +82,13 @@ fun Modifier.dxFileTouchGesture(
                     val secondTappedFile = findItemAtPosition(secondFinger.position)
                     if (secondTappedFile != null) {
                         usedSecondFinger = true
-                        DxHaptics.lightVibrate(context)
+                        DxHaptics.lightVibrate(context, hapticView)
                         onSecondFingerTapItem(secondTappedFile, secondFinger.position)
                     }
                 }
 
             if (primaryChange == null || !primaryChange.pressed) {
+                primaryChange?.consume()
                 val finalPos = primaryChange?.position ?: startPosition
                 if (didDragBeyondSlop) {
                     val targetFolder = findItemAtPosition(finalPos)

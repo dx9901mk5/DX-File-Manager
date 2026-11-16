@@ -45,6 +45,8 @@
   - 新增檔案傳輸（複製 / 移動 / 上傳 / 下載）通知欄即時進度條 (`TransferNotificationHelper.kt`)，支援 Android 13+ 通知權限請求與位元組串流進度回報。
   - 移除左上角「根目錄」標題列的重複齒輪設定按鈕，保留下方導覽工具列的設定齒輪圖示。
   - 檔案與資料夾清單改為純依「資料夾優先 + 檔名」排序，移除原本依月份分組的標題列。
+  - 修復長壓 1.5 秒進入多選與震動失效問題：改用 `PointerEventPass.Initial` 攔截與 `boundsInRoot()` 精準座標命中，並於 `DxHaptics` 補齊 `View.performHapticFeedback` 雙重震動支援。
+  - 新增系統返回手勢處理 (`BackHandler`)：依目前點擊聚焦的分區退回上層目錄，若已達根目錄退無可退再按返回則詢問是否退出 App。
 - **v1.0.7** (`versionCode = 8`)：
   - 資料夾圖示全面改版為 iOS 27 液態玻璃風格 (`IosGlassFolderIcon.kt`)，並透過 `VfsFile.isEmpty` 區分「空資料夾」（通透中空玻璃）與「有內容物資料夾」（內含層疊文件卡片與暖金玻璃折射光澤）。
   - 三大分區 (`ThreePaneScaffold.kt`) 摺疊／展開全面加入彈簧回彈 (`spring`) 動畫，半圓展開按鈕同步支援彈簧縮放進出場。

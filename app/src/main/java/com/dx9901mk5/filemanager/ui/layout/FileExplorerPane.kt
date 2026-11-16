@@ -82,6 +82,7 @@ import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -144,8 +145,12 @@ fun FileExplorerPane(
     var rubberBandRect by remember { mutableStateOf<Rect?>(null) }
     var listContainerRootOffset by remember { mutableStateOf(Offset.Zero) }
     val context = LocalContext.current
+    val hapticView = LocalView.current
 
-    val itemLocalBounds = remember { mutableStateMapOf<String, Rect>() }
+    val itemRootBounds = remember { mutableStateMapOf<String, Rect>() }
+    LaunchedEffect(state.currentPath, state.viewMode, state.mode) {
+        itemRootBounds.clear()
+    }
     val filesByPath = remember(state.files) { state.files.associateBy { it.path } }
 
     val filteredFiles = remember(state.files, state.searchQuery) {
@@ -437,14 +442,16 @@ fun FileExplorerPane(
                         .dxMouseHandler(
                             onRightClick = { localPos ->
                                 onFocusPane()
-                                val hitPath = itemLocalBounds.entries.firstOrNull { (_, r) -> r.contains(localPos) }?.key
+                                val rootPos = listContainerRootOffset + localPos
+                                val hitPath = itemRootBounds.entries.firstOrNull { (_, r) -> r.contains(rootPos) }?.key
                                 onShowContextMenu(hitPath?.let { filesByPath[it] })
                             },
                             onRubberBandStart = { onFocusPane() },
                             onRubberBandUpdate = { rect ->
                                 rubberBandRect = rect
-                                val hits = itemLocalBounds.entries
-                                    .filter { (_, bounds) -> rect.overlaps(bounds) }
+                                val rootRect = rect.translate(listContainerRootOffset)
+                                val hits = itemRootBounds.entries
+                                    .filter { (_, bounds) -> rootRect.overlaps(bounds) }
                                     .map { it.key }
                                     .toSet()
                                 onRubberBandSelect(hits)
@@ -456,8 +463,10 @@ fun FileExplorerPane(
                         )
                         .dxFileTouchGesture(
                             context = context,
+                            hapticView = hapticView,
                             findItemAtPosition = { localPos ->
-                                itemLocalBounds.entries.firstOrNull { (_, rect) -> rect.contains(localPos) }?.key
+                                val rootPos = listContainerRootOffset + localPos
+                                itemRootBounds.entries.firstOrNull { (_, rect) -> rect.contains(rootPos) }?.key
                             },
                             onEmptySpaceLongPress = {
                                 if (state.mode == PaneMode.FILES) {
@@ -576,7 +585,7 @@ fun FileExplorerPane(
                                         modifier = Modifier
                                             .scale(hoverScale)
                                             .onGloballyPositioned { coords ->
-                                                itemLocalBounds[file.path] = coords.boundsInParent()
+                                                itemRootBounds[file.path] = coords.boundsInRoot()
                                             }
                                             .clickable {
                                                 onFocusPane()
@@ -617,8 +626,7 @@ fun FileExplorerPane(
                                         modifier = Modifier
                                             .scale(hoverScale)
                                             .onGloballyPositioned { coords ->
-                                                val b = coords.boundsInParent()
-                                                itemLocalBounds[file.path] = b
+                                                itemRootBounds[file.path] = coords.boundsInRoot()
                                             }
                                             .clickable {
                                                 onFocusPane()
