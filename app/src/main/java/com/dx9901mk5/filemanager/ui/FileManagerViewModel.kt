@@ -15,6 +15,7 @@ import com.dx9901mk5.filemanager.DxFileManagerApp
 import com.dx9901mk5.filemanager.MainActivity
 import com.dx9901mk5.filemanager.core.archive.ArchiveAndCryptoManager
 import com.dx9901mk5.filemanager.core.settings.AppLanguage
+import com.dx9901mk5.filemanager.core.settings.DarkBackgroundStyle
 import com.dx9901mk5.filemanager.core.settings.DxSettingsState
 import com.dx9901mk5.filemanager.core.shizuku.InstalledAppInfo
 import com.dx9901mk5.filemanager.core.shizuku.ShizukuApkInstaller
@@ -506,6 +507,7 @@ class FileManagerViewModel(application: Application) : AndroidViewModel(applicat
         loadPane(3)
     }
     fun setDarkTheme(dark: Boolean) = viewModelScope.launch { prefs.setDarkTheme(dark) }
+    fun setDarkBackgroundStyle(style: DarkBackgroundStyle) = viewModelScope.launch { prefs.setDarkBackgroundStyle(style) }
     fun setLanguage(language: AppLanguage) = viewModelScope.launch { prefs.setLanguage(language) }
     fun addBookmark(path: String) = viewModelScope.launch { prefs.addBookmark(path); toast("已加入書籤") }
 

@@ -39,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.dx9901mk5.filemanager.BuildConfig
 import com.dx9901mk5.filemanager.core.settings.AppLanguage
+import com.dx9901mk5.filemanager.core.settings.DarkBackgroundStyle
 import com.dx9901mk5.filemanager.core.settings.DxSettingsState
 import com.dx9901mk5.filemanager.core.settings.dxStringsFor
 import com.dx9901mk5.filemanager.core.shizuku.ShizukuApkInstaller
@@ -56,6 +57,7 @@ fun SettingsAndAboutDialog(
     onToggleShizukuInstall: (Boolean) -> Unit,
     onToggleShowHidden: (Boolean) -> Unit,
     onToggleDarkTheme: (Boolean) -> Unit,
+    onChangeDarkBackgroundStyle: (DarkBackgroundStyle) -> Unit,
     onChangeLanguage: (AppLanguage) -> Unit,
     onOpenStorageAnalyzer: () -> Unit,
     onOpenWebShare: () -> Unit,
@@ -146,6 +148,24 @@ fun SettingsAndAboutDialog(
                     checked = settings.darkTheme,
                     onCheckedChange = onToggleDarkTheme
                 )
+                if (settings.darkTheme) {
+                    Text(s.darkBgStyleTitle, style = MaterialTheme.typography.bodyMedium)
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        FilterChip(
+                            selected = settings.darkBackgroundStyle == DarkBackgroundStyle.OLED_BLACK,
+                            onClick = { onChangeDarkBackgroundStyle(DarkBackgroundStyle.OLED_BLACK) },
+                            label = { Text(s.darkBgOledBlack) }
+                        )
+                        FilterChip(
+                            selected = settings.darkBackgroundStyle == DarkBackgroundStyle.DARK_GRAY,
+                            onClick = { onChangeDarkBackgroundStyle(DarkBackgroundStyle.DARK_GRAY) },
+                            label = { Text(s.darkBgDarkGray) }
+                        )
+                    }
+                }
                 Text(s.languageTitle, style = MaterialTheme.typography.bodyMedium)
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),

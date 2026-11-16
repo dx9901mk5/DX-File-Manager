@@ -109,6 +109,7 @@ fun NavigationPane(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
+                .dxVerticalOverscrollBounce()
                 .padding(horizontal = 8.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {

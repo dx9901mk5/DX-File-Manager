@@ -41,6 +41,13 @@
   - 第一區「圖片 / 影片 / 相片」整合為單一「相片與影片」入口，進入後上方提供「全部 / 照片 / 影片」子分類篩選。
 - **v1.0.5** (`versionCode = 6`)：
   - 完成雲端掛載修復、無邊界半圓展開鈕、手機直向第三分區、左上角反白工具列、根目錄固定比例、Shizuku 授權監聽與 2秒/3秒分段手勢。
+- **v1.0.7** (`versionCode = 8`)：
+  - 資料夾圖示全面改版為 iOS 27 液態玻璃風格 (`IosGlassFolderIcon.kt`)，並透過 `VfsFile.isEmpty` 區分「空資料夾」（通透中空玻璃）與「有內容物資料夾」（內含層疊文件卡片與暖金玻璃折射光澤）。
+  - 三大分區 (`ThreePaneScaffold.kt`) 摺疊／展開全面加入彈簧回彈 (`spring`) 動畫，半圓展開按鈕同步支援彈簧縮放進出場。
+  - 清單與網格檢視 (`DxOverscrollBounce.kt`) 新增 iOS 風格垂直滑動至頂部／底部的阻尼拉伸與彈簧回彈效果。
+  - 暗色主題 (`Theme.kt` / `AppPreferences.kt` / 設定頁) 新增兩種底色切換：**全黑 (OLED 螢幕適用)** (`#000000`) 與 **灰黑底** (`#18191C` / `#202226`)。
+  - 多選與觸控手勢重構 (`TwoFingerStackGesture.kt` / `CrossPaneDragController.kt` / `MainActivity.kt`)：長壓 1.5 秒大震動進入多選並顯示底部操作選單；手指未離開時第二指點擊連續多選並播放檔案聚合飛入動畫，底部選單暫時隱藏；第一指挪動即進入多檔案拖曳（資料夾顯示短暫放大鏡特效、移至分區展開鈕自動展開目標分區並摺疊原分區），放開詢問複製或移動；未拖曳原地放開則顯示優先含「新增資料夾 / 壓縮」的底部選單。
+  - 第二、三分區頂部工具列新增「新增空白資料夾」圖示按鈕。
 - **v1.0.6** (`versionCode = 7`)：
   - 修復 `TwoFingerStackGesture.kt` 誤用 `kotlinx.coroutines.withTimeoutOrNull` 導致進入多選時當機的問題，改用 `AwaitPointerEventScope` 內建 `withTimeoutOrNull` 並於 `PointerEventPass.Initial` 攔截第二指點擊。
   - 修復 `CrossPaneDragController.kt` 單一 `flyingCard` 覆蓋問題，改為 `mutableStateListOf<FlyingStackCard>` 支援連續多指點擊的卡片飛入疊合動畫。

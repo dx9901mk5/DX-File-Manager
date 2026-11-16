@@ -56,6 +56,7 @@ data class FlyingStackCard(
 )
 
 class CrossPaneDragController {
+    var isHolding by mutableStateOf(false)
     var isDragging by mutableStateOf(false)
     var sourcePaneIndex by mutableStateOf(2)
     var draggedFiles by mutableStateOf<List<VfsFile>>(emptyList())
@@ -80,7 +81,19 @@ class CrossPaneDragController {
         else expandButtonBounds[paneIndex] = rect
     }
 
+    fun prepareHold(paneIndex: Int, initialFile: VfsFile, rootOffset: Offset) {
+        isHolding = true
+        isDragging = false
+        sourcePaneIndex = paneIndex
+        draggedFiles = listOf(initialFile)
+        pointerRootOffset = rootOffset
+        activePaneIndexDuringDrag = null
+        hoveredExpandButtonPane = null
+        hoveredFolderPath = null
+    }
+
     fun startDrag(paneIndex: Int, initialFile: VfsFile, rootOffset: Offset) {
+        isHolding = true
         isDragging = true
         sourcePaneIndex = paneIndex
         draggedFiles = listOf(initialFile)
@@ -104,6 +117,10 @@ class CrossPaneDragController {
     }
 
     fun updateDrag(rootOffset: Offset, hoveredFolder: String?) {
+        if (!isDragging) {
+            isDragging = true
+            activePaneIndexDuringDrag = sourcePaneIndex
+        }
         pointerRootOffset = rootOffset
         hoveredFolderPath = hoveredFolder
 
@@ -158,6 +175,7 @@ class CrossPaneDragController {
     }
 
     fun resetDrag() {
+        isHolding = false
         isDragging = false
         activePaneIndexDuringDrag = null
         hoveredExpandButtonPane = null
@@ -176,10 +194,9 @@ data class PendingDropRequest(
 
 @Composable
 fun DragAndDropOverlay(controller: CrossPaneDragController) {
-    if (!controller.isDragging || controller.draggedFiles.isEmpty()) return
-
-    val count = controller.draggedFiles.size
-    val leadFile = controller.draggedFiles.first()
+    val showFlying = controller.flyingCards.isNotEmpty()
+    val showFloating = controller.isDragging && controller.draggedFiles.isNotEmpty()
+    if (!showFlying && !showFloating) return
 
     Box(modifier = Modifier.fillMaxSize()) {
         // 第二指點擊飛入第一指座標的卡片疊合動畫（支援連續多指點擊同時飛行疊加）
@@ -217,60 +234,64 @@ fun DragAndDropOverlay(controller: CrossPaneDragController) {
         }
 
         // 跟隨第一指的堆疊預覽卡片 + 右上角數量徽章
-        Box(
-            modifier = Modifier.offset {
-                IntOffset(
-                    (controller.pointerRootOffset.x - 80).roundToInt(),
-                    (controller.pointerRootOffset.y - 44).roundToInt()
-                )
-            }
-        ) {
-            if (count > 1) {
-                Box(
-                    modifier = Modifier
-                        .offset(x = 6.dp, y = 6.dp)
-                        .size(width = 180.dp, height = 46.dp)
-                        .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
-                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
-                )
-            }
-            Surface(
-                modifier = Modifier
-                    .size(width = 180.dp, height = 46.dp)
-                    .shadow(12.dp, RoundedCornerShape(12.dp)),
-                shape = RoundedCornerShape(12.dp),
-                color = MaterialTheme.colorScheme.primaryContainer
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.InsertDriveFile,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(20.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = leadFile.name,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+        if (showFloating) {
+            val count = controller.draggedFiles.size
+            val leadFile = controller.draggedFiles.first()
+            Box(
+                modifier = Modifier.offset {
+                    IntOffset(
+                        (controller.pointerRootOffset.x - 80).roundToInt(),
+                        (controller.pointerRootOffset.y - 44).roundToInt()
                     )
                 }
-            }
-            Badge(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .offset(x = 8.dp, y = (-8).dp)
-                    .background(MaterialTheme.colorScheme.error, CircleShape)
             ) {
-                Text(
-                    text = count.toString(),
-                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
-                )
+                if (count > 1) {
+                    Box(
+                        modifier = Modifier
+                            .offset(x = 6.dp, y = 6.dp)
+                            .size(width = 180.dp, height = 46.dp)
+                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(12.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(12.dp))
+                    )
+                }
+                Surface(
+                    modifier = Modifier
+                        .size(width = 180.dp, height = 46.dp)
+                        .shadow(12.dp, RoundedCornerShape(12.dp)),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.InsertDriveFile,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            text = leadFile.name,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
+                Badge(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = 8.dp, y = (-8).dp)
+                        .background(MaterialTheme.colorScheme.error, CircleShape)
+                ) {
+                    Text(
+                        text = count.toString(),
+                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+                    )
+                }
             }
         }
     }

@@ -1,6 +1,13 @@
 package com.dx9901mk5.filemanager.ui.layout
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -36,14 +43,15 @@ import androidx.compose.material.icons.filled.BookmarkAdd
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.DeleteForever
-import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.RestoreFromTrash
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
@@ -58,6 +66,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -84,11 +93,13 @@ import com.dx9901mk5.filemanager.core.vfs.VfsFile
 import com.dx9901mk5.filemanager.ui.ExplorerPaneState
 import com.dx9901mk5.filemanager.ui.FileViewMode
 import com.dx9901mk5.filemanager.ui.PaneMode
+import com.dx9901mk5.filemanager.ui.components.IosGlassFolderIcon
 import com.dx9901mk5.filemanager.ui.dialogs.formatFileSize
 import com.dx9901mk5.filemanager.ui.gesture.CrossPaneDragController
 import com.dx9901mk5.filemanager.ui.gesture.RubberBandOverlay
 import com.dx9901mk5.filemanager.ui.gesture.dxFileTouchGesture
 import com.dx9901mk5.filemanager.ui.gesture.dxMouseHandler
+import com.dx9901mk5.filemanager.ui.gesture.dxVerticalOverscrollBounce
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -120,6 +131,8 @@ fun FileExplorerPane(
     onCtrlWheelZoom: (Float) -> Unit,
     onAddBookmark: (String) -> Unit,
     onCreateNewFolderClick: () -> Unit,
+    onShowBottomActionBar: (prioritizeCreateOrCompress: Boolean) -> Unit = {},
+    onHideBottomActionBar: () -> Unit = {},
     onSwitchCategory: (FileCategory) -> Unit = {},
     onToggleAppSelection: (String) -> Unit,
     onToggleSystemApps: () -> Unit,
@@ -241,6 +254,14 @@ fun FileExplorerPane(
                             )
                         }
                         if (state.mode == PaneMode.FILES) {
+                            IconButton(onClick = onCreateNewFolderClick, modifier = Modifier.size(28.dp)) {
+                                Icon(
+                                    Icons.Default.CreateNewFolder,
+                                    contentDescription = "新增空白資料夾",
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                             IconButton(onClick = { onAddBookmark(state.currentPath) }, modifier = Modifier.size(28.dp)) {
                                 Icon(
                                     Icons.Default.BookmarkAdd,
@@ -436,35 +457,38 @@ fun FileExplorerPane(
                             findItemAtPosition = { localPos ->
                                 itemLocalBounds.entries.firstOrNull { (_, rect) -> rect.contains(localPos) }?.key
                             },
-                            onLongPressStationary = { filePath, _ ->
-                                onFocusPane()
-                                onShowContextMenu(filesByPath[filePath])
-                            },
                             onEmptySpaceLongPress = {
                                 if (state.mode == PaneMode.FILES) {
                                     onFocusPane()
                                     onCreateNewFolderClick()
                                 }
                             },
-                            onStartDragSelection = { initialPath, localOffset ->
+                            onLongPressEnterMultiSelect = { initialPath, localOffset ->
                                 onFocusPane()
                                 val file = filesByPath[initialPath] ?: return@dxFileTouchGesture
-                                onToggleSelect(initialPath)
-                                dragController.startDrag(
+                                if (initialPath !in state.selectedPaths) {
+                                    onToggleSelect(initialPath)
+                                }
+                                dragController.prepareHold(
                                     paneIndex = state.paneIndex,
                                     initialFile = file,
                                     rootOffset = listContainerRootOffset + localOffset
                                 )
+                                onShowBottomActionBar(false)
                             },
                             onSecondFingerTapItem = { tappedPath, localOffset ->
                                 val file = filesByPath[tappedPath] ?: return@dxFileTouchGesture
-                                onToggleSelect(tappedPath)
+                                onHideBottomActionBar()
+                                if (tappedPath !in state.selectedPaths) {
+                                    onToggleSelect(tappedPath)
+                                }
                                 dragController.addSecondFingerFile(
                                     file = file,
                                     tapRootOffset = listContainerRootOffset + localOffset
                                 )
                             },
                             onPrimaryFingerDrag = { localOffset, hoveredPath ->
+                                onHideBottomActionBar()
                                 val hoveredFolder = hoveredPath?.takeIf { filesByPath[it]?.isDirectory == true }
                                 dragController.updateDrag(
                                     rootOffset = listContainerRootOffset + localOffset,
@@ -480,7 +504,10 @@ fun FileExplorerPane(
                                     didDrag = didDrag
                                 )
                             },
-                            onDragCancel = { dragController.resetDrag() }
+                            onStationaryRelease = { _, _ ->
+                                dragController.resetDrag()
+                                onShowBottomActionBar(true)
+                            }
                         )
                 ) {
                     when {
@@ -523,7 +550,10 @@ fun FileExplorerPane(
                             val gridIconDp = if (state.viewMode == FileViewMode.LARGE_GRID) 56.dp else 36.dp
                             LazyVerticalGrid(
                                 columns = GridCells.Adaptive(minSize = cellMinSize),
-                                modifier = Modifier.fillMaxSize().padding(6.dp),
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .dxVerticalOverscrollBounce()
+                                    .padding(6.dp),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
@@ -571,7 +601,11 @@ fun FileExplorerPane(
                             }
                         }
                         else -> {
-                            LazyColumn(modifier = Modifier.fillMaxSize()) {
+                            LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .dxVerticalOverscrollBounce()
+                            ) {
                                 groupedByMonth.forEach { (monthLabel, monthFiles) ->
                                     item(key = "header_$monthLabel") {
                                         Text(
@@ -670,12 +704,23 @@ private fun FileGridItem(
             .padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Icon(
-            imageVector = if (file.isDirectory) Icons.Default.Folder else Icons.Default.InsertDriveFile,
-            contentDescription = null,
-            tint = if (file.isDirectory) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.size(iconSizeDp)
-        )
+        if (file.isDirectory) {
+            Box(contentAlignment = Alignment.Center) {
+                IosGlassFolderIcon(
+                    isEmpty = file.isEmpty,
+                    accentColor = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(iconSizeDp)
+                )
+                FolderMagnifierBadge(visible = isHoveredTarget)
+            }
+        } else {
+            Icon(
+                imageVector = Icons.Default.InsertDriveFile,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.size(iconSizeDp)
+            )
+        }
         Spacer(Modifier.height(4.dp))
         Text(
             text = file.name,
@@ -727,12 +772,21 @@ private fun FileRowItem(
                 .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(10.dp)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = if (file.isDirectory) Icons.Default.Folder else Icons.Default.InsertDriveFile,
-                contentDescription = null,
-                tint = if (file.isDirectory) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size((22 * iconScale).dp)
-            )
+            if (file.isDirectory) {
+                IosGlassFolderIcon(
+                    isEmpty = file.isEmpty,
+                    accentColor = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size((28 * iconScale).dp)
+                )
+                FolderMagnifierBadge(visible = isHoveredTarget)
+            } else {
+                Icon(
+                    imageVector = Icons.Default.InsertDriveFile,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size((22 * iconScale).dp)
+                )
+            }
         }
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
@@ -759,6 +813,46 @@ private fun FileRowItem(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FolderMagnifierBadge(visible: Boolean) {
+    var pulseActive by remember { mutableStateOf(false) }
+    LaunchedEffect(visible) {
+        if (visible) {
+            pulseActive = true
+            kotlinx.coroutines.delay(750L)
+            pulseActive = false
+        } else {
+            pulseActive = false
+        }
+    }
+    AnimatedVisibility(
+        visible = pulseActive,
+        enter = scaleIn(
+            spring(
+                dampingRatio = Spring.DampingRatioMediumBouncy,
+                stiffness = Spring.StiffnessMedium
+            )
+        ) + fadeIn(),
+        exit = scaleOut() + fadeOut()
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.92f),
+            shadowElevation = 6.dp,
+            modifier = Modifier.size(22.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Default.ZoomIn,
+                    contentDescription = "資料夾放大預覽",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(14.dp)
                 )
             }
         }

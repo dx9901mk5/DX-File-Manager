@@ -11,14 +11,41 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Archive
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.CreateNewFolder
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DriveFileMove
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
@@ -28,8 +55,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.dx9901mk5.filemanager.core.vfs.OAuth2AuthHelper
 import com.dx9901mk5.filemanager.core.vfs.VfsFile
@@ -79,7 +109,10 @@ class MainActivity : ComponentActivity() {
             val isExpandedScreen = windowSizeClass.widthSizeClass != WindowWidthSizeClass.Compact
             val isLargeTablet = windowSizeClass.widthSizeClass == WindowWidthSizeClass.Expanded
 
-            DxFileManagerTheme(darkTheme = settings.darkTheme) {
+            DxFileManagerTheme(
+                darkTheme = settings.darkTheme,
+                darkBackgroundStyle = settings.darkBackgroundStyle
+            ) {
                 DxFileManagerScreen(
                     viewModel = viewModel,
                     isExpandedScreen = isExpandedScreen,
@@ -141,6 +174,8 @@ private fun DxFileManagerScreen(
     var showStorageAnalyzer by remember { mutableStateOf(false) }
     var showWebShare by remember { mutableStateOf(false) }
     var showNewFolderForPane by remember { mutableStateOf<Int?>(null) }
+    // Pair(paneIndex, prioritizeCreateOrCompress)
+    var bottomActionBarState by remember { mutableStateOf<Pair<Int, Boolean>?>(null) }
 
     var contextMenuTarget by remember { mutableStateOf<Pair<Int, VfsFile?>?>(null) }
     var renameTarget by remember { mutableStateOf<Pair<Int, List<VfsFile>>?>(null) }
@@ -317,6 +352,8 @@ private fun DxFileManagerScreen(
                     onCtrlWheelZoom = { viewModel.adjustIconScale(2, it) },
                     onAddBookmark = { viewModel.addBookmark(it) },
                     onCreateNewFolderClick = { showNewFolderForPane = 2 },
+                    onShowBottomActionBar = { prioritize -> bottomActionBarState = 2 to prioritize },
+                    onHideBottomActionBar = { bottomActionBarState = null },
                     onSwitchCategory = { cat -> viewModel.openCategory(2, cat) },
                     onToggleAppSelection = { viewModel.toggleAppPackageSelection(it) },
                     onToggleSystemApps = { viewModel.toggleSystemApps() },
@@ -355,6 +392,8 @@ private fun DxFileManagerScreen(
                     onCtrlWheelZoom = { viewModel.adjustIconScale(3, it) },
                     onAddBookmark = { viewModel.addBookmark(it) },
                     onCreateNewFolderClick = { showNewFolderForPane = 3 },
+                    onShowBottomActionBar = { prioritize -> bottomActionBarState = 3 to prioritize },
+                    onHideBottomActionBar = { bottomActionBarState = null },
                     onSwitchCategory = { cat -> viewModel.openCategory(3, cat) },
                     onToggleAppSelection = { viewModel.toggleAppPackageSelection(it) },
                     onToggleSystemApps = { viewModel.toggleSystemApps() },
@@ -367,6 +406,67 @@ private fun DxFileManagerScreen(
 
         // 全域雙指堆疊拖曳預覽層
         DragAndDropOverlay(dragController)
+
+        // 長壓 1.5 秒多選底部操作選單（第二指多選或開始拖曳時自動隱藏；原地放開優先顯示新增資料夾/壓縮）
+        val activeBarPane = bottomActionBarState?.first
+        val activeBarSelected = activeBarPane?.let { activeFiles(it) }.orEmpty()
+        val isBarVisible = bottomActionBarState != null &&
+            activeBarSelected.isNotEmpty() &&
+            !dragController.isDragging
+        AnimatedVisibility(
+            visible = isBarVisible,
+            enter = slideInVertically(
+                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
+                initialOffsetY = { it }
+            ) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(horizontal = 12.dp, vertical = 14.dp)
+        ) {
+            val paneIdx = activeBarPane ?: 2
+            val prioritizeCreateOrCompress = bottomActionBarState?.second == true
+            val selectedList = activeFiles(paneIdx)
+            MultiSelectBottomActionBar(
+                selectedCount = selectedList.size,
+                prioritizeCreateOrCompress = prioritizeCreateOrCompress,
+                onNewFolder = {
+                    bottomActionBarState = null
+                    showNewFolderForPane = paneIdx
+                },
+                onCompress = {
+                    bottomActionBarState = null
+                    handleContextAction(paneIdx, selectedList.firstOrNull(), ContextMenuAction.COMPRESS_OR_EXTRACT)
+                },
+                onCopy = {
+                    bottomActionBarState = null
+                    if (selectedList.isNotEmpty()) viewModel.copyToClipboard(paneIdx, selectedList, isCut = false)
+                },
+                onMove = {
+                    bottomActionBarState = null
+                    if (selectedList.isNotEmpty()) viewModel.copyToClipboard(paneIdx, selectedList, isCut = true)
+                },
+                onOpen = {
+                    bottomActionBarState = null
+                    selectedList.firstOrNull()?.let {
+                        if (it.isDirectory) viewModel.navigateToPath(paneIdx, it.path)
+                        else viewModel.openWithSystemChooser(File(it.path), it.mimeType)
+                    }
+                },
+                onDelete = {
+                    bottomActionBarState = null
+                    if (selectedList.isNotEmpty()) viewModel.deleteFiles(paneIdx, selectedList)
+                },
+                onMore = {
+                    bottomActionBarState = null
+                    contextMenuTarget = paneIdx to selectedList.firstOrNull()
+                },
+                onDismiss = {
+                    bottomActionBarState = null
+                    viewModel.clearSelection(paneIdx)
+                }
+            )
+        }
 
         // 拖曳放開「複製或移動」詢問視窗
         dragController.pendingDropTarget?.let { req ->
@@ -444,6 +544,7 @@ private fun DxFileManagerScreen(
                 onToggleShizukuInstall = { viewModel.setUseShizukuInstall(it) },
                 onToggleShowHidden = { viewModel.setShowHiddenFiles(it) },
                 onToggleDarkTheme = { viewModel.setDarkTheme(it) },
+                onChangeDarkBackgroundStyle = { viewModel.setDarkBackgroundStyle(it) },
                 onChangeLanguage = { viewModel.setLanguage(it) },
                 onOpenStorageAnalyzer = { showStorageAnalyzer = true },
                 onOpenWebShare = { showWebShare = true },
@@ -473,5 +574,91 @@ private fun DxFileManagerScreen(
                 onDismiss = { showWebShare = false }
             )
         }
+    }
+}
+
+@Composable
+private fun MultiSelectBottomActionBar(
+    selectedCount: Int,
+    prioritizeCreateOrCompress: Boolean,
+    onNewFolder: () -> Unit,
+    onCompress: () -> Unit,
+    onCopy: () -> Unit,
+    onMove: () -> Unit,
+    onOpen: () -> Unit,
+    onDelete: () -> Unit,
+    onMore: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.96f),
+        shadowElevation = 12.dp,
+        tonalElevation = 8.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "已選 $selectedCount",
+                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+            if (prioritizeCreateOrCompress) {
+                BottomBarActionButton(Icons.Default.CreateNewFolder, "新增資料夾", highlight = true, onClick = onNewFolder)
+                BottomBarActionButton(Icons.Default.Archive, "壓縮", highlight = true, onClick = onCompress)
+                BottomBarActionButton(Icons.Default.ContentCopy, "複製", onClick = onCopy)
+                BottomBarActionButton(Icons.Default.DriveFileMove, "移動", onClick = onMove)
+                BottomBarActionButton(Icons.Default.OpenInNew, "開啟", onClick = onOpen)
+            } else {
+                BottomBarActionButton(Icons.Default.ContentCopy, "複製", onClick = onCopy)
+                BottomBarActionButton(Icons.Default.DriveFileMove, "移動", onClick = onMove)
+                BottomBarActionButton(Icons.Default.OpenInNew, "開啟", onClick = onOpen)
+                BottomBarActionButton(Icons.Default.Archive, "壓縮", onClick = onCompress)
+                BottomBarActionButton(Icons.Default.CreateNewFolder, "新增資料夾", onClick = onNewFolder)
+            }
+            BottomBarActionButton(Icons.Default.Delete, "刪除", isDestructive = true, onClick = onDelete)
+            BottomBarActionButton(Icons.Default.MoreHoriz, "更多", onClick = onMore)
+            BottomBarActionButton(Icons.Default.Close, "取消", onClick = onDismiss)
+        }
+    }
+}
+
+@Composable
+private fun BottomBarActionButton(
+    icon: ImageVector,
+    label: String,
+    highlight: Boolean = false,
+    isDestructive: Boolean = false,
+    onClick: () -> Unit
+) {
+    val tint = when {
+        isDestructive -> MaterialTheme.colorScheme.error
+        highlight -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.onSurface
+    }
+    Column(
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = tint,
+            modifier = Modifier.size(20.dp)
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = tint,
+            maxLines = 1
+        )
     }
 }

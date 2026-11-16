@@ -19,11 +19,22 @@ import java.io.File
 
 private val Context.dxDataStore: DataStore<Preferences> by preferencesDataStore(name = "dx_file_manager_prefs")
 
+enum class DarkBackgroundStyle(val key: String) {
+    OLED_BLACK("oled_black"),
+    DARK_GRAY("dark_gray");
+
+    companion object {
+        fun fromKey(key: String?): DarkBackgroundStyle =
+            entries.firstOrNull { it.key == key } ?: OLED_BLACK
+    }
+}
+
 data class DxSettingsState(
     val recycleBinEnabled: Boolean = true,
     val useShizukuInstall: Boolean = false,
     val showHiddenFiles: Boolean = false,
     val darkTheme: Boolean = true,
+    val darkBackgroundStyle: DarkBackgroundStyle = DarkBackgroundStyle.OLED_BLACK,
     val language: AppLanguage = AppLanguage.fromSystemOrCode(null),
     val bookmarks: List<String> = emptyList(),
     val cloudMounts: List<VfsMountConfig> = emptyList(),
@@ -43,6 +54,7 @@ class AppPreferences(private val context: Context) {
         val SHIZUKU_INSTALL = booleanPreferencesKey("use_shizuku_install")
         val SHOW_HIDDEN = booleanPreferencesKey("show_hidden_files")
         val DARK_THEME = booleanPreferencesKey("dark_theme")
+        val DARK_BG_STYLE = stringPreferencesKey("dark_bg_style")
         val LANGUAGE = stringPreferencesKey("app_language")
         val BOOKMARKS = stringSetPreferencesKey("bookmarks")
         val CLOUD_MOUNTS_JSON = stringPreferencesKey("cloud_mounts_json")
@@ -64,6 +76,7 @@ class AppPreferences(private val context: Context) {
             useShizukuInstall = prefs[Keys.SHIZUKU_INSTALL] ?: false,
             showHiddenFiles = prefs[Keys.SHOW_HIDDEN] ?: false,
             darkTheme = prefs[Keys.DARK_THEME] ?: true,
+            darkBackgroundStyle = DarkBackgroundStyle.fromKey(prefs[Keys.DARK_BG_STYLE]),
             language = AppLanguage.fromSystemOrCode(prefs[Keys.LANGUAGE]),
             bookmarks = (prefs[Keys.BOOKMARKS] ?: setOf(defaultDownloadPath)).toList().sorted(),
             cloudMounts = decodeMounts(prefs[Keys.CLOUD_MOUNTS_JSON]),
@@ -90,6 +103,10 @@ class AppPreferences(private val context: Context) {
 
     suspend fun setDarkTheme(dark: Boolean) {
         context.dxDataStore.edit { it[Keys.DARK_THEME] = dark }
+    }
+
+    suspend fun setDarkBackgroundStyle(style: DarkBackgroundStyle) {
+        context.dxDataStore.edit { it[Keys.DARK_BG_STYLE] = style.key }
     }
 
     suspend fun setLanguage(language: AppLanguage) {

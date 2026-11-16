@@ -1,6 +1,14 @@
 package com.dx9901mk5.filemanager.ui.layout
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -13,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,6 +47,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Rect
@@ -85,6 +95,42 @@ fun ThreePaneScaffold(
     val effectivePane2Expanded = if (autoCollapseUnusedPaneOnDrag != null) autoCollapseUnusedPaneOnDrag == 2 else pane2Expanded
     val effectivePane3Expanded = if (autoCollapseUnusedPaneOnDrag != null) autoCollapseUnusedPaneOnDrag == 3 else pane3Expanded
 
+    val paneSpringDp = spring<androidx.compose.ui.unit.Dp>(
+        dampingRatio = 0.68f,
+        stiffness = Spring.StiffnessMediumLow
+    )
+    val paneSpringFloat = spring<Float>(
+        dampingRatio = 0.68f,
+        stiffness = Spring.StiffnessMediumLow
+    )
+
+    val animatedPane1Width by animateDpAsState(
+        targetValue = if (effectivePane1Expanded) pane1Width else 0.dp,
+        animationSpec = paneSpringDp,
+        label = "Pane1WidthSpring"
+    )
+
+    val targetPane2Weight = when {
+        effectivePane2Expanded && showPane3 && effectivePane3Expanded -> pane2Weight.coerceIn(0.2f, 0.8f)
+        effectivePane2Expanded -> 1f
+        else -> 0f
+    }
+    val targetPane3Weight = when {
+        showPane3 && effectivePane3Expanded && effectivePane2Expanded -> (1f - pane2Weight).coerceIn(0.2f, 0.8f)
+        showPane3 && effectivePane3Expanded -> 1f
+        else -> 0f
+    }
+    val animPane2Weight by animateFloatAsState(
+        targetValue = targetPane2Weight,
+        animationSpec = paneSpringFloat,
+        label = "Pane2WeightSpring"
+    )
+    val animPane3Weight by animateFloatAsState(
+        targetValue = targetPane3Weight,
+        animationSpec = paneSpringFloat,
+        label = "Pane3WeightSpring"
+    )
+
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
@@ -96,19 +142,30 @@ fun ThreePaneScaffold(
             pane1WidthInitialized = true
         }
 
+        val safePane1Width = animatedPane1Width.coerceAtLeast(0.dp)
+        val safeW2 = animPane2Weight.coerceAtLeast(0f)
+        val safeW3 = animPane3Weight.coerceAtLeast(0f)
+
         Row(modifier = Modifier.fillMaxSize()) {
-            // 第一區：展開時顯示完整側欄；摺疊時完全隱藏（0dp，無邊界）
-            if (effectivePane1Expanded) {
+            // 第一區：彈簧回彈展開/摺疊動畫；完全摺疊時消除寬度與邊界
+            if (safePane1Width > 1.dp) {
                 Box(
                     modifier = Modifier
-                        .width(pane1Width)
+                        .width(safePane1Width)
                         .fillMaxHeight()
+                        .clipToBounds()
                         .onGloballyPositioned { coords ->
-                            val b = coords.boundsInRoot()
-                            onPaneBoundsChanged(1, b.left, b.right)
+                            if (effectivePane1Expanded) {
+                                val b = coords.boundsInRoot()
+                                onPaneBoundsChanged(1, b.left, b.right)
+                            }
                         }
                 ) {
-                    Column(Modifier.fillMaxSize()) {
+                    Column(
+                        Modifier
+                            .requiredWidth(pane1Width)
+                            .fillMaxHeight()
+                    ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -178,18 +235,17 @@ fun ThreePaneScaffold(
             ) {
                 val totalWidth = maxWidth
                 Row(Modifier.fillMaxSize()) {
-                    if (effectivePane2Expanded) {
-                        val pane2Modifier = if (showPane3 && effectivePane3Expanded) {
-                            Modifier.weight(pane2Weight.coerceIn(0.2f, 0.8f))
-                        } else {
-                            Modifier.weight(1f)
-                        }
+                    if (safeW2 > 0.005f) {
                         Box(
-                            modifier = pane2Modifier
+                            modifier = Modifier
+                                .weight(safeW2)
                                 .fillMaxHeight()
+                                .clipToBounds()
                                 .onGloballyPositioned { coords ->
-                                    val b = coords.boundsInRoot()
-                                    onPaneBoundsChanged(2, b.left, b.right)
+                                    if (effectivePane2Expanded) {
+                                        val b = coords.boundsInRoot()
+                                        onPaneBoundsChanged(2, b.left, b.right)
+                                    }
                                 }
                         ) {
                             pane2Content { onPaneExpandedChange(2, false) }
@@ -197,7 +253,7 @@ fun ThreePaneScaffold(
                     }
 
                     // 僅在第二與第三區同時展開時才顯示分隔線 2
-                    if (showPane3 && effectivePane2Expanded && effectivePane3Expanded) {
+                    if (showPane3 && safeW2 > 0.02f && safeW3 > 0.02f) {
                         ResizableDivider(
                             editable = isRatioEditMode,
                             onDrag = { deltaPx ->
@@ -207,18 +263,17 @@ fun ThreePaneScaffold(
                         )
                     }
 
-                    if (showPane3 && effectivePane3Expanded) {
-                        val pane3Modifier = if (effectivePane2Expanded) {
-                            Modifier.weight((1f - pane2Weight).coerceIn(0.2f, 0.8f))
-                        } else {
-                            Modifier.weight(1f)
-                        }
+                    if (showPane3 && safeW3 > 0.005f) {
                         Box(
-                            modifier = pane3Modifier
+                            modifier = Modifier
+                                .weight(safeW3)
                                 .fillMaxHeight()
+                                .clipToBounds()
                                 .onGloballyPositioned { coords ->
-                                    val b = coords.boundsInRoot()
-                                    onPaneBoundsChanged(3, b.left, b.right)
+                                    if (effectivePane3Expanded) {
+                                        val b = coords.boundsInRoot()
+                                        onPaneBoundsChanged(3, b.left, b.right)
+                                    }
                                 }
                         ) {
                             pane3Content { onPaneExpandedChange(3, false) }
@@ -229,9 +284,17 @@ fun ThreePaneScaffold(
         }
 
         // 第一區摺疊後：左緣保留一個小半圓形展開按鈕（拖曳經過時放大提示）
-        if (!effectivePane1Expanded) {
+        AnimatedVisibility(
+            visible = !effectivePane1Expanded,
+            enter = scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)) + fadeIn(),
+            exit = scaleOut() + fadeOut(),
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(top = 56.dp)
+        ) {
             val scale1 by animateFloatAsState(
                 targetValue = if (hoveredExpandButtonPane == 1) 1.35f else 1f,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
                 label = "ExpandBtn1Scale"
             )
             DisposableEffect(Unit) {
@@ -242,8 +305,6 @@ fun ThreePaneScaffold(
                 color = MaterialTheme.colorScheme.primary,
                 shadowElevation = 6.dp,
                 modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(top = 56.dp)
                     .scale(scale1)
                     .width(26.dp)
                     .height(48.dp)
@@ -262,9 +323,15 @@ fun ThreePaneScaffold(
         }
 
         // 第二區摺疊後：上方保留一個小半圓形展開按鈕（拖曳經過時放大提示）
-        if (!effectivePane2Expanded) {
+        AnimatedVisibility(
+            visible = !effectivePane2Expanded,
+            enter = scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)) + fadeIn(),
+            exit = scaleOut() + fadeOut(),
+            modifier = Modifier.align(Alignment.TopCenter)
+        ) {
             val scale2 by animateFloatAsState(
                 targetValue = if (hoveredExpandButtonPane == 2) 1.35f else 1f,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
                 label = "ExpandBtn2Scale"
             )
             DisposableEffect(Unit) {
@@ -275,7 +342,6 @@ fun ThreePaneScaffold(
                 color = MaterialTheme.colorScheme.primary,
                 shadowElevation = 6.dp,
                 modifier = Modifier
-                    .align(Alignment.TopCenter)
                     .scale(scale2)
                     .width(48.dp)
                     .height(26.dp)
@@ -294,9 +360,17 @@ fun ThreePaneScaffold(
         }
 
         // 第三區摺疊後：右緣保留一個小半圓形展開按鈕（拖曳經過時放大提示）
-        if (showPane3 && !effectivePane3Expanded) {
+        AnimatedVisibility(
+            visible = showPane3 && !effectivePane3Expanded,
+            enter = scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)) + fadeIn(),
+            exit = scaleOut() + fadeOut(),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 56.dp)
+        ) {
             val scale3 by animateFloatAsState(
                 targetValue = if (hoveredExpandButtonPane == 3) 1.35f else 1f,
+                animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
                 label = "ExpandBtn3Scale"
             )
             DisposableEffect(Unit) {
@@ -307,8 +381,6 @@ fun ThreePaneScaffold(
                 color = MaterialTheme.colorScheme.primary,
                 shadowElevation = 6.dp,
                 modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 56.dp)
                     .scale(scale3)
                     .width(26.dp)
                     .height(48.dp)

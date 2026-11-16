@@ -60,7 +60,8 @@ data class VfsFile(
     val mimeType: String = if (isDirectory) "inode/directory" else "*/*",
     val isHidden: Boolean = name.startsWith("."),
     val protocol: VfsProtocol = VfsProtocol.LOCAL,
-    val mountId: String = "local"
+    val mountId: String = "local",
+    val isEmpty: Boolean = false
 )
 
 data class StorageSpaceInfo(

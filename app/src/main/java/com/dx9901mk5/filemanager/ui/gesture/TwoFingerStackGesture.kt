@@ -11,22 +11,22 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 
 /**
- * 雙指堆疊觸控手勢：
+ * 多選與雙指堆疊觸控手勢：
  * 1. 滑動過程 (> touchSlop) 立即放行，絕不誤入選擇或拖曳模式
- * 2. 觸控停住不動滿 2000ms (2秒) -> 觸發「大振動」進入多選拖曳狀態
- * 3. 若滿 2 秒後繼續完全不動達 3000ms (再停 1 秒) 且未拖動/未第二指點擊 -> 彈出完整功能選單
- * 4. 一旦開始拖動檔案，過程絕不判定觸發選單；第二指點擊給「小震動」並播放卡片飛入疊合動畫；放開才詢問「複製 / 移動 / 取消」
+ * 2. 長壓原地停住滿 1500ms (1.5秒) -> 大振動進入多選狀態，底部顯示操作選單
+ * 3. 手指未離開時，第二指點擊其他檔案 -> 連續多選並播放檔案聚合飛入動畫，底部選單暫時隱藏
+ * 4. 第一指開始挪動 (> touchSlop) -> 進入多檔案拖曳狀態（資料夾顯示短暫放大鏡特效，移至分區展開鈕可展開目標分區），放開詢問複製或移動
+ * 5. 未拖曳而原地放開手指 -> 保留多選狀態並顯示優先含「新增資料夾 / 壓縮」的底部選單
  */
 fun Modifier.dxFileTouchGesture(
     context: Context,
     findItemAtPosition: (Offset) -> String?,
-    onLongPressStationary: (filePath: String, pressOffset: Offset) -> Unit,
     onEmptySpaceLongPress: (pressOffset: Offset) -> Unit = {},
-    onStartDragSelection: (initialFilePath: String, startOffset: Offset) -> Unit,
+    onLongPressEnterMultiSelect: (initialFilePath: String, startOffset: Offset) -> Unit,
     onSecondFingerTapItem: (tappedFilePath: String, tapOffset: Offset) -> Unit,
     onPrimaryFingerDrag: (currentOffset: Offset, hoveredFolderPath: String?) -> Unit,
     onDropComplete: (dropOffset: Offset, targetFolderPath: String?, didDrag: Boolean) -> Unit,
-    onDragCancel: () -> Unit = {}
+    onStationaryRelease: (initialFilePath: String, usedSecondFinger: Boolean) -> Unit
 ): Modifier = this.pointerInput(Unit) {
     awaitEachGesture {
         val firstDown = awaitFirstDown(requireUnconsumed = false)
@@ -35,8 +35,8 @@ fun Modifier.dxFileTouchGesture(
         val touchedFile = findItemAtPosition(startPosition)
         val touchSlop = viewConfiguration.touchSlop
 
-        // 第 1 階段：使用 AwaitPointerEventScope 內建 withTimeoutOrNull 監測原地停住 2000ms
-        val movedOrReleasedBefore2s = withTimeoutOrNull(2000L) {
+        // 第 1 階段：原地停住滿 1500ms (1.5 秒)
+        val movedOrReleasedBeforeHold = withTimeoutOrNull(1500L) {
             while (true) {
                 val event = awaitPointerEvent(PointerEventPass.Initial)
                 val primaryChange = event.changes.firstOrNull { it.id == primaryPointerId }
@@ -51,11 +51,11 @@ fun Modifier.dxFileTouchGesture(
             true
         }
 
-        if (movedOrReleasedBefore2s != null) {
+        if (movedOrReleasedBeforeHold != null) {
             return@awaitEachGesture
         }
 
-        // 滿 2 秒 -> 大振動並進入多選狀態
+        // 滿 1.5 秒 -> 大振動並進入多選狀態
         DxHaptics.strongVibrate(context)
 
         if (touchedFile == null) {
@@ -63,59 +63,13 @@ fun Modifier.dxFileTouchGesture(
             return@awaitEachGesture
         }
 
-        onStartDragSelection(touchedFile, startPosition)
-        var isDraggingMode = true
+        onLongPressEnterMultiSelect(touchedFile, startPosition)
+        var isHolding = true
         var didDragBeyondSlop = false
+        var usedSecondFinger = false
 
-        // 第 2 階段：再等待 1000ms（總計 3 秒）判斷是否完全不動以觸發功能選單；一旦動了或第二指點擊就跳入純拖曳迴圈
-        val movedOrSecondFingerBefore3s = withTimeoutOrNull(1000L) {
-            while (true) {
-                val event = awaitPointerEvent(PointerEventPass.Initial)
-                val primaryChange = event.changes.firstOrNull { it.id == primaryPointerId }
-
-                val secondTaps = event.changes.filter {
-                    it.id != primaryPointerId && it.pressed && !it.previousPressed
-                }
-                if (secondTaps.isNotEmpty()) {
-                    secondTaps.forEach { secondFinger ->
-                        secondFinger.consume()
-                        val tappedPath = findItemAtPosition(secondFinger.position)
-                        if (tappedPath != null) {
-                            DxHaptics.lightVibrate(context)
-                            onSecondFingerTapItem(tappedPath, secondFinger.position)
-                        }
-                    }
-                    return@withTimeoutOrNull true
-                }
-
-                if (primaryChange == null || !primaryChange.pressed) {
-                    onDropComplete(primaryChange?.position ?: startPosition, null, false)
-                    isDraggingMode = false
-                    return@withTimeoutOrNull true
-                }
-
-                if ((primaryChange.position - startPosition).getDistance() > touchSlop) {
-                    didDragBeyondSlop = true
-                    primaryChange.consume()
-                    val hovered = findItemAtPosition(primaryChange.position)
-                    onPrimaryFingerDrag(primaryChange.position, hovered)
-                    return@withTimeoutOrNull true
-                }
-            }
-            @Suppress("UNREACHABLE_CODE")
-            true
-        }
-
-        // 若滿 3 秒完全沒動也沒第二指點擊 -> 取消拖曳浮層，彈出完整功能選單
-        if (movedOrSecondFingerBefore3s == null) {
-            onDragCancel()
-            DxHaptics.lightVibrate(context)
-            onLongPressStationary(touchedFile, startPosition)
-            return@awaitEachGesture
-        }
-
-        // 第 3 階段：純拖曳 + 雙指點擊疊合迴圈（過程絕不觸發選單）
-        while (isDraggingMode) {
+        // 第 2 階段：持續按住監聽第二指多選點擊、第一指挪動拖曳、或原地放開
+        while (isHolding) {
             val event = awaitPointerEvent(PointerEventPass.Initial)
             val primaryChange = event.changes.firstOrNull { it.id == primaryPointerId }
 
@@ -125,6 +79,7 @@ fun Modifier.dxFileTouchGesture(
                     secondFinger.consume()
                     val secondTappedFile = findItemAtPosition(secondFinger.position)
                     if (secondTappedFile != null) {
+                        usedSecondFinger = true
                         DxHaptics.lightVibrate(context)
                         onSecondFingerTapItem(secondTappedFile, secondFinger.position)
                     }
@@ -132,16 +87,22 @@ fun Modifier.dxFileTouchGesture(
 
             if (primaryChange == null || !primaryChange.pressed) {
                 val finalPos = primaryChange?.position ?: startPosition
-                val targetFolder = findItemAtPosition(finalPos)
-                onDropComplete(finalPos, targetFolder, didDragBeyondSlop)
-                isDraggingMode = false
+                if (didDragBeyondSlop) {
+                    val targetFolder = findItemAtPosition(finalPos)
+                    onDropComplete(finalPos, targetFolder, true)
+                } else {
+                    onStationaryRelease(touchedFile, usedSecondFinger)
+                }
+                isHolding = false
             } else if (primaryChange.positionChange() != Offset.Zero) {
-                if ((primaryChange.position - startPosition).getDistance() > touchSlop) {
+                if (!didDragBeyondSlop && (primaryChange.position - startPosition).getDistance() > touchSlop) {
                     didDragBeyondSlop = true
                 }
-                primaryChange.consume()
-                val hoveredItem = findItemAtPosition(primaryChange.position)
-                onPrimaryFingerDrag(primaryChange.position, hoveredItem)
+                if (didDragBeyondSlop) {
+                    primaryChange.consume()
+                    val hoveredItem = findItemAtPosition(primaryChange.position)
+                    onPrimaryFingerDrag(primaryChange.position, hoveredItem)
+                }
             }
         }
     }

@@ -24,7 +24,7 @@ class LocalVfsProvider : VfsProvider {
                 }
                 val children = dir.listFiles().orEmpty()
                     .filter { showHidden || (!it.isHidden && !it.name.startsWith(".")) }
-                    .map { it.toVfsFile() }
+                    .map { it.toVfsFile(showHidden) }
                     .sortedWith(compareByDescending<VfsFile> { it.isDirectory }.thenBy { it.name.lowercase() })
                 children
             }
@@ -166,12 +166,22 @@ class LocalVfsProvider : VfsProvider {
         return candidate
     }
 
-    private fun File.toVfsFile(): VfsFile {
+    private fun File.toVfsFile(showHidden: Boolean = false): VfsFile {
         val ext = extension.lowercase()
         val mime = if (isDirectory) {
             "inode/directory"
         } else {
             MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: "application/octet-stream"
+        }
+        val emptyDir = if (isDirectory) {
+            val names = list()
+            when {
+                names == null -> true
+                showHidden -> names.isEmpty()
+                else -> names.none { !it.startsWith(".") }
+            }
+        } else {
+            false
         }
         return VfsFile(
             path = absolutePath,
@@ -182,7 +192,8 @@ class LocalVfsProvider : VfsProvider {
             mimeType = mime,
             isHidden = isHidden || name.startsWith("."),
             protocol = VfsProtocol.LOCAL,
-            mountId = "local"
+            mountId = "local",
+            isEmpty = emptyDir
         )
     }
 }
