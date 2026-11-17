@@ -63,7 +63,7 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 
 /**
- * 5 步驟網路連線指引（比照 Solid Explorer 精靈流程，支援同平台多重帳號掛載）
+ * 5 步驟網路連線指引（支援同平台多重帳號掛載）
  * Step 1: 連線類型
  * Step 2: 顯示名稱
  * Step 3: 登入（系統帳戶選擇器 / OAuth2 / 伺服器帳密）
@@ -81,6 +81,9 @@ fun CloudMountWizardDialog(
         listOf(
             VfsProtocol.GOOGLE_DRIVE,
             VfsProtocol.ONEDRIVE,
+            VfsProtocol.DROPBOX,
+            VfsProtocol.PCLOUD,
+            VfsProtocol.YANDEX,
             VfsProtocol.LAN_SMB,
             VfsProtocol.FTP,
             VfsProtocol.SFTP,

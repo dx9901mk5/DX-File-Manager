@@ -69,6 +69,7 @@
 - **待確認變更（尚未發布 APK）**：
   - **底部選擇自動預留留白與捲動閃避**：`FileExplorerPane.kt` 偵測底部操作選單顯示或最後 3 個項目被選取時，自動平滑拉伸底部 `contentPadding` 至 `112.dp` 並自動捲動至最後選取項目，避免被底部功能列遮住重疊。
   - **AI 錯誤訊息友善化 ＋ 本機智慧整理備援**：針對 Gemini API `402`（預付額度用盡）等錯誤轉譯為清楚中文提示，並於 `AiAssistantClient.kt` / `AiFileAssistantDialog.kt` 新增「本機智慧整理（免金鑰 / 免額度）」離線分類功能。
+  - **恢復 Dropbox / pCloud / Yandex.Disk 掛載選項**：於 `CloudMountWizardSheet.kt` 重新加入 `DROPBOX`、`PCLOUD`、`YANDEX`（連同既有的 `GOOGLE_DRIVE`、`ONEDRIVE`、`LAN_SMB`、`FTP`、`SFTP`、`WEBDAV`、`OWNCLOUD_NEXTCLOUD`、`AMAZON_S3` 共 11 種）。
   - **長壓進入多選時間減半**：`TwoFingerStackGesture.kt` 長壓進入多選門檻由 `1500ms` (1.5 秒) 縮短為 `750ms` (0.75 秒)。
 - **v1.0.13** (`versionCode = 14`)：
   - **第一區書籤與內部儲存空間樹狀展開**：書籤新增長壓確認移除；「內部儲存空間」新增展開/收合箭頭，可直接展開並點擊進入根目錄資料夾。
