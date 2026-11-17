@@ -121,7 +121,7 @@ fun NavigationPane(
 
     Surface(
         modifier = Modifier.fillMaxSize(),
-        color = MaterialTheme.colorScheme.background,
+        color = MaterialTheme.colorScheme.surface,
         contentColor = MaterialTheme.colorScheme.onBackground
     ) {
         Column(modifier = Modifier.fillMaxSize()) {

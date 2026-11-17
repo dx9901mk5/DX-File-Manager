@@ -52,6 +52,26 @@ private val DxGrayDarkColors = darkColorScheme(
     outlineVariant = Color(0xFF3F434A)
 )
 
+// 暗色主題（黑至灰黑玻璃漸層）：半透明磨砂玻璃面板 + 高對比純白文字
+private val DxGlassGradientDarkColors = darkColorScheme(
+    primary = Color(0xFFFFC83D),
+    onPrimary = Color(0xFF1A1200),
+    primaryContainer = Color(0x993B2E00),
+    onPrimaryContainer = Color(0xFFFFF3C4),
+    secondary = Color(0xFFFFD566),
+    onSecondary = Color(0xFF1E1700),
+    secondaryContainer = Color(0x882C2612),
+    onSecondaryContainer = Color.White,
+    background = Color(0xFF000000),
+    onBackground = Color.White,
+    surface = Color(0x99121418),
+    onSurface = Color.White,
+    surfaceVariant = Color(0xAA252830),
+    onSurfaceVariant = Color(0xFFE8E8E8),
+    outline = Color(0x888A8E96),
+    outlineVariant = Color(0x44FFFFFF)
+)
+
 private val DxLightColors = lightColorScheme(
     primary = Color(0xFFC48B00),
     onPrimary = Color.White,
@@ -77,6 +97,7 @@ fun DxFileManagerTheme(
         darkTheme -> when (darkBackgroundStyle) {
             DarkBackgroundStyle.OLED_BLACK -> DxOledDarkColors
             DarkBackgroundStyle.DARK_GRAY -> DxGrayDarkColors
+            DarkBackgroundStyle.BLACK_TO_GRAY_GLASS -> DxGlassGradientDarkColors
         }
         else -> DxLightColors
     }

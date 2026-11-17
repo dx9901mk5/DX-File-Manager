@@ -53,6 +53,9 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import com.dx9901mk5.filemanager.core.settings.DarkBackgroundStyle
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
@@ -317,10 +320,25 @@ private fun DxFileManagerScreen(
         }
     }
 
+    val isGlassGradient = settings.darkTheme && settings.darkBackgroundStyle == DarkBackgroundStyle.BLACK_TO_GRAY_GLASS
+    val rootBgModifier = if (isGlassGradient) {
+        Modifier.background(
+            Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xFF000000),
+                    Color(0xFF14161A),
+                    Color(0xFF282B32)
+                )
+            )
+        )
+    } else {
+        Modifier.background(MaterialTheme.colorScheme.background)
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .then(rootBgModifier)
             .windowInsetsPadding(WindowInsets.safeDrawing)
             .padding(top = 4.dp, bottom = 6.dp)
             .dxKeyboardShortcuts { shortcut ->

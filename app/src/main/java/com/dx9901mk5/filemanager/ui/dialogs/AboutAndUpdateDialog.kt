@@ -169,6 +169,11 @@ fun SettingsAndAboutDialog(
                             onClick = { onChangeDarkBackgroundStyle(DarkBackgroundStyle.DARK_GRAY) },
                             label = { Text(s.darkBgDarkGray) }
                         )
+                        FilterChip(
+                            selected = settings.darkBackgroundStyle == DarkBackgroundStyle.BLACK_TO_GRAY_GLASS,
+                            onClick = { onChangeDarkBackgroundStyle(DarkBackgroundStyle.BLACK_TO_GRAY_GLASS) },
+                            label = { Text(s.darkBgBlackToGrayGlass) }
+                        )
                     }
                 }
                 Text(s.languageTitle, style = MaterialTheme.typography.bodyMedium)

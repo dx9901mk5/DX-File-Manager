@@ -138,7 +138,7 @@ fun ThreePaneScaffold(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(androidx.compose.ui.graphics.Color.Transparent)
     ) {
         if (!pane1WidthInitialized) {
             // 根目錄固定比例（約 24%，介於 180dp ~ 240dp，不開放變更）

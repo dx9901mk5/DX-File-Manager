@@ -203,124 +203,129 @@ fun FileExplorerPane(
                             .padding(horizontal = 6.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(
+                        Row(
                             modifier = Modifier
                                 .weight(1f)
-                                .padding(horizontal = 8.dp)
+                                .horizontalScroll(rememberScrollState()),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = currentTitle,
-                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
-                                color = MaterialTheme.colorScheme.onSurface,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = "$folderCount 個資料夾, $fileCount 個檔案",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        IconButton(onClick = { showSearchBar = !showSearchBar }, modifier = Modifier.size(30.dp)) {
-                            Icon(
-                                Icons.Default.Search,
-                                contentDescription = "搜尋",
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        // 清單列表 / 小圖示 / 大圖示 檢視切換按鈕
-                        IconButton(
-                            onClick = { onViewModeChange(FileViewMode.LIST) },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ViewList,
-                                contentDescription = "清單列表",
-                                tint = if (state.viewMode == FileViewMode.LIST) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        IconButton(
-                            onClick = { onViewModeChange(FileViewMode.SMALL_GRID) },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.GridView,
-                                contentDescription = "小圖示",
-                                tint = if (state.viewMode == FileViewMode.SMALL_GRID) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        IconButton(
-                            onClick = { onViewModeChange(FileViewMode.LARGE_GRID) },
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Icon(
-                                Icons.Default.Apps,
-                                contentDescription = "大圖示",
-                                tint = if (state.viewMode == FileViewMode.LARGE_GRID) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        if (state.mode == PaneMode.FILES && hasClipboard) {
-                            Surface(
-                                shape = RoundedCornerShape(16.dp),
-                                color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier
-                                    .padding(end = 4.dp)
-                                    .clickable {
-                                        onFocusPane()
-                                        onPasteClick()
-                                    }
+                            Column(
+                                modifier = Modifier.padding(horizontal = 6.dp)
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                Text(
+                                    text = currentTitle,
+                                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = "$folderCount 個資料夾, $fileCount 個檔案",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            IconButton(onClick = { showSearchBar = !showSearchBar }, modifier = Modifier.size(30.dp)) {
+                                Icon(
+                                    Icons.Default.Search,
+                                    contentDescription = "搜尋",
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            // 清單列表 / 小圖示 / 大圖示 檢視切換按鈕
+                            IconButton(
+                                onClick = { onViewModeChange(FileViewMode.LIST) },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ViewList,
+                                    contentDescription = "清單列表",
+                                    tint = if (state.viewMode == FileViewMode.LIST) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            IconButton(
+                                onClick = { onViewModeChange(FileViewMode.SMALL_GRID) },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.GridView,
+                                    contentDescription = "小圖示",
+                                    tint = if (state.viewMode == FileViewMode.SMALL_GRID) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            IconButton(
+                                onClick = { onViewModeChange(FileViewMode.LARGE_GRID) },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Apps,
+                                    contentDescription = "大圖示",
+                                    tint = if (state.viewMode == FileViewMode.LARGE_GRID) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            if (state.mode == PaneMode.FILES && hasClipboard) {
+                                Surface(
+                                    shape = RoundedCornerShape(16.dp),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier
+                                        .padding(end = 4.dp)
+                                        .clickable {
+                                            onFocusPane()
+                                            onPasteClick()
+                                        }
                                 ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.ContentPaste,
+                                            contentDescription = "貼上",
+                                            tint = MaterialTheme.colorScheme.onPrimary,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Text(
+                                            text = if (clipboardCount > 1) "貼上($clipboardCount)" else "貼上",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                            color = MaterialTheme.colorScheme.onPrimary,
+                                            maxLines = 1
+                                        )
+                                    }
+                                }
+                            }
+                            if (state.mode == PaneMode.FILES) {
+                                IconButton(onClick = onCreateNewFolderClick, modifier = Modifier.size(28.dp)) {
                                     Icon(
-                                        Icons.Default.ContentPaste,
-                                        contentDescription = "貼上",
-                                        tint = MaterialTheme.colorScheme.onPrimary,
-                                        modifier = Modifier.size(14.dp)
+                                        Icons.Default.CreateNewFolder,
+                                        contentDescription = "新增空白資料夾",
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
                                     )
-                                    Text(
-                                        text = if (clipboardCount > 1) "貼上($clipboardCount)" else "貼上",
-                                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                        color = MaterialTheme.colorScheme.onPrimary,
-                                        maxLines = 1
+                                }
+                                IconButton(onClick = { onAddBookmark(state.currentPath) }, modifier = Modifier.size(28.dp)) {
+                                    Icon(
+                                        Icons.Default.BookmarkAdd,
+                                        contentDescription = "加入書籤",
+                                        tint = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.size(17.dp)
                                     )
                                 }
                             }
                         }
-                        if (state.mode == PaneMode.FILES) {
-                            IconButton(onClick = onCreateNewFolderClick, modifier = Modifier.size(28.dp)) {
-                                Icon(
-                                    Icons.Default.CreateNewFolder,
-                                    contentDescription = "新增空白資料夾",
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                            IconButton(onClick = { onAddBookmark(state.currentPath) }, modifier = Modifier.size(28.dp)) {
-                                Icon(
-                                    Icons.Default.BookmarkAdd,
-                                    contentDescription = "加入書籤",
-                                    tint = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.size(17.dp)
-                                )
-                            }
-                        }
-                        // 右上角折疊按鈕
-                        IconButton(onClick = onCollapsePane, modifier = Modifier.size(32.dp)) {
+                        // 右上角折疊按鈕固定在最右側（紅框處），窄螢幕絕不被擠出
+                        IconButton(onClick = onCollapsePane, modifier = Modifier.size(34.dp)) {
                             Icon(
-                                Icons.Default.ChevronLeft,
+                                if (state.paneIndex == 3) Icons.Default.ChevronRight else Icons.Default.ChevronLeft,
                                 contentDescription = "摺疊此面板",
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
+                                modifier = Modifier.size(22.dp)
                             )
                         }
                     }

@@ -21,7 +21,8 @@ private val Context.dxDataStore: DataStore<Preferences> by preferencesDataStore(
 
 enum class DarkBackgroundStyle(val key: String) {
     OLED_BLACK("oled_black"),
-    DARK_GRAY("dark_gray");
+    DARK_GRAY("dark_gray"),
+    BLACK_TO_GRAY_GLASS("black_to_gray_glass");
 
     companion object {
         fun fromKey(key: String?): DarkBackgroundStyle =
