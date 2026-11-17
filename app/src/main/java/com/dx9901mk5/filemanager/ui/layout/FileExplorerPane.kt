@@ -85,7 +85,9 @@ import androidx.compose.ui.layout.boundsInParent
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import android.app.Activity
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -98,6 +100,8 @@ import com.dx9901mk5.filemanager.core.vfs.VfsFile
 import com.dx9901mk5.filemanager.ui.ExplorerPaneState
 import com.dx9901mk5.filemanager.ui.FileViewMode
 import com.dx9901mk5.filemanager.ui.PaneMode
+import com.dx9901mk5.filemanager.ui.components.FileThumbnailIcon
+import com.dx9901mk5.filemanager.ui.gesture.SystemCrossAppDragHelper
 import com.dx9901mk5.filemanager.ui.components.IosGlassFolderIcon
 import com.dx9901mk5.filemanager.ui.dialogs.formatFileSize
 import com.dx9901mk5.filemanager.ui.gesture.CrossPaneDragController
@@ -577,9 +581,31 @@ fun FileExplorerPane(
                             },
                             onPrimaryFingerDrag = { localOffset, hoveredPath ->
                                 onHideBottomActionBar()
+                                val rootOffset = listContainerRootOffset + localOffset
+                                val isMultiWin = (context as? Activity)?.isInMultiWindowMode == true
+                                val marginPx = if (isMultiWin) 24f else -4f
+                                val w = hapticView.width.toFloat()
+                                val h = hapticView.height.toFloat()
+                                val crossingWindowEdge = w > 0f && h > 0f && (
+                                    rootOffset.x <= marginPx ||
+                                        rootOffset.x >= w - marginPx ||
+                                        rootOffset.y <= marginPx ||
+                                        rootOffset.y >= h - marginPx
+                                    )
+                                if (crossingWindowEdge &&
+                                    dragController.draggedFiles.any { !it.isDirectory && it.mountId == "local" } &&
+                                    SystemCrossAppDragHelper.startSystemDrag(
+                                        view = hapticView,
+                                        context = context,
+                                        files = dragController.draggedFiles
+                                    )
+                                ) {
+                                    dragController.resetDrag()
+                                    return@dxFileTouchGesture
+                                }
                                 val hoveredFolder = hoveredPath?.takeIf { filesByPath[it]?.isDirectory == true }
                                 dragController.updateDrag(
-                                    rootOffset = listContainerRootOffset + localOffset,
+                                    rootOffset = rootOffset,
                                     hoveredFolder = hoveredFolder
                                 )
                             },
@@ -807,11 +833,10 @@ private fun FileGridItem(
                 FolderMagnifierBadge(visible = isHoveredTarget)
             }
         } else {
-            Icon(
-                imageVector = Icons.Default.InsertDriveFile,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.size(iconSizeDp)
+            FileThumbnailIcon(
+                file = file,
+                iconSize = iconSizeDp,
+                cornerRadius = 10.dp
             )
         }
         Spacer(Modifier.height(4.dp))
@@ -873,11 +898,10 @@ private fun FileRowItem(
                 )
                 FolderMagnifierBadge(visible = isHoveredTarget)
             } else {
-                Icon(
-                    imageVector = Icons.Default.InsertDriveFile,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size((22 * iconScale).dp)
+                FileThumbnailIcon(
+                    file = file,
+                    iconSize = (36 * iconScale).dp,
+                    cornerRadius = 8.dp
                 )
             }
         }

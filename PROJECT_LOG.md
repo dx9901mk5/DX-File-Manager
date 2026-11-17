@@ -66,6 +66,9 @@
 - **v1.0.16** (`versionCode = 17`)：
   - 長壓進入多選時間減半為 `750ms` (0.75 秒)。
   - Release 頁面：https://github.com/dx9901mk5/DX-File-Manager/releases/tag/v1.0.16
+- **v1.0.19** (`versionCode = 20`，本機測試版)：
+  - **檔案照片／影片／APK 實景縮圖預覽**：新增 `FileThumbnailIcon.kt`，於清單與圖示檢視即時載入相片縮圖（支援 EXIF 旋轉校正與 `LruCache` 快取）、影片首幀縮圖與 APK 圖示，其餘文件／試算表／投影片／PDF／壓縮檔／音訊皆依類型彩色區分。
+  - **雙 App 並排跨 App 系統級拖曳分享**：新增 `SystemCrossAppDragHelper.kt`（`FileProvider` + `View.startDragAndDrop` + `DRAG_FLAG_GLOBAL | DRAG_FLAG_GLOBAL_URI_READ`），多視窗／並排模式下將檔案拖曳跨越視窗邊界時自動交棒給 Android 系統拖曳，可直接拖入通訊軟體、Word、試算表、投影片、社群 App 上傳。
 - **v1.0.18** (`versionCode = 19`)：
   - **清空垃圾桶前二次確認 ＋ 倒垃圾音效與震動**：點擊垃圾桶「清空」按鈕先跳出確認對話框；確認清空時觸發 `DxHaptics.trashEmptyVibrate` 兩段式震動與 `DxSoundEffects.playTrashEmptySound` 合成倒垃圾音效（約 360ms 傾倒沙沙聲 + 收尾音）。
   - Release 頁面：https://github.com/dx9901mk5/DX_fileManager/releases/tag/v1.0.18
