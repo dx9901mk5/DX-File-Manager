@@ -69,6 +69,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalView
 import com.dx9901mk5.filemanager.ui.gesture.DxHaptics
+import com.dx9901mk5.filemanager.ui.gesture.DxSoundEffects
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -205,6 +206,7 @@ private fun DxFileManagerScreen(
     var showStorageAnalyzer by remember { mutableStateOf(false) }
     var showWebShare by remember { mutableStateOf(false) }
     var showNewFolderForPane by remember { mutableStateOf<Int?>(null) }
+    var showEmptyTrashConfirmDialog by remember { mutableStateOf(false) }
     var showExitConfirmDialog by remember { mutableStateOf(false) }
     // Pair(paneIndex, prioritizeCreateOrCompress)
     var bottomActionBarState by remember { mutableStateOf<Pair<Int, Boolean>?>(null) }
@@ -461,7 +463,7 @@ private fun DxFileManagerScreen(
                     onToggleSystemApps = { viewModel.toggleSystemApps() },
                     onExportSelectedApps = { viewModel.exportSelectedApps(selectedAppPackages.toList()) },
                     onRestoreTrashItem = { viewModel.restoreTrashItem(it) },
-                    onEmptyTrash = { viewModel.emptyTrash() }
+                    onEmptyTrash = { showEmptyTrashConfirmDialog = true }
                 )
             },
             pane3Content = { onCollapse ->
@@ -508,7 +510,7 @@ private fun DxFileManagerScreen(
                     onToggleSystemApps = { viewModel.toggleSystemApps() },
                     onExportSelectedApps = { viewModel.exportSelectedApps(selectedAppPackages.toList()) },
                     onRestoreTrashItem = { viewModel.restoreTrashItem(it) },
-                    onEmptyTrash = { viewModel.emptyTrash() }
+                    onEmptyTrash = { showEmptyTrashConfirmDialog = true }
                 )
             }
         )
@@ -634,6 +636,35 @@ private fun DxFileManagerScreen(
             NewFolderDialog(
                 onConfirm = { name -> viewModel.createFolder(paneIdx, name) },
                 onDismiss = { showNewFolderForPane = null }
+            )
+        }
+
+        if (showEmptyTrashConfirmDialog) {
+            AlertDialog(
+                onDismissRequest = { showEmptyTrashConfirmDialog = false },
+                title = { Text("清空垃圾桶") },
+                text = { Text("確定要永久刪除垃圾桶中的 ${trashItems.size} 個項目嗎？此動作無法復原。") },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            showEmptyTrashConfirmDialog = false
+                            DxHaptics.trashEmptyVibrate(activityContext, hapticView)
+                            DxSoundEffects.playTrashEmptySound()
+                            viewModel.emptyTrash()
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError
+                        )
+                    ) {
+                        Text("確定清空")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showEmptyTrashConfirmDialog = false }) {
+                        Text("取消")
+                    }
+                }
             )
         }
 

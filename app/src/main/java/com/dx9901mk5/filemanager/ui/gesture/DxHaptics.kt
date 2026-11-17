@@ -31,6 +31,38 @@ object DxHaptics {
         vibrate(context, durationMs = 30L, amplitude = 120)
     }
 
+    /**
+     * 清空垃圾桶時的兩段式「倒垃圾」震動回饋
+     */
+    fun trashEmptyVibrate(context: Context, view: View? = null) {
+        val constant = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            HapticFeedbackConstants.CONFIRM
+        } else {
+            HapticFeedbackConstants.LONG_PRESS
+        }
+        view?.performHapticFeedback(
+            constant,
+            HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
+        )
+        runCatching {
+            val vibrator: Vibrator? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                vm?.defaultVibrator
+            } else {
+                context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            }
+            if (vibrator?.hasVibrator() == true) {
+                vibrator.vibrate(
+                    VibrationEffect.createWaveform(
+                        longArrayOf(0L, 45L, 55L, 85L),
+                        intArrayOf(0, 160, 0, 255),
+                        -1
+                    )
+                )
+            }
+        }
+    }
+
     @Suppress("DEPRECATION")
     private fun vibrate(context: Context, durationMs: Long, amplitude: Int) {
         runCatching {
