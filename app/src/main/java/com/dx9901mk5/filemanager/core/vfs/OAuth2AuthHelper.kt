@@ -5,13 +5,22 @@ import android.accounts.AccountManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.util.Base64
 import com.google.android.gms.auth.GoogleAuthUtil
 import com.google.android.gms.auth.UserRecoverableAuthException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.FormBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
 import java.net.URLEncoder
+import java.security.MessageDigest
+import java.security.SecureRandom
 
 sealed class GoogleTokenResult {
     data class Success(val token: String, val accountName: String) : GoogleTokenResult()
@@ -29,6 +38,14 @@ object OAuth2AuthHelper {
 
     private val _receivedToken = MutableStateFlow<String?>(null)
     val receivedToken = _receivedToken.asStateFlow()
+
+    @Volatile
+    private var pendingOneDriveVerifier: String? = null
+
+    @Volatile
+    private var pendingOneDriveClientId: String? = null
+
+    private val httpClient by lazy { OkHttpClient() }
 
     fun clearToken() {
         _receivedToken.value = null
@@ -79,13 +96,57 @@ object OAuth2AuthHelper {
                 .toMap()["access_token"]
 
             val queryToken = data.getQueryParameter("access_token")
-                ?: data.getQueryParameter("code")
+            val authCode = data.getQueryParameter("code")
+            val verifier = pendingOneDriveVerifier
+            val clientId = pendingOneDriveClientId
 
-            val token = fragmentToken ?: queryToken
-            if (!token.isNullOrBlank()) {
-                _receivedToken.value = token
+            if (!queryToken.isNullOrBlank() || !fragmentToken.isNullOrBlank()) {
+                _receivedToken.value = fragmentToken ?: queryToken
+            } else if (!authCode.isNullOrBlank() && !verifier.isNullOrBlank() && !clientId.isNullOrBlank()) {
+                pendingOneDriveVerifier = null
+                pendingOneDriveClientId = null
+                exchangeOneDriveCodeForToken(authCode, verifier, clientId)
+            } else if (!authCode.isNullOrBlank()) {
+                _receivedToken.value = authCode
             }
         }
+    }
+
+    private fun exchangeOneDriveCodeForToken(code: String, codeVerifier: String, clientId: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching {
+                val form = FormBody.Builder()
+                    .add("client_id", clientId)
+                    .add("grant_type", "authorization_code")
+                    .add("code", code)
+                    .add("redirect_uri", REDIRECT_URI)
+                    .add("code_verifier", codeVerifier)
+                    .add("scope", "Files.ReadWrite.All offline_access User.Read")
+                    .build()
+                val req = Request.Builder()
+                    .url("https://login.microsoftonline.com/common/oauth2/v2.0/token")
+                    .post(form)
+                    .build()
+                httpClient.newCall(req).execute().use { resp ->
+                    val bodyStr = resp.body?.string().orEmpty()
+                    if (resp.isSuccessful) {
+                        val token = JSONObject(bodyStr).optString("access_token")
+                        if (token.isNotBlank()) {
+                            _receivedToken.value = token
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun generatePkcePair(): Pair<String, String> {
+        val bytes = ByteArray(32)
+        SecureRandom().nextBytes(bytes)
+        val verifier = Base64.encodeToString(bytes, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
+        val digest = MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray(Charsets.US_ASCII))
+        val challenge = Base64.encodeToString(digest, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
+        return verifier to challenge
     }
 
     fun buildAuthorizeUrl(protocol: VfsProtocol, clientId: String): String? {
@@ -100,8 +161,11 @@ object OAuth2AuthHelper {
                 "https://www.dropbox.com/oauth2/authorize?client_id=$cid&redirect_uri=$redirect&response_type=token"
             }
             VfsProtocol.ONEDRIVE -> {
-                val scope = URLEncoder.encode("Files.ReadWrite.All", "UTF-8")
-                "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=$cid&redirect_uri=$redirect&response_type=token&scope=$scope"
+                val (verifier, challenge) = generatePkcePair()
+                pendingOneDriveVerifier = verifier
+                pendingOneDriveClientId = clientId.trim()
+                val scope = URLEncoder.encode("Files.ReadWrite.All offline_access User.Read", "UTF-8")
+                "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=$cid&redirect_uri=$redirect&response_type=code&scope=$scope&code_challenge=$challenge&code_challenge_method=S256"
             }
             VfsProtocol.YANDEX -> {
                 "https://oauth.yandex.com/authorize?response_type=token&client_id=$cid&redirect_uri=$redirect"

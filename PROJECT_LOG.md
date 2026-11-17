@@ -68,7 +68,7 @@
   - 長壓進入多選時間減半為 `750ms` (0.75 秒)。
   - Release 頁面：https://github.com/dx9901mk5/DX-File-Manager/releases/tag/v1.0.16
 - **v1.0.20** (`versionCode = 21`，本機測試版)：
-  - **OneDrive 一鍵瀏覽器登入**：於 `OAuth2AuthHelper.kt` 內建 Azure 應用程式 Client ID（`5bea5b7f-d2fa-44e1-889d-bad83d2a3e77`），用戶在雲端掛載精靈選擇 OneDrive 後，直接點擊「登入到 OneDrive」即可跳轉瀏覽器完成登入授權並自動導回 APP 掛載。
+  - **OneDrive 一鍵瀏覽器登入（PKCE 授權碼流程）**：於 `OAuth2AuthHelper.kt` 內建 Azure 應用程式 Client ID（`5bea5b7f-d2fa-44e1-889d-bad83d2a3e77`）並改用標準 OAuth2 Authorization Code + PKCE（`response_type=code` 自動換取 `access_token`），用戶在雲端掛載精靈選擇 OneDrive 後，直接點擊「登入到 OneDrive」即可跳轉瀏覽器完成登入授權並自動導回 APP 掛載。
 - **v1.0.19** (`versionCode = 20`，本機測試版)：
   - **檔案照片／影片／APK 實景縮圖預覽**：新增 `FileThumbnailIcon.kt`，於清單與圖示檢視即時載入相片縮圖（支援 EXIF 旋轉校正與 `LruCache` 快取）、影片首幀縮圖與 APK 圖示，其餘文件／試算表／投影片／PDF／壓縮檔／音訊皆依類型彩色區分。
   - **雙 App 並排跨 App 系統級拖曳分享**：新增 `SystemCrossAppDragHelper.kt`（`FileProvider` + `View.startDragAndDrop` + `DRAG_FLAG_GLOBAL | DRAG_FLAG_GLOBAL_URI_READ`），多視窗／並排模式下將檔案拖曳跨越視窗邊界時自動交棒給 Android 系統拖曳，可直接拖入通訊軟體、Word、試算表、投影片、社群 App 上傳。
