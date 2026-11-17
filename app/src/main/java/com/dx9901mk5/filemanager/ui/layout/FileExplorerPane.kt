@@ -216,29 +216,7 @@ fun FileExplorerPane(
                 }
 
                 // 頂部圓角膠囊標題列（參照雙欄檔案管理器設計 + Windows 黃黑配色）
-                val listState = rememberLazyListState()
-    val gridState = rememberLazyGridState()
-    val hasBottom3Selected = remember(filteredFiles, state.selectedPaths) {
-        filteredFiles.takeLast(3).any { it.path in state.selectedPaths }
-    }
-    val bottomClearanceDp by androidx.compose.animation.core.animateDpAsState(
-        targetValue = if (isBottomActionBarVisible || state.isMultiSelectMode || hasBottom3Selected) 112.dp else 72.dp,
-        label = "BottomClearanceDp"
-    )
-    LaunchedEffect(isBottomActionBarVisible, hasBottom3Selected) {
-        if (isBottomActionBarVisible && hasBottom3Selected) {
-            val targetIdx = filteredFiles.indexOfLast { it.path in state.selectedPaths }
-            if (targetIdx >= 0) {
-                if (state.viewMode == FileViewMode.LIST) {
-                    listState.animateScrollToItem(targetIdx)
-                } else {
-                    gridState.animateScrollToItem(targetIdx)
-                }
-            }
-        }
-    }
-
-    Surface(
+                Surface(
                     shape = RoundedCornerShape(24.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     modifier = Modifier
@@ -318,29 +296,7 @@ fun FileExplorerPane(
                                 )
                             }
                             if (state.mode == PaneMode.FILES && hasClipboard) {
-                                val listState = rememberLazyListState()
-    val gridState = rememberLazyGridState()
-    val hasBottom3Selected = remember(filteredFiles, state.selectedPaths) {
-        filteredFiles.takeLast(3).any { it.path in state.selectedPaths }
-    }
-    val bottomClearanceDp by androidx.compose.animation.core.animateDpAsState(
-        targetValue = if (isBottomActionBarVisible || state.isMultiSelectMode || hasBottom3Selected) 112.dp else 72.dp,
-        label = "BottomClearanceDp"
-    )
-    LaunchedEffect(isBottomActionBarVisible, hasBottom3Selected) {
-        if (isBottomActionBarVisible && hasBottom3Selected) {
-            val targetIdx = filteredFiles.indexOfLast { it.path in state.selectedPaths }
-            if (targetIdx >= 0) {
-                if (state.viewMode == FileViewMode.LIST) {
-                    listState.animateScrollToItem(targetIdx)
-                } else {
-                    gridState.animateScrollToItem(targetIdx)
-                }
-            }
-        }
-    }
-
-    Surface(
+                                Surface(
                                     shape = RoundedCornerShape(16.dp),
                                     color = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier
@@ -968,29 +924,7 @@ private fun FolderMagnifierBadge(visible: Boolean) {
         ) + fadeIn(),
         exit = scaleOut() + fadeOut()
     ) {
-        val listState = rememberLazyListState()
-    val gridState = rememberLazyGridState()
-    val hasBottom3Selected = remember(filteredFiles, state.selectedPaths) {
-        filteredFiles.takeLast(3).any { it.path in state.selectedPaths }
-    }
-    val bottomClearanceDp by androidx.compose.animation.core.animateDpAsState(
-        targetValue = if (isBottomActionBarVisible || state.isMultiSelectMode || hasBottom3Selected) 112.dp else 72.dp,
-        label = "BottomClearanceDp"
-    )
-    LaunchedEffect(isBottomActionBarVisible, hasBottom3Selected) {
-        if (isBottomActionBarVisible && hasBottom3Selected) {
-            val targetIdx = filteredFiles.indexOfLast { it.path in state.selectedPaths }
-            if (targetIdx >= 0) {
-                if (state.viewMode == FileViewMode.LIST) {
-                    listState.animateScrollToItem(targetIdx)
-                } else {
-                    gridState.animateScrollToItem(targetIdx)
-                }
-            }
-        }
-    }
-
-    Surface(
+        Surface(
             shape = CircleShape,
             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.92f),
             shadowElevation = 6.dp,
