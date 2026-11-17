@@ -17,7 +17,7 @@ import androidx.compose.ui.input.pointer.positionChange
 /**
  * 多選與雙指堆疊觸控手勢：
  * 1. 滑動過程 (> touchSlop) 立即放行，絕不誤入選擇或拖曳模式
- * 2. 長壓原地停住滿 1500ms (1.5秒) -> 大振動進入多選狀態，底部顯示操作選單
+ * 2. 長壓原地停住滿 750ms (0.75秒) -> 大振動進入多選狀態，底部顯示操作選單
  * 3. 手指未離開時，第二指點擊其他檔案 -> 連續多選並播放檔案聚合飛入動畫，底部選單暫時隱藏
  * 4. 第一指開始挪動 (> touchSlop) -> 進入多檔案拖曳狀態（資料夾顯示短暫放大鏡特效，移至分區展開鈕可展開目標分區），放開詢問複製或移動
  * 5. 未拖曳而原地放開手指 -> 保留多選狀態並顯示優先含「新增資料夾 / 壓縮」的底部選單
@@ -54,8 +54,8 @@ fun Modifier.dxFileTouchGesture(
         val touchSlop = viewConfiguration.touchSlop
         val holdSlop = touchSlop * 1.8f
 
-        // 第 1 階段：原地停住滿 1500ms (1.5 秒)
-        val movedOrReleasedBeforeHold = withTimeoutOrNull(1500L) {
+        // 第 1 階段：原地停住滿 750ms (0.75 秒)
+        val movedOrReleasedBeforeHold = withTimeoutOrNull(750L) {
             while (true) {
                 val event = awaitPointerEvent(PointerEventPass.Initial)
                 val primaryChange = event.changes.firstOrNull { it.id == primaryPointerId }
@@ -74,7 +74,7 @@ fun Modifier.dxFileTouchGesture(
             return@awaitEachGesture
         }
 
-        // 滿 1.5 秒 -> 大振動並進入多選狀態
+        // 滿 0.75 秒 -> 大振動並進入多選狀態
         DxHaptics.strongVibrate(context, hapticView)
 
         if (touchedFile == null) {

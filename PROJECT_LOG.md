@@ -62,6 +62,9 @@
 - **v1.0.15** (`versionCode = 16`)：
   - **手機版第二、三分區頂部摺疊按鈕防擠出修復**：`FileExplorerPane.kt` 頂部圓角膠囊列中段圖示改為可水平捲動區域，並將右上角摺疊按鈕（`ChevronLeft` / `ChevronRight`）固定釘選在最右側，窄螢幕手機不再被擠出畫面、隨時可點擊摺疊與展開。
   - **新增「黑至灰黑玻璃漸層」深色主題**：於 `AppPreferences.kt`、`Theme.kt`、`DxI18n.kt`、`AboutAndUpdateDialog.kt` 與 `MainActivity.kt` 新增 `BLACK_TO_GRAY_GLASS` 選項（`#000000` → `#14161A` → `#282B32` 垂直漸層搭配半透明磨砂玻璃面板）。
+  - Release 頁面：https://github.com/dx9901mk5/DX-File-Manager/releases/tag/v1.0.15
+- **待確認變更（尚未發布 APK）**：
+  - **長壓進入多選時間減半**：`TwoFingerStackGesture.kt` 長壓進入多選門檻由 `1500ms` (1.5 秒) 縮短為 `750ms` (0.75 秒)。
 - **v1.0.13** (`versionCode = 14`)：
   - **第一區書籤與內部儲存空間樹狀展開**：書籤新增長壓確認移除；「內部儲存空間」新增展開/收合箭頭，可直接展開並點擊進入根目錄資料夾。
   - **拖曳至第一區根目錄即時放大鏡提示**：拖曳檔案至第一區的內部儲存空間、展開資料夾或書籤時即時顯示放大鏡與邊框提示，放開即詢問複製或移動。
