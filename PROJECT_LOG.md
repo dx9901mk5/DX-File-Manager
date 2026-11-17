@@ -1,6 +1,6 @@
 # DX檔案管理器 (DX File Manager) — 本機開發與發布紀錄
 
-- **最後更新時間**：2026-11-16
+- **最後更新時間**：2026-11-17
 - **本機專案路徑**：`D:\Google雲端硬碟\Antigravity\DX檔案管理器`
 - **GitHub 儲存庫**：https://github.com/dx9901mk5/DX_fileManager
 - **Application ID**：`com.dx9901mk5.filemanager`
@@ -66,13 +66,13 @@
 - **v1.0.16** (`versionCode = 17`)：
   - 長壓進入多選時間減半為 `750ms` (0.75 秒)。
   - Release 頁面：https://github.com/dx9901mk5/DX-File-Manager/releases/tag/v1.0.16
-- **待確認變更（尚未發布 APK）**：
+- **v1.0.17** (`versionCode = 18`)：
   - **底部選擇自動預留留白與捲動閃避**：`FileExplorerPane.kt` 偵測底部操作選單顯示或最後 3 個項目被選取時，自動平滑拉伸底部 `contentPadding` 至 `112.dp` 並自動捲動至最後選取項目，避免被底部功能列遮住重疊。
   - **AI 錯誤訊息友善化 ＋ 本機智慧整理備援**：針對 Gemini API `402`（預付額度用盡）等錯誤轉譯為清楚中文提示，並於 `AiAssistantClient.kt` / `AiFileAssistantDialog.kt` 新增「本機智慧整理（免金鑰 / 免額度）」離線分類功能。
   - **恢復 Dropbox / pCloud / Yandex.Disk 掛載選項**：於 `CloudMountWizardSheet.kt` 重新加入 `DROPBOX`、`PCLOUD`、`YANDEX`（連同既有的 `GOOGLE_DRIVE`、`ONEDRIVE`、`LAN_SMB`、`FTP`、`SFTP`、`WEBDAV`、`OWNCLOUD_NEXTCLOUD`、`AMAZON_S3` 共 11 種）。
   - **專案與 App 更名為 `DX_fileManager`**：更新 `strings.xml`（四語系）、`DxI18n.kt`、`settings.gradle.kts`、`app/build.gradle.kts`（產出 APK 名稱與 `GITHUB_REPO_URL` / `GITHUB_API_LATEST`）。
   - **雲端掛載精靈改為自動連線回報**：`CloudMountWizardSheet.kt` 於選擇帳號按下「下一步」後即自動連線驗證並顯示結果與自動掛載，移除手動「連線」按鈕步驟。
-  - **長壓進入多選時間減半**：`TwoFingerStackGesture.kt` 長壓進入多選門檻由 `1500ms` (1.5 秒) 縮短為 `750ms` (0.75 秒)。
+  - Release 頁面：https://github.com/dx9901mk5/DX_fileManager/releases/tag/v1.0.17
 - **v1.0.13** (`versionCode = 14`)：
   - **第一區書籤與內部儲存空間樹狀展開**：書籤新增長壓確認移除；「內部儲存空間」新增展開/收合箭頭，可直接展開並點擊進入根目錄資料夾。
   - **拖曳至第一區根目錄即時放大鏡提示**：拖曳檔案至第一區的內部儲存空間、展開資料夾或書籤時即時顯示放大鏡與邊框提示，放開即詢問複製或移動。
