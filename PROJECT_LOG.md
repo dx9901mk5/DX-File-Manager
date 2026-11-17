@@ -59,7 +59,7 @@
   - **金黃半透明玻璃風格 App 圖示 + 閃電標誌**：更新 `ic_launcher_background.xml` / `ic_launcher_foreground.xml` 為溫暖金黃光暈與半透明磨砂黃色玻璃資料夾，搭配 `DX⚡` 閃電徽章。
   - **1.5 秒長壓震動後下滑連選**：在 `TwoFingerStackGesture.kt` 與 `FileExplorerPane.kt` 新增 `onSweepSelectItem`，長壓 1.5 秒震動進入多選後，手指直接下滑經過的檔案依序震動圈選並飛入疊圖；於同一資料夾放開即保留多選與底部選單，不誤跳複製/移動視窗。
   - **延長雙指疊合動畫（約 1 秒）與放開確認後依序丟入目標資料夾動畫（約 2 秒）**：更新 `CrossPaneDragController.kt` 與 `MainActivity.kt`，多選飛入疊圖延長至約 1 秒；放開確認複製或移動後，疊圖檔案依序縮小飛入目標資料夾（約 2 秒過渡特效）。
-- **待確認變更（尚未發布 APK）**：
+- **v1.0.15** (`versionCode = 16`)：
   - **手機版第二、三分區頂部摺疊按鈕防擠出修復**：`FileExplorerPane.kt` 頂部圓角膠囊列中段圖示改為可水平捲動區域，並將右上角摺疊按鈕（`ChevronLeft` / `ChevronRight`）固定釘選在最右側，窄螢幕手機不再被擠出畫面、隨時可點擊摺疊與展開。
   - **新增「黑至灰黑玻璃漸層」深色主題**：於 `AppPreferences.kt`、`Theme.kt`、`DxI18n.kt`、`AboutAndUpdateDialog.kt` 與 `MainActivity.kt` 新增 `BLACK_TO_GRAY_GLASS` 選項（`#000000` → `#14161A` → `#282B32` 垂直漸層搭配半透明磨砂玻璃面板）。
 - **v1.0.13** (`versionCode = 14`)：
