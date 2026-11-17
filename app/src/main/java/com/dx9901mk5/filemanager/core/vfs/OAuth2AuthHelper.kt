@@ -24,6 +24,7 @@ sealed class GoogleTokenResult {
  */
 object OAuth2AuthHelper {
     const val REDIRECT_URI = "dxfilemanager://oauth2redirect"
+    const val ONEDRIVE_CLIENT_ID = "5bea5b7f-d2fa-44e1-889d-bad83d2a3e77"
     private const val GOOGLE_DRIVE_SCOPE = "oauth2:https://www.googleapis.com/auth/drive"
 
     private val _receivedToken = MutableStateFlow<String?>(null)
@@ -99,7 +100,7 @@ object OAuth2AuthHelper {
                 "https://www.dropbox.com/oauth2/authorize?client_id=$cid&redirect_uri=$redirect&response_type=token"
             }
             VfsProtocol.ONEDRIVE -> {
-                val scope = URLEncoder.encode("Files.ReadWrite.All offline_access", "UTF-8")
+                val scope = URLEncoder.encode("Files.ReadWrite.All", "UTF-8")
                 "https://login.microsoftonline.com/common/oauth2/v2.0/authorize?client_id=$cid&redirect_uri=$redirect&response_type=token&scope=$scope"
             }
             VfsProtocol.YANDEX -> {
@@ -116,8 +117,11 @@ object OAuth2AuthHelper {
     }
 
     fun launchBrowserAuth(context: Context, protocol: VfsProtocol, clientId: String): Result<Unit> = runCatching {
-        require(clientId.isNotBlank()) { "請展開進階設定填入 OAuth Client ID，或直接貼上 Access Token" }
-        val url = buildAuthorizeUrl(protocol, clientId)
+        val effectiveClientId = clientId.trim().ifBlank {
+            if (protocol == VfsProtocol.ONEDRIVE) ONEDRIVE_CLIENT_ID else ""
+        }
+        require(effectiveClientId.isNotBlank()) { "請展開進階設定填入 OAuth Client ID，或直接貼上 Access Token" }
+        val url = buildAuthorizeUrl(protocol, effectiveClientId)
             ?: throw UnsupportedOperationException("${protocol.displayName} 不使用 OAuth2 瀏覽器授權")
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
