@@ -16,6 +16,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,7 +30,9 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -138,6 +141,7 @@ fun FileExplorerPane(
     onPasteClick: () -> Unit = {},
     onShowBottomActionBar: (prioritizeCreateOrCompress: Boolean) -> Unit = {},
     onHideBottomActionBar: () -> Unit = {},
+    isBottomActionBarVisible: Boolean = false,
     onSwitchCategory: (FileCategory) -> Unit = {},
     onToggleAppSelection: (String) -> Unit,
     onToggleSystemApps: () -> Unit,
@@ -170,6 +174,28 @@ fun FileExplorerPane(
         )
     }
 
+    val listState = rememberLazyListState()
+    val gridState = rememberLazyGridState()
+    val hasBottom3Selected = remember(filteredFiles, state.selectedPaths) {
+        filteredFiles.takeLast(3).any { it.path in state.selectedPaths }
+    }
+    val bottomClearanceDp by androidx.compose.animation.core.animateDpAsState(
+        targetValue = if (isBottomActionBarVisible || state.isMultiSelectMode || hasBottom3Selected) 112.dp else 72.dp,
+        label = "BottomClearanceDp"
+    )
+    LaunchedEffect(isBottomActionBarVisible, hasBottom3Selected) {
+        if (isBottomActionBarVisible && hasBottom3Selected) {
+            val targetIdx = filteredFiles.indexOfLast { it.path in state.selectedPaths }
+            if (targetIdx >= 0) {
+                if (state.viewMode == FileViewMode.LIST) {
+                    listState.animateScrollToItem(targetIdx)
+                } else {
+                    gridState.animateScrollToItem(targetIdx)
+                }
+            }
+        }
+    }
+
     Surface(
         modifier = Modifier
             .fillMaxSize()
@@ -190,7 +216,29 @@ fun FileExplorerPane(
                 }
 
                 // 頂部圓角膠囊標題列（參照雙欄檔案管理器設計 + Windows 黃黑配色）
-                Surface(
+                val listState = rememberLazyListState()
+    val gridState = rememberLazyGridState()
+    val hasBottom3Selected = remember(filteredFiles, state.selectedPaths) {
+        filteredFiles.takeLast(3).any { it.path in state.selectedPaths }
+    }
+    val bottomClearanceDp by androidx.compose.animation.core.animateDpAsState(
+        targetValue = if (isBottomActionBarVisible || state.isMultiSelectMode || hasBottom3Selected) 112.dp else 72.dp,
+        label = "BottomClearanceDp"
+    )
+    LaunchedEffect(isBottomActionBarVisible, hasBottom3Selected) {
+        if (isBottomActionBarVisible && hasBottom3Selected) {
+            val targetIdx = filteredFiles.indexOfLast { it.path in state.selectedPaths }
+            if (targetIdx >= 0) {
+                if (state.viewMode == FileViewMode.LIST) {
+                    listState.animateScrollToItem(targetIdx)
+                } else {
+                    gridState.animateScrollToItem(targetIdx)
+                }
+            }
+        }
+    }
+
+    Surface(
                     shape = RoundedCornerShape(24.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant,
                     modifier = Modifier
@@ -270,7 +318,29 @@ fun FileExplorerPane(
                                 )
                             }
                             if (state.mode == PaneMode.FILES && hasClipboard) {
-                                Surface(
+                                val listState = rememberLazyListState()
+    val gridState = rememberLazyGridState()
+    val hasBottom3Selected = remember(filteredFiles, state.selectedPaths) {
+        filteredFiles.takeLast(3).any { it.path in state.selectedPaths }
+    }
+    val bottomClearanceDp by androidx.compose.animation.core.animateDpAsState(
+        targetValue = if (isBottomActionBarVisible || state.isMultiSelectMode || hasBottom3Selected) 112.dp else 72.dp,
+        label = "BottomClearanceDp"
+    )
+    LaunchedEffect(isBottomActionBarVisible, hasBottom3Selected) {
+        if (isBottomActionBarVisible && hasBottom3Selected) {
+            val targetIdx = filteredFiles.indexOfLast { it.path in state.selectedPaths }
+            if (targetIdx >= 0) {
+                if (state.viewMode == FileViewMode.LIST) {
+                    listState.animateScrollToItem(targetIdx)
+                } else {
+                    gridState.animateScrollToItem(targetIdx)
+                }
+            }
+        }
+    }
+
+    Surface(
                                     shape = RoundedCornerShape(16.dp),
                                     color = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier
@@ -617,11 +687,17 @@ fun FileExplorerPane(
                             val cellMinSize = if (state.viewMode == FileViewMode.LARGE_GRID) 132.dp else 88.dp
                             val gridIconDp = if (state.viewMode == FileViewMode.LARGE_GRID) 56.dp else 36.dp
                             LazyVerticalGrid(
+                                state = gridState,
                                 columns = GridCells.Adaptive(minSize = cellMinSize),
+                                contentPadding = PaddingValues(
+                                    start = 6.dp,
+                                    end = 6.dp,
+                                    top = 6.dp,
+                                    bottom = bottomClearanceDp
+                                ),
                                 modifier = Modifier
                                     .fillMaxSize()
-                                    .dxVerticalOverscrollBounce()
-                                    .padding(6.dp),
+                                    .dxVerticalOverscrollBounce(),
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
@@ -666,6 +742,8 @@ fun FileExplorerPane(
                         }
                         else -> {
                             LazyColumn(
+                                state = listState,
+                                contentPadding = PaddingValues(bottom = bottomClearanceDp),
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .dxVerticalOverscrollBounce()
@@ -890,7 +968,29 @@ private fun FolderMagnifierBadge(visible: Boolean) {
         ) + fadeIn(),
         exit = scaleOut() + fadeOut()
     ) {
-        Surface(
+        val listState = rememberLazyListState()
+    val gridState = rememberLazyGridState()
+    val hasBottom3Selected = remember(filteredFiles, state.selectedPaths) {
+        filteredFiles.takeLast(3).any { it.path in state.selectedPaths }
+    }
+    val bottomClearanceDp by androidx.compose.animation.core.animateDpAsState(
+        targetValue = if (isBottomActionBarVisible || state.isMultiSelectMode || hasBottom3Selected) 112.dp else 72.dp,
+        label = "BottomClearanceDp"
+    )
+    LaunchedEffect(isBottomActionBarVisible, hasBottom3Selected) {
+        if (isBottomActionBarVisible && hasBottom3Selected) {
+            val targetIdx = filteredFiles.indexOfLast { it.path in state.selectedPaths }
+            if (targetIdx >= 0) {
+                if (state.viewMode == FileViewMode.LIST) {
+                    listState.animateScrollToItem(targetIdx)
+                } else {
+                    gridState.animateScrollToItem(targetIdx)
+                }
+            }
+        }
+    }
+
+    Surface(
             shape = CircleShape,
             color = MaterialTheme.colorScheme.primary.copy(alpha = 0.92f),
             shadowElevation = 6.dp,
