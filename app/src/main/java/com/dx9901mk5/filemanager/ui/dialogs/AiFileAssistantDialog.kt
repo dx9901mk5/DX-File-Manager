@@ -241,6 +241,18 @@ fun AiFileAssistantDialog(
                         }
                     }
 
+                    OutlinedButton(
+                        enabled = !busy,
+                        onClick = {
+                            errorMsg = null
+                            appliedMsg = null
+                            aiResult = AiAssistantClient.offlineSmartOrganize(paneState.files)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("本機智慧整理（免金鑰 / 免額度）")
+                    }
+
                     if (!errorMsg.isNullOrBlank()) {
                         Text(errorMsg!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                     }

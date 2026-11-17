@@ -92,7 +92,15 @@ object AiAssistantClient {
         val req = Request.Builder().url(url).post(body.toString().toRequestBody(jsonMedia)).build()
         http.newCall(req).execute().use { resp ->
             val raw = resp.body?.string().orEmpty()
-            if (!resp.isSuccessful) throw IllegalStateException("Gemini 錯誤 (${resp.code})：${raw.take(200)}")
+            if (!resp.isSuccessful) {
+                val friendly = when (resp.code) {
+                    402 -> "Gemini API 專案預付額度已用盡 (402)。請至 AI Studio 檢查帳單或切換免費專案金鑰，或改用下方「本機智慧整理（免額度）」。"
+                    401, 403 -> "Gemini API 金鑰無效或權限不足 (${resp.code})，請重新確認金鑰。"
+                    429 -> "Gemini 請求過於頻繁或超過免費額度上限 (429)，請稍後再試或改用「本機智慧整理」。"
+                    else -> "Gemini 錯誤 (${resp.code})：${raw.take(180)}"
+                }
+                throw IllegalStateException(friendly)
+            }
             val json = JSONObject(raw)
             return json.optJSONArray("candidates")
                 ?.optJSONObject(0)
@@ -185,5 +193,40 @@ object AiAssistantClient {
         }
         val cleanSummary = if (match != null) rawText.replace(match.value, "").trim() else rawText.trim()
         return AiOrganizeResult(summary = cleanSummary, moves = moves)
+    }
+
+    /**
+     * 免 API 金鑰／免額度的本機智慧分類整理計畫
+     */
+    fun offlineSmartOrganize(files: List<VfsFile>): AiOrganizeResult {
+        val imageExt = setOf("jpg", "jpeg", "png", "webp", "gif", "heic", "bmp")
+        val videoExt = setOf("mp4", "mkv", "avi", "mov", "webm", "flv")
+        val audioExt = setOf("mp3", "flac", "wav", "aac", "ogg", "m4a")
+        val docExt = setOf("pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "md", "csv")
+        val apkExt = setOf("apk", "apks", "xapk")
+        val archiveExt = setOf("zip", "7z", "rar", "tar", "gz", "tgz")
+
+        val onlyFiles = files.filter { !it.isDirectory }
+        val moves = onlyFiles.map { f ->
+            val ext = f.name.substringAfterLast('.', "").lowercase()
+            val target = when (ext) {
+                in imageExt -> "圖片"
+                in videoExt -> "影片"
+                in audioExt -> "音訊"
+                in docExt -> "文件"
+                in apkExt -> "安裝套件"
+                in archiveExt -> "壓縮檔"
+                else -> "其他檔案"
+            }
+            AiMoveInstruction(fileName = f.name, targetFolder = target)
+        }
+        val groupedCount = moves.groupingBy { it.targetFolder }.eachCount()
+        val summary = if (moves.isEmpty()) {
+            "目前資料夾內沒有可分類的檔案（共有 ${files.size} 個資料夾）。"
+        } else {
+            val detail = groupedCount.entries.joinToString("\n") { "• ${it.key}：${it.value} 個檔案" }
+            "已完成本機智慧分類（共 ${moves.size} 個檔案）：\n$detail"
+        }
+        return AiOrganizeResult(summary = summary, moves = moves)
     }
 }
