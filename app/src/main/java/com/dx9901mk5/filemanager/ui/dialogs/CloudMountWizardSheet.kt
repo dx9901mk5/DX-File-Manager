@@ -468,88 +468,82 @@ fun CloudMountWizardDialog(
                     }
                 }
 
-                // Step 4: 總覽（比照示範影片 00:14）
-                4 -> {
+                // Step 4: 總覽與自動連線回報（選擇帳號按下「下一步」後自動連線，不需再手動點擊連線）
+                else -> {
                     val effectiveName = displayName.trim().ifBlank { selectedProtocol.displayName }
-                    val effectiveUser = (loggedInAccount ?: username).ifBlank { host.ifBlank { "未設定" } }
-                    Surface(
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            SummaryRow("連線類型", selectedProtocol.displayName)
-                            SummaryRow("顯示名稱", effectiveName)
-                            SummaryRow("使用者名稱", effectiveUser)
+                    val effectiveUser = (loggedInAccount ?: username).ifBlank { host.ifBlank { "已授權帳號" } }
+                    var autoConnectedSuccess by remember(step) { mutableStateOf(false) }
+
+                    LaunchedEffect(step) {
+                        if (step == 4) {
+                            connecting = true
+                            statusMessage = null
+                            autoConnectedSuccess = false
+                            val cfg = buildConfig()
+                            val tempRegistry = VfsRegistry().apply { registerMount(cfg) }
+                            val res = tempRegistry.getProvider(cfg.id).listFiles(cfg.rootPath, false)
+                            connecting = false
+                            res.onSuccess { list ->
+                                autoConnectedSuccess = true
+                                statusMessage = "連線成功！已自動掛載（偵測到 ${list.size} 個項目）"
+                                onMountCreated(cfg)
+                            }.onFailure { err ->
+                                autoConnectedSuccess = false
+                                statusMessage = "連線失敗：${err.message}"
+                            }
                         }
                     }
-                }
 
-                // Step 5: 就快完成了！（比照示範影片 00:15-00:17）
-                else -> {
                     Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Button(
-                            enabled = !connecting,
-                            onClick = {
-                                connecting = true
-                                statusMessage = null
-                                val cfg = buildConfig()
-                                scope.launch {
-                                    val tempRegistry = VfsRegistry().apply { registerMount(cfg) }
-                                    val res = tempRegistry.getProvider(cfg.id).listFiles(cfg.rootPath, false)
-                                    connecting = false
-                                    res.onSuccess {
-                                        onMountCreated(cfg)
-                                        onDismiss()
-                                    }.onFailure { err ->
-                                        statusMessage = "連線失敗：${err.message}"
-                                    }
-                                }
-                            },
-                            shape = RoundedCornerShape(20.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(88.dp)
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            if (connecting) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    CircularProgressIndicator(
-                                        modifier = Modifier.size(22.dp),
-                                        color = MaterialTheme.colorScheme.onPrimary,
-                                        strokeWidth = 2.5.dp
-                                    )
-                                    Text("正在連線...", style = MaterialTheme.typography.titleMedium)
-                                }
-                            } else {
-                                Text("連線", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                            Column(
+                                modifier = Modifier.padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                SummaryRow("連線類型", selectedProtocol.displayName)
+                                SummaryRow("顯示名稱", effectiveName)
+                                SummaryRow("使用者名稱", effectiveUser)
                             }
                         }
 
-                        if (!statusMessage.isNullOrBlank()) {
-                            Text(
-                                text = statusMessage!!,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.error
-                            )
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                if (connecting) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(22.dp),
+                                        strokeWidth = 2.5.dp
+                                    )
+                                    Text("正在自動連線驗證中...", style = MaterialTheme.typography.bodyMedium)
+                                } else if (!statusMessage.isNullOrBlank()) {
+                                    Text(
+                                        text = statusMessage!!,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = if (autoConnectedSuccess) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
                         }
                     }
                 }
             }
         },
         confirmButton = {
-            if (step < 5) {
+            if (step < 4) {
                 Button(
                     onClick = {
                         if (step == 2 && displayName.isBlank()) {
@@ -565,6 +559,13 @@ fun CloudMountWizardDialog(
                     }
                 ) {
                     Text("下一步")
+                }
+            } else {
+                Button(
+                    enabled = !connecting,
+                    onClick = onDismiss
+                ) {
+                    Text("完成")
                 }
             }
         },

@@ -71,6 +71,7 @@
   - **AI 錯誤訊息友善化 ＋ 本機智慧整理備援**：針對 Gemini API `402`（預付額度用盡）等錯誤轉譯為清楚中文提示，並於 `AiAssistantClient.kt` / `AiFileAssistantDialog.kt` 新增「本機智慧整理（免金鑰 / 免額度）」離線分類功能。
   - **恢復 Dropbox / pCloud / Yandex.Disk 掛載選項**：於 `CloudMountWizardSheet.kt` 重新加入 `DROPBOX`、`PCLOUD`、`YANDEX`（連同既有的 `GOOGLE_DRIVE`、`ONEDRIVE`、`LAN_SMB`、`FTP`、`SFTP`、`WEBDAV`、`OWNCLOUD_NEXTCLOUD`、`AMAZON_S3` 共 11 種）。
   - **專案與 App 更名為 `DX_fileManager`**：更新 `strings.xml`（四語系）、`DxI18n.kt`、`settings.gradle.kts`、`app/build.gradle.kts`（產出 APK 名稱與 `GITHUB_REPO_URL` / `GITHUB_API_LATEST`）。
+  - **雲端掛載精靈改為自動連線回報**：`CloudMountWizardSheet.kt` 於選擇帳號按下「下一步」後即自動連線驗證並顯示結果與自動掛載，移除手動「連線」按鈕步驟。
   - **長壓進入多選時間減半**：`TwoFingerStackGesture.kt` 長壓進入多選門檻由 `1500ms` (1.5 秒) 縮短為 `750ms` (0.75 秒)。
 - **v1.0.13** (`versionCode = 14`)：
   - **第一區書籤與內部儲存空間樹狀展開**：書籤新增長壓確認移除；「內部儲存空間」新增展開/收合箭頭，可直接展開並點擊進入根目錄資料夾。
