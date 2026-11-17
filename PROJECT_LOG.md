@@ -67,7 +67,7 @@
 - **v1.0.16** (`versionCode = 17`)：
   - 長壓進入多選時間減半為 `750ms` (0.75 秒)。
   - Release 頁面：https://github.com/dx9901mk5/DX-File-Manager/releases/tag/v1.0.16
-- **待確認變更（尚未編譯 APK，接續 `v1.0.21`）**：
+- **v1.1.1** (`versionCode = 23`，本機編譯版)：
   - **修復 Google 雲端硬碟更新／Token 過期後失效需重掛載問題**：
     - 原因：`CloudAndWebDavVfsProvider` 原本只使用掛載當下靜態儲存的 `config.accessToken`（Google OAuth2 Access Token 約 1 小時或 App 更新後即失效），遇到 `HTTP 401` 時未利用已保存的 Google 帳號（`config.username`）重新向 `GoogleAuthUtil` 取得新 Token。
     - 修正：於 `DxFileManagerApp.kt` 暴露 `instance`，在 `OAuth2AuthHelper.kt` 新增 `refreshGoogleDriveTokenSync()`（`clearToken` + `getToken`），並於 `NetworkVfsProviders.kt` 新增 `executeGoogleDriveRequest()`：遇到 `401` 或 Token 為空時自動背景靜默換取新 Token、寫回 `AppPreferences` 並重試請求，不需再手動重新掛載。
@@ -158,7 +158,7 @@
   - GitHub 最後成功發布於 Releases 的版本：`v1.0.17` (`versionCode = 18`)。
   - 目前帳號 `dx9901mk5` 因系統停權（`403 Your account is suspended`）暫無法 `git push`；已透過 `help.github.com` 送出帳號恢復申訴，工單編號 **`#5015727`**（通知寄往 `dx9901mk5@gmail.com`）。待恢復後可將本機 `main`（含 `v1.0.18`～`v1.0.21`）推送至 `origin`。
 - **本機編譯與 Google 雲端硬碟發布通道（目前替代方案）**：
-  - **最新本機簽名 APK**：`v1.0.21` (`versionCode = 22`)，`release_apks/DX_fileManager-v1.0.21-release.apk`（固定簽名 `app/release.keystore`）。
+  - **最新本機簽名 APK**：`v1.1.1` (`versionCode = 23`)，`release_apks/DX_fileManager-v1.1.1-release.apk`（固定簽名 `app/release.keystore`）。
   - **本機編譯注意事項（Windows 中文路徑）**：因專案路徑含中文字元導致 Kotlin 編譯器 `.argfile` 跳脫失敗且 Google Drive 同步會鎖定 `build/`，需先 `robocopy` 原始碼（排除 `build .gradle .git release_apks`）至純英文暫存路徑執行 `gradle assembleRelease`，再複製 APK 回 `release_apks/`。
   - **Google 雲端硬碟「測試用」資料夾**（已設為知道連結者可瀏覽）：https://drive.google.com/drive/folders/1h_I2rDnRJvTYe2V0_04AM9hAnk17wO5x （已上傳 `v1.0.18`、`v1.0.19`、`v1.0.20`、`v1.0.21`）。
   - **Google 雲端硬碟「正式發布」資料夾**（已設為知道連結者可瀏覽）：https://drive.google.com/drive/folders/1JrrkNtKZZIGEvpLaHuXRxGiCRJPQO6Vu
