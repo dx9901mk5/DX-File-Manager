@@ -54,7 +54,7 @@ data class DxStrings(
 
 fun dxStringsFor(lang: AppLanguage): DxStrings = when (lang) {
     AppLanguage.ZH_TW -> DxStrings(
-        appName = "DX檔案管理器",
+        appName = "DX_fileManager",
         rootNav = "根目錄與導覽",
         storageDevices = "儲存裝置",
         internalStorage = "內部儲存空間",
@@ -81,7 +81,7 @@ fun dxStringsFor(lang: AppLanguage): DxStrings = when (lang) {
         done = "完成"
     )
     AppLanguage.ZH_CN -> DxStrings(
-        appName = "DX文件管理器",
+        appName = "DX_fileManager",
         rootNav = "根目录与导航",
         storageDevices = "存储设备",
         internalStorage = "内部存储空间",
@@ -108,7 +108,7 @@ fun dxStringsFor(lang: AppLanguage): DxStrings = when (lang) {
         done = "完成"
     )
     AppLanguage.EN -> DxStrings(
-        appName = "DX File Manager",
+        appName = "DX_fileManager",
         rootNav = "Root & Navigation",
         storageDevices = "Storage Devices",
         internalStorage = "Internal Storage",
@@ -135,7 +135,7 @@ fun dxStringsFor(lang: AppLanguage): DxStrings = when (lang) {
         done = "Done"
     )
     AppLanguage.JA -> DxStrings(
-        appName = "DXファイルマネージャー",
+        appName = "DX_fileManager",
         rootNav = "ルート・ナビゲーション",
         storageDevices = "ストレージ",
         internalStorage = "内部ストレージ",

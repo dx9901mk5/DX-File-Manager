@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">DXファイルマネージャー</string>
+    <string name="app_name">DX_fileManager</string>
     <string name="nav_root_title">ルート・ナビゲーション</string>
     <string name="nav_storage_devices">ストレージ</string>
     <string name="nav_internal_storage">内部ストレージ</string>

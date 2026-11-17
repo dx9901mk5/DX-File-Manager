@@ -22,17 +22,17 @@ android {
         targetSdk = 35
         versionCode = 17
         versionName = "1.0.16"
-        base.archivesName.set("DX-File-Manager-v${versionName}")
+        base.archivesName.set("DX_fileManager-v${versionName}")
 
         buildConfigField(
             "String",
             "GITHUB_REPO_URL",
-            "\"https://github.com/dx9901mk5/DX-File-Manager\""
+            "\"https://github.com/dx9901mk5/DX_fileManager\""
         )
         buildConfigField(
             "String",
             "GITHUB_API_LATEST",
-            "\"https://api.github.com/repos/dx9901mk5/DX-File-Manager/releases/latest\""
+            "\"https://api.github.com/repos/dx9901mk5/DX_fileManager/releases/latest\""
         )
     }
 

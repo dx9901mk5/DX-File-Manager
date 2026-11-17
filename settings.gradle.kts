@@ -15,5 +15,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "DXFileManager"
+rootProject.name = "DX_fileManager"
 include(":app")

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">DX文件管理器</string>
+    <string name="app_name">DX_fileManager</string>
     <string name="nav_root_title">根目录与导航</string>
     <string name="nav_storage_devices">存储设备</string>
     <string name="nav_internal_storage">内部存储空间</string>

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">DX File Manager</string>
+    <string name="app_name">DX_fileManager</string>
     <string name="nav_root_title">Root &amp; Navigation</string>
     <string name="nav_storage_devices">Storage Devices</string>
     <string name="nav_internal_storage">Internal Storage</string>
