@@ -291,6 +291,24 @@ fun NavigationPane(
                     }
                 }
 
+                item {
+                    SectionHeader("系統資料夾")
+                }
+                items(
+                    listOf(
+                        "Android/data" to "$localRootPath/Android/data",
+                        "Android/obb" to "$localRootPath/Android/obb",
+                        "系統根目錄 (/)" to "/"
+                    ),
+                    key = { "sys_${it.second}" }
+                ) { (label, sysPath) ->
+                    NavRowItem(
+                        icon = Icons.Default.Folder,
+                        label = label,
+                        onClick = { onOpenBookmark(sysPath) }
+                    )
+                }
+
                 items(cloudMounts, key = { it.id }) { mount ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),

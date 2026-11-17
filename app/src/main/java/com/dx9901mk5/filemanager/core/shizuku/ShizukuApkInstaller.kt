@@ -8,6 +8,7 @@ import android.os.Environment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.lingala.zip4j.ZipFile
+import com.dx9901mk5.filemanager.core.vfs.VfsFile
 import rikka.shizuku.Shizuku
 import java.io.File
 
@@ -84,6 +85,56 @@ object ShizukuApkInstaller {
             Result.failure(e)
         }
     }
+
+    /**
+     * 使用 Shizuku 列出受保護目錄 (如 Android/data、Android/obb、系統根目錄)
+     */
+    suspend fun listDirectoryWithShizuku(dirPath: String, showHidden: Boolean): List<VfsFile> =
+        withContext(Dispatchers.IO) {
+            if (!isShizukuReady()) return@withContext emptyList()
+            runCatching {
+                val escaped = dirPath.replace("\"", "\\\"")
+                val newProcessMethod = Shizuku::class.java.getDeclaredMethod(
+                    "newProcess",
+                    Array<String>::class.java,
+                    Array<String>::class.java,
+                    String::class.java
+                ).apply { isAccessible = true }
+                // 輸出格式：類型(d/f/l)|大小|名稱
+                val cmd = "for f in \"$escaped\"/* \"$escaped\"/.*; do " +
+                    "b=\"\${f##*/}\"; [ \"\$b\" = \".\" ] || [ \"\$b\" = \"..\" ] || [ ! -e \"\$f\" ] && continue; " +
+                    "if [ -d \"\$f\" ]; then t=d; s=0; else t=f; s=\$(wc -c < \"\$f\" 2>/dev/null || echo 0); fi; " +
+                    "echo \"\$t|\$s|\$b\"; done"
+                val process = newProcessMethod.invoke(
+                    null,
+                    arrayOf("sh", "-c", cmd),
+                    null,
+                    null
+                ) as Process
+                val out = process.inputStream.bufferedReader().readLines()
+                process.waitFor()
+                val normalizedDir = dirPath.trimEnd('/').ifEmpty { "/" }
+                out.mapNotNull { line ->
+                    val parts = line.split("|", limit = 3)
+                    if (parts.size < 3) return@mapNotNull null
+                    val isDir = parts[0] == "d"
+                    val size = parts[1].trim().toLongOrNull() ?: 0L
+                    val name = parts[2]
+                    if (!showHidden && name.startsWith(".")) return@mapNotNull null
+                    val fullPath = if (normalizedDir == "/") "/$name" else "$normalizedDir/$name"
+                    VfsFile(
+                        name = name,
+                        path = fullPath,
+                        isDirectory = isDir,
+                        size = size,
+                        lastModified = System.currentTimeMillis(),
+                        mimeType = if (isDir) "inode/directory" else "application/octet-stream",
+                        mountId = "local",
+                        isEmpty = false
+                    )
+                }.sortedWith(compareByDescending<VfsFile> { it.isDirectory }.thenBy { it.name.lowercase() })
+            }.getOrDefault(emptyList())
+        }
 
     /**
      * 讀取已安裝應用程式清單

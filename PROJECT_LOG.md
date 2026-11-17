@@ -67,6 +67,10 @@
 - **v1.0.16** (`versionCode = 17`)：
   - 長壓進入多選時間減半為 `750ms` (0.75 秒)。
   - Release 頁面：https://github.com/dx9901mk5/DX-File-Manager/releases/tag/v1.0.16
+- **v1.0.21** (`versionCode = 22`，本機測試版)：
+  - **系統資料夾與 `Android/data`、`Android/obb` 檢視**：`NavigationPane.kt` 新增「系統資料夾」快速入口（`Android/data`、`Android/obb`、`系統根目錄 (/)`）；`ShizukuApkInstaller.kt` 與 `LocalVfsProvider.kt` 整合 Shizuku Shell 權限讀取受保護目錄，未授權 Shizuku 時給予明確引導提示。
+  - **AI 助理新增 DeepSeek、模型選擇與深度思考開關**：`AppPreferences.kt`、`AiAssistantClient.kt`、`AiFileAssistantDialog.kt` 與 `AboutAndUpdateDialog.kt` 新增 `DeepSeek`（`deepseek-chat` / `deepseek-reasoner`）、各家預設模型切換，以及「深度思考模式 (Thinking)」開關（支援 Gemini 2.5 `thinkingBudget`、DeepSeek Reasoner、Claude `thinking`、OpenAI/Grok `reasoning_effort`）。
+  - **更新檢查新增雲端硬碟雙通道連結**：於「設定與關於我」更新區塊新增「檢查測試版雲端」（`https://drive.google.com/drive/folders/1h_I2rDnRJvTYe2V0_04AM9hAnk17wO5x`）與「檢查正式版雲端」（`https://drive.google.com/drive/folders/1JrrkNtKZZIGEvpLaHuXRxGiCRJPQO6Vu`）按鈕。
 - **v1.0.20** (`versionCode = 21`，本機測試版)：
   - **OneDrive 一鍵瀏覽器登入（PKCE 授權碼流程）**：於 `OAuth2AuthHelper.kt` 內建 Azure 應用程式 Client ID（`5bea5b7f-d2fa-44e1-889d-bad83d2a3e77`）並改用標準 OAuth2 Authorization Code + PKCE（`response_type=code` 自動換取 `access_token`），用戶在雲端掛載精靈選擇 OneDrive 後，直接點擊「登入到 OneDrive」即可跳轉瀏覽器完成登入授權並自動導回 APP 掛載。
 - **v1.0.19** (`versionCode = 20`，本機測試版)：

@@ -691,6 +691,8 @@ private fun DxFileManagerScreen(
                 onChangeLanguage = { viewModel.setLanguage(it) },
                 onChangeAiProvider = { viewModel.setAiProvider(it) },
                 onSaveAiApiKey = { provider, key -> viewModel.setAiApiKey(provider, key) },
+                onChangeAiModel = { provider, model -> viewModel.setAiModel(provider, model) },
+                onToggleAiThinking = { viewModel.setAiThinkingEnabled(it) },
                 onOpenStorageAnalyzer = { showStorageAnalyzer = true },
                 onOpenWebShare = { showWebShare = true },
                 onOpenShortcuts = { showShortcutsDialog = true },
@@ -707,6 +709,8 @@ private fun DxFileManagerScreen(
                 paneState = targetState,
                 onSelectProvider = { viewModel.setAiProvider(it) },
                 onSaveApiKey = { provider, key -> viewModel.setAiApiKey(provider, key) },
+                onSelectModel = { provider, model -> viewModel.setAiModel(provider, model) },
+                onToggleThinking = { viewModel.setAiThinkingEnabled(it) },
                 onApplyOrganizeMoves = { moves -> viewModel.organizeFilesWithPlan(targetPaneIdx, moves) },
                 onDismiss = { showAiAssistantDialog = false }
             )

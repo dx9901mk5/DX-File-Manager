@@ -33,12 +33,15 @@ object AiAssistantClient {
     suspend fun analyzeAndPlan(
         provider: AiProvider,
         apiKey: String,
+        model: String = provider.defaultModel,
+        thinkingEnabled: Boolean = false,
         currentPath: String,
         files: List<VfsFile>,
         userPrompt: String
     ): Result<AiOrganizeResult> = withContext(Dispatchers.IO) {
         runCatching {
             require(apiKey.isNotBlank()) { "請先輸入 ${provider.displayName} API 金鑰" }
+            val chosenModel = model.trim().ifBlank { provider.defaultModel }
 
             val fileSummary = files.take(150).joinToString("\n") { f ->
                 val kind = if (f.isDirectory) "DIR" else "FILE (${f.size} bytes)"
@@ -59,35 +62,63 @@ object AiAssistantClient {
             """.trimIndent()
 
             val rawText = when (provider) {
-                AiProvider.GEMINI -> callGemini(apiKey.trim(), provider.defaultModel, systemInstruction, userPrompt)
+                AiProvider.GEMINI -> callGemini(apiKey.trim(), chosenModel, thinkingEnabled, systemInstruction, userPrompt)
+                AiProvider.DEEPSEEK -> {
+                    val dsModel = if (thinkingEnabled && chosenModel == "deepseek-chat") "deepseek-reasoner" else chosenModel
+                    callOpenAiCompatible(
+                        url = "https://api.deepseek.com/v1/chat/completions",
+                        apiKey = apiKey.trim(),
+                        model = dsModel,
+                        thinkingEnabled = thinkingEnabled,
+                        systemPrompt = systemInstruction,
+                        userPrompt = userPrompt
+                    )
+                }
                 AiProvider.GPT -> callOpenAiCompatible(
                     url = "https://api.openai.com/v1/chat/completions",
                     apiKey = apiKey.trim(),
-                    model = provider.defaultModel,
+                    model = chosenModel,
+                    thinkingEnabled = thinkingEnabled,
                     systemPrompt = systemInstruction,
                     userPrompt = userPrompt
                 )
                 AiProvider.GROK -> callOpenAiCompatible(
                     url = "https://api.x.ai/v1/chat/completions",
                     apiKey = apiKey.trim(),
-                    model = provider.defaultModel,
+                    model = chosenModel,
+                    thinkingEnabled = thinkingEnabled,
                     systemPrompt = systemInstruction,
                     userPrompt = userPrompt
                 )
-                AiProvider.CLAUDE -> callClaude(apiKey.trim(), provider.defaultModel, systemInstruction, userPrompt)
+                AiProvider.CLAUDE -> callClaude(apiKey.trim(), chosenModel, thinkingEnabled, systemInstruction, userPrompt)
             }
 
             parseAiResponse(rawText)
         }
     }
 
-    private fun callGemini(apiKey: String, model: String, systemPrompt: String, userPrompt: String): String {
+    private fun callGemini(
+        apiKey: String,
+        model: String,
+        thinkingEnabled: Boolean,
+        systemPrompt: String,
+        userPrompt: String
+    ): String {
         val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$apiKey"
         val body = JSONObject().apply {
             put("contents", JSONArray().put(JSONObject().apply {
                 put("role", "user")
                 put("parts", JSONArray().put(JSONObject().put("text", "$systemPrompt\n\n使用者需求：$userPrompt")))
             }))
+            if (model.startsWith("gemini-2.5") || model.startsWith("gemini-3")) {
+                put(
+                    "generationConfig",
+                    JSONObject().put(
+                        "thinkingConfig",
+                        JSONObject().put("thinkingBudget", if (thinkingEnabled) 4096 else 0)
+                    )
+                )
+            }
         }
         val req = Request.Builder().url(url).post(body.toString().toRequestBody(jsonMedia)).build()
         http.newCall(req).execute().use { resp ->
@@ -117,11 +148,15 @@ object AiAssistantClient {
         url: String,
         apiKey: String,
         model: String,
+        thinkingEnabled: Boolean,
         systemPrompt: String,
         userPrompt: String
     ): String {
         val body = JSONObject().apply {
             put("model", model)
+            if (thinkingEnabled && (model.startsWith("o1") || model.startsWith("o3") || model.startsWith("o4") || model == "grok-3-mini")) {
+                put("reasoning_effort", "medium")
+            }
             put("messages", JSONArray().apply {
                 put(JSONObject().put("role", "system").put("content", systemPrompt))
                 put(JSONObject().put("role", "user").put("content", userPrompt))
@@ -145,12 +180,21 @@ object AiAssistantClient {
         }
     }
 
-    private fun callClaude(apiKey: String, model: String, systemPrompt: String, userPrompt: String): String {
+    private fun callClaude(
+        apiKey: String,
+        model: String,
+        thinkingEnabled: Boolean,
+        systemPrompt: String,
+        userPrompt: String
+    ): String {
         val body = JSONObject().apply {
             put("model", model)
-            put("max_tokens", 2048)
+            put("max_tokens", if (thinkingEnabled) 4096 else 2048)
             put("system", systemPrompt)
             put("messages", JSONArray().put(JSONObject().put("role", "user").put("content", userPrompt)))
+            if (thinkingEnabled) {
+                put("thinking", JSONObject().put("type", "enabled").put("budget_tokens", 2048))
+            }
         }
         val req = Request.Builder()
             .url("https://api.anthropic.com/v1/messages")
@@ -162,11 +206,17 @@ object AiAssistantClient {
             val raw = resp.body?.string().orEmpty()
             if (!resp.isSuccessful) throw IllegalStateException("Claude 錯誤 (${resp.code})：${raw.take(200)}")
             val json = JSONObject(raw)
-            return json.optJSONArray("content")
-                ?.optJSONObject(0)
-                ?.optString("text")
-                .orEmpty()
-                .ifBlank { "AI 未回傳文字內容" }
+            val contentArr = json.optJSONArray("content")
+            if (contentArr != null) {
+                for (i in 0 until contentArr.length()) {
+                    val item = contentArr.optJSONObject(i) ?: continue
+                    if (item.optString("type") == "text") {
+                        val txt = item.optString("text")
+                        if (txt.isNotBlank()) return txt
+                    }
+                }
+            }
+            return "AI 未回傳文字內容"
         }
     }
 

@@ -64,6 +64,8 @@ fun SettingsAndAboutDialog(
     onChangeLanguage: (AppLanguage) -> Unit,
     onChangeAiProvider: (AiProvider) -> Unit,
     onSaveAiApiKey: (AiProvider, String) -> Unit,
+    onChangeAiModel: (AiProvider, String) -> Unit,
+    onToggleAiThinking: (Boolean) -> Unit,
     onOpenStorageAnalyzer: () -> Unit,
     onOpenWebShare: () -> Unit,
     onOpenShortcuts: () -> Unit,
@@ -236,6 +238,25 @@ fun SettingsAndAboutDialog(
                         }
                     }
                 }
+                Text("AI 模型 (${settings.aiProvider.displayName})", style = MaterialTheme.typography.bodySmall)
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    settings.aiProvider.presetModels.forEach { preset ->
+                        FilterChip(
+                            selected = settings.currentAiModel == preset,
+                            onClick = { onChangeAiModel(settings.aiProvider, preset) },
+                            label = { Text(preset) }
+                        )
+                    }
+                }
+                SettingSwitchRow(
+                    title = "AI 深度思考模式 (Thinking)",
+                    subtitle = "啟用推理模型思考（Gemini / DeepSeek / Claude / GPT / Grok）",
+                    checked = settings.aiThinkingEnabled,
+                    onCheckedChange = onToggleAiThinking
+                )
 
                 HorizontalDivider()
 
@@ -314,6 +335,37 @@ fun SettingsAndAboutDialog(
                         modifier = Modifier.weight(1f)
                     ) {
                         Text(if (checkingUpdate) "檢查中..." else "檢查更新")
+                    }
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = {
+                            runCatching {
+                                val intent = Intent(
+                                    Intent.ACTION_VIEW,
+                                    Uri.parse("https://drive.google.com/drive/folders/1h_I2rDnRJvTYe2V0_04AM9hAnk17wO5x")
+                                ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                                context.startActivity(intent)
+                            }.onFailure { updateMessage = "無法開啟測試版雲端硬碟：${it.message}" }
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("檢查測試版雲端")
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            runCatching {
+                                val intent = Intent(
+                                    Intent.ACTION_VIEW,
+                                    Uri.parse("https://drive.google.com/drive/folders/1JrrkNtKZZIGEvpLaHuXRxGiCRJPQO6Vu")
+                                ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                                context.startActivity(intent)
+                            }.onFailure { updateMessage = "無法開啟正式版雲端硬碟：${it.message}" }
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("檢查正式版雲端")
                     }
                 }
 

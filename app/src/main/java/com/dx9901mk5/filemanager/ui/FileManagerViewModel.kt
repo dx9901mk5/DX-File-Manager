@@ -601,6 +601,8 @@ class FileManagerViewModel(application: Application) : AndroidViewModel(applicat
     fun removeBookmark(path: String) = viewModelScope.launch { prefs.removeBookmark(path); toast("已移除書籤") }
     fun setAiProvider(provider: AiProvider) = viewModelScope.launch { prefs.setAiProvider(provider) }
     fun setAiApiKey(provider: AiProvider, key: String) = viewModelScope.launch { prefs.setAiApiKey(provider, key) }
+    fun setAiModel(provider: AiProvider, model: String) = viewModelScope.launch { prefs.setAiModel(provider, model) }
+    fun setAiThinkingEnabled(enabled: Boolean) = viewModelScope.launch { prefs.setAiThinkingEnabled(enabled) }
 
     suspend fun organizeFilesWithPlan(paneIndex: Int, moves: List<AiMoveInstruction>): Result<Int> =
         withContext(Dispatchers.IO) {

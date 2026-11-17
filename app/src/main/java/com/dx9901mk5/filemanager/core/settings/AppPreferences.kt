@@ -34,12 +34,44 @@ enum class AiProvider(
     val id: String,
     val displayName: String,
     val defaultModel: String,
+    val presetModels: List<String>,
     val keyHelpUrl: String
 ) {
-    GEMINI("gemini", "Gemini", "gemini-2.5-flash", "https://aistudio.google.com/apikey"),
-    GPT("gpt", "GPT (OpenAI)", "gpt-4o-mini", "https://platform.openai.com/api-keys"),
-    CLAUDE("claude", "Claude", "claude-3-5-haiku-latest", "https://console.anthropic.com/settings/keys"),
-    GROK("grok", "Grok", "grok-2-latest", "https://console.x.ai/");
+    GEMINI(
+        "gemini",
+        "Gemini",
+        "gemini-2.5-flash",
+        listOf("gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"),
+        "https://aistudio.google.com/apikey"
+    ),
+    DEEPSEEK(
+        "deepseek",
+        "DeepSeek",
+        "deepseek-chat",
+        listOf("deepseek-chat", "deepseek-reasoner"),
+        "https://platform.deepseek.com/api_keys"
+    ),
+    GPT(
+        "gpt",
+        "GPT (OpenAI)",
+        "gpt-4o-mini",
+        listOf("gpt-4o-mini", "gpt-4o", "o3-mini"),
+        "https://platform.openai.com/api-keys"
+    ),
+    CLAUDE(
+        "claude",
+        "Claude",
+        "claude-sonnet-4-20250514",
+        listOf("claude-sonnet-4-20250514", "claude-3-5-haiku-latest"),
+        "https://console.anthropic.com/settings/keys"
+    ),
+    GROK(
+        "grok",
+        "Grok",
+        "grok-3-mini",
+        listOf("grok-3-mini", "grok-2-latest"),
+        "https://console.x.ai/"
+    );
 
     companion object {
         fun fromId(id: String?): AiProvider =
@@ -58,6 +90,8 @@ data class DxSettingsState(
     val cloudMounts: List<VfsMountConfig> = emptyList(),
     val aiProvider: AiProvider = AiProvider.GEMINI,
     val aiApiKeys: Map<AiProvider, String> = emptyMap(),
+    val aiModels: Map<AiProvider, String> = emptyMap(),
+    val aiThinkingEnabled: Boolean = false,
     // 記憶各分區上次展開或折疊狀態 (手機直向預設第1+2區、無第3區；平板/摺疊預設三區全開)
     val pane1ExpandedCompact: Boolean = true,
     val pane2ExpandedCompact: Boolean = true,
@@ -68,6 +102,9 @@ data class DxSettingsState(
 ) {
     val currentAiApiKey: String
         get() = aiApiKeys[aiProvider].orEmpty()
+
+    val currentAiModel: String
+        get() = aiModels[aiProvider]?.takeIf { it.isNotBlank() } ?: aiProvider.defaultModel
 }
 
 class AppPreferences(private val context: Context) {
@@ -83,6 +120,8 @@ class AppPreferences(private val context: Context) {
         val CLOUD_MOUNTS_JSON = stringPreferencesKey("cloud_mounts_json")
         val AI_PROVIDER = stringPreferencesKey("ai_provider")
         val AI_KEYS_JSON = stringPreferencesKey("ai_keys_json")
+        val AI_MODELS_JSON = stringPreferencesKey("ai_models_json")
+        val AI_THINKING_ENABLED = booleanPreferencesKey("ai_thinking_enabled")
 
         val P1_COMPACT = booleanPreferencesKey("pane1_expanded_compact")
         val P2_COMPACT = booleanPreferencesKey("pane2_expanded_compact")
@@ -107,6 +146,8 @@ class AppPreferences(private val context: Context) {
             cloudMounts = decodeMounts(prefs[Keys.CLOUD_MOUNTS_JSON]),
             aiProvider = AiProvider.fromId(prefs[Keys.AI_PROVIDER]),
             aiApiKeys = decodeAiKeys(prefs[Keys.AI_KEYS_JSON]),
+            aiModels = decodeAiKeys(prefs[Keys.AI_MODELS_JSON]),
+            aiThinkingEnabled = prefs[Keys.AI_THINKING_ENABLED] ?: false,
             pane1ExpandedCompact = prefs[Keys.P1_COMPACT] ?: true,
             pane2ExpandedCompact = prefs[Keys.P2_COMPACT] ?: true,
             pane3ExpandedCompact = prefs[Keys.P3_COMPACT] ?: false,
@@ -178,6 +219,18 @@ class AppPreferences(private val context: Context) {
             if (apiKey.isBlank()) map.remove(provider) else map[provider] = apiKey.trim()
             prefs[Keys.AI_KEYS_JSON] = encodeAiKeys(map)
         }
+    }
+
+    suspend fun setAiModel(provider: AiProvider, model: String) {
+        context.dxDataStore.edit { prefs ->
+            val map = decodeAiKeys(prefs[Keys.AI_MODELS_JSON]).toMutableMap()
+            if (model.isBlank()) map.remove(provider) else map[provider] = model.trim()
+            prefs[Keys.AI_MODELS_JSON] = encodeAiKeys(map)
+        }
+    }
+
+    suspend fun setAiThinkingEnabled(enabled: Boolean) {
+        context.dxDataStore.edit { it[Keys.AI_THINKING_ENABLED] = enabled }
     }
 
     private fun encodeAiKeys(keys: Map<AiProvider, String>): String {

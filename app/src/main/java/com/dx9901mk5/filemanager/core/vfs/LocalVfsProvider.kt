@@ -3,6 +3,7 @@ package com.dx9901mk5.filemanager.core.vfs
 import android.os.Environment
 import android.os.StatFs
 import android.webkit.MimeTypeMap
+import com.dx9901mk5.filemanager.core.shizuku.ShizukuApkInstaller
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -18,17 +19,36 @@ class LocalVfsProvider : VfsProvider {
     override suspend fun listFiles(path: String, showHidden: Boolean): Result<List<VfsFile>> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val dir = File(path.ifBlank { rootStoragePath })
+                val targetPath = path.ifBlank { rootStoragePath }
+                val dir = File(targetPath)
                 if (!dir.exists() || !dir.isDirectory) {
+                    if (ShizukuApkInstaller.isShizukuReady()) {
+                        val shizukuList = ShizukuApkInstaller.listDirectoryWithShizuku(targetPath, showHidden)
+                        if (shizukuList.isNotEmpty()) return@runCatching shizukuList
+                    }
                     return@runCatching emptyList()
                 }
-                val children = dir.listFiles().orEmpty()
+                val rawFiles = dir.listFiles()
+                if (rawFiles == null || (rawFiles.isEmpty() && isRestrictedAndroidPath(targetPath))) {
+                    if (ShizukuApkInstaller.isShizukuReady()) {
+                        val shizukuList = ShizukuApkInstaller.listDirectoryWithShizuku(targetPath, showHidden)
+                        if (shizukuList.isNotEmpty()) return@runCatching shizukuList
+                    } else if (isRestrictedAndroidPath(targetPath)) {
+                        throw IllegalStateException("Android 11+ 受系統保護無法直接讀取 Android/data 或 Android/obb，請先啟動並在設定中授權 Shizuku 後即可完整檢視。")
+                    }
+                }
+                val children = rawFiles.orEmpty()
                     .filter { showHidden || (!it.isHidden && !it.name.startsWith(".")) }
                     .map { it.toVfsFile(showHidden) }
                     .sortedWith(compareByDescending<VfsFile> { it.isDirectory }.thenBy { it.name.lowercase() })
                 children
             }
         }
+
+    private fun isRestrictedAndroidPath(path: String): Boolean {
+        val norm = path.replace('\\', '/').lowercase()
+        return norm.contains("/android/data") || norm.contains("/android/obb")
+    }
 
     override suspend fun createDirectory(parentPath: String, name: String): Result<VfsFile> =
         withContext(Dispatchers.IO) {

@@ -28,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -58,6 +59,8 @@ fun AiFileAssistantDialog(
     paneState: ExplorerPaneState,
     onSelectProvider: (AiProvider) -> Unit,
     onSaveApiKey: (AiProvider, String) -> Unit,
+    onSelectModel: (AiProvider, String) -> Unit,
+    onToggleThinking: (Boolean) -> Unit,
     onApplyOrganizeMoves: suspend (List<AiMoveInstruction>) -> Result<Int>,
     onDismiss: () -> Unit
 ) {
@@ -100,7 +103,7 @@ fun AiFileAssistantDialog(
             ) {
                 if (showLoginSetup) {
                     Text(
-                        "第一次使用請選擇您偏好的 AI（預設為 Gemini，也可改選 GPT、Claude 或 Grok），並填入對應 API 金鑰：",
+                        "第一次使用請選擇您偏好的 AI（預設為 Gemini，也可改選 DeepSeek、GPT、Claude 或 Grok），並填入對應 API 金鑰：",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -175,7 +178,7 @@ fun AiFileAssistantDialog(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = "共 ${paneState.files.size} 個項目（${settings.aiProvider.displayName}）",
+                                    text = "共 ${paneState.files.size} 個項目（${settings.aiProvider.displayName} / ${settings.currentAiModel}）",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -184,6 +187,38 @@ fun AiFileAssistantDialog(
                                 Text("切換 AI")
                             }
                         }
+                    }
+
+                    Text("模型選擇：", style = MaterialTheme.typography.labelMedium)
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        settings.aiProvider.presetModels.forEach { preset ->
+                            FilterChip(
+                                selected = settings.currentAiModel == preset,
+                                onClick = { onSelectModel(settings.aiProvider, preset) },
+                                label = { Text(preset, style = MaterialTheme.typography.labelSmall) }
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("深度思考 (Thinking)", style = MaterialTheme.typography.bodySmall)
+                            Text(
+                                "啟用模型推理模式（依各服務支援程度生效）",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = settings.aiThinkingEnabled,
+                            onCheckedChange = onToggleThinking
+                        )
                     }
 
                     FlowRow(
@@ -221,6 +256,8 @@ fun AiFileAssistantDialog(
                                 val res = AiAssistantClient.analyzeAndPlan(
                                     provider = settings.aiProvider,
                                     apiKey = settings.currentAiApiKey,
+                                    model = settings.currentAiModel,
+                                    thinkingEnabled = settings.aiThinkingEnabled,
                                     currentPath = paneState.currentPath,
                                     files = paneState.files,
                                     userPrompt = promptText.trim()
