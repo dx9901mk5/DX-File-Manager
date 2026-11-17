@@ -63,6 +63,21 @@ object OAuth2AuthHelper {
         )
     }
 
+    fun refreshGoogleDriveTokenSync(
+        context: Context,
+        accountName: String,
+        expiredToken: String?
+    ): String? {
+        if (accountName.isBlank()) return null
+        return runCatching {
+            if (!expiredToken.isNullOrBlank()) {
+                runCatching { GoogleAuthUtil.clearToken(context, expiredToken) }
+            }
+            val account = Account(accountName, "com.google")
+            GoogleAuthUtil.getToken(context, account, GOOGLE_DRIVE_SCOPE)
+        }.getOrNull()?.takeIf { it.isNotBlank() }
+    }
+
     suspend fun fetchGoogleDriveToken(context: Context, accountName: String): GoogleTokenResult =
         withContext(Dispatchers.IO) {
             try {

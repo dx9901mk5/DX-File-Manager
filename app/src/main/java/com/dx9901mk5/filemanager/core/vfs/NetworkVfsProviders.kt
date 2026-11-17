@@ -10,12 +10,14 @@ import com.hierynomus.smbj.share.DiskShare
 import com.jcraft.jsch.ChannelSftp
 import com.jcraft.jsch.JSch
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.Credentials
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 import org.apache.commons.net.ftp.FTP
 import org.apache.commons.net.ftp.FTPClient
 import org.json.JSONObject
@@ -399,6 +401,9 @@ class CloudAndWebDavVfsProvider(private val config: VfsMountConfig) : VfsProvide
     override val protocol: VfsProtocol = config.protocol
     private val http = OkHttpClient()
 
+    @Volatile
+    private var runtimeAccessToken: String = config.accessToken
+
     private fun baseUrl(): String {
         val raw = config.host.trimEnd('/')
         val withScheme = if (raw.startsWith("http://") || raw.startsWith("https://")) raw else "https://$raw"
@@ -410,10 +415,49 @@ class CloudAndWebDavVfsProvider(private val config: VfsMountConfig) : VfsProvide
     }
 
     private fun authHeader(): String {
-        return if (config.accessToken.isNotBlank()) {
-            "Bearer ${config.accessToken.trim()}"
+        val tok = runtimeAccessToken.ifBlank { config.accessToken }
+        return if (tok.isNotBlank()) {
+            "Bearer ${tok.trim()}"
         } else {
             Credentials.basic(config.username, config.password)
+        }
+    }
+
+    private fun executeGoogleDriveRequest(buildReq: () -> Request): Response {
+        if (runtimeAccessToken.isBlank() && config.username.isNotBlank()) {
+            OAuth2AuthHelper.refreshGoogleDriveTokenSync(
+                com.dx9901mk5.filemanager.DxFileManagerApp.instance,
+                config.username,
+                null
+            )?.let { refreshed ->
+                runtimeAccessToken = refreshed
+                persistRefreshedToken(refreshed)
+            }
+        }
+        val firstResp = http.newCall(buildReq()).execute()
+        if (firstResp.code == 401 && config.username.isNotBlank()) {
+            firstResp.close()
+            val refreshed = OAuth2AuthHelper.refreshGoogleDriveTokenSync(
+                com.dx9901mk5.filemanager.DxFileManagerApp.instance,
+                config.username,
+                runtimeAccessToken
+            )
+            if (!refreshed.isNullOrBlank()) {
+                runtimeAccessToken = refreshed
+                persistRefreshedToken(refreshed)
+                return http.newCall(buildReq()).execute()
+            }
+        }
+        return firstResp
+    }
+
+    private fun persistRefreshedToken(newToken: String) {
+        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+            runCatching {
+                com.dx9901mk5.filemanager.DxFileManagerApp.instance.preferences.saveCloudMount(
+                    config.copy(accessToken = newToken)
+                )
+            }
         }
     }
 
@@ -439,11 +483,14 @@ class CloudAndWebDavVfsProvider(private val config: VfsMountConfig) : VfsProvide
         }
 
     private fun listGoogleDriveFiles(folderIdOrPath: String): List<VfsFile> {
-        require(config.accessToken.isNotBlank()) { "請先登入 Google 雲端硬碟取得授權 Token" }
+        require(runtimeAccessToken.isNotBlank() || config.username.isNotBlank()) {
+            "請先登入 Google 雲端硬碟取得授權 Token"
+        }
         val folderId = if (folderIdOrPath == "/" || folderIdOrPath.isBlank()) "root" else folderIdOrPath.trim('/')
         val url = "https://www.googleapis.com/drive/v3/files?q='$folderId'+in+parents+and+trashed=false&fields=files(id,name,mimeType,size,modifiedTime)&pageSize=200"
-        val req = Request.Builder().url(url).header("Authorization", authHeader()).build()
-        http.newCall(req).execute().use { resp ->
+        executeGoogleDriveRequest {
+            Request.Builder().url(url).header("Authorization", authHeader()).build()
+        }.use { resp ->
             if (!resp.isSuccessful) throw IllegalStateException("Google Drive 驗證/連線失敗 (HTTP ${resp.code})")
             val json = JSONObject(resp.body?.string() ?: "{}")
             val arr = json.optJSONArray("files") ?: return emptyList()
@@ -708,12 +755,13 @@ class CloudAndWebDavVfsProvider(private val config: VfsMountConfig) : VfsProvide
                             .put("name", name)
                             .put("mimeType", "application/vnd.google-apps.folder")
                             .put("parents", org.json.JSONArray().put(parentId))
-                        val req = Request.Builder()
-                            .url("https://www.googleapis.com/drive/v3/files")
-                            .post(json.toString().toRequestBody("application/json".toMediaTypeOrNull()))
-                            .header("Authorization", authHeader())
-                            .build()
-                        http.newCall(req).execute().close()
+                        executeGoogleDriveRequest {
+                            Request.Builder()
+                                .url("https://www.googleapis.com/drive/v3/files")
+                                .post(json.toString().toRequestBody("application/json".toMediaTypeOrNull()))
+                                .header("Authorization", authHeader())
+                                .build()
+                        }.close()
                     }
                     else -> {}
                 }
@@ -727,12 +775,13 @@ class CloudAndWebDavVfsProvider(private val config: VfsMountConfig) : VfsProvide
                 when (protocol) {
                     VfsProtocol.GOOGLE_DRIVE -> {
                         val id = path.trim('/')
-                        val req = Request.Builder()
-                            .url("https://www.googleapis.com/drive/v3/files/$id")
-                            .delete()
-                            .header("Authorization", authHeader())
-                            .build()
-                        http.newCall(req).execute().close()
+                        executeGoogleDriveRequest {
+                            Request.Builder()
+                                .url("https://www.googleapis.com/drive/v3/files/$id")
+                                .delete()
+                                .header("Authorization", authHeader())
+                                .build()
+                        }.close()
                     }
                     else -> {
                         val url = "${baseUrl()}/${path.trim('/')}"
@@ -755,14 +804,17 @@ class CloudAndWebDavVfsProvider(private val config: VfsMountConfig) : VfsProvide
     override suspend fun openInputStream(path: String): Result<InputStream> =
         withContext(Dispatchers.IO) {
             runCatching {
-                val req = when (protocol) {
-                    VfsProtocol.GOOGLE_DRIVE -> {
-                        val id = path.trim('/')
+                if (protocol == VfsProtocol.GOOGLE_DRIVE) {
+                    val id = path.trim('/')
+                    val bytes = executeGoogleDriveRequest {
                         Request.Builder()
                             .url("https://www.googleapis.com/drive/v3/files/$id?alt=media")
                             .header("Authorization", authHeader())
                             .build()
-                    }
+                    }.use { it.body?.bytes() ?: ByteArray(0) }
+                    return@runCatching ByteArrayInputStream(bytes)
+                }
+                val req = when (protocol) {
                     VfsProtocol.DROPBOX -> {
                         val arg = JSONObject().put("path", path).toString()
                         Request.Builder()

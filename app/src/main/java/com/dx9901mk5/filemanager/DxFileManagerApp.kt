@@ -7,6 +7,11 @@ import com.dx9901mk5.filemanager.core.trash.TrashManager
 import com.dx9901mk5.filemanager.core.vfs.VfsRegistry
 
 class DxFileManagerApp : Application() {
+    companion object {
+        lateinit var instance: DxFileManagerApp
+            private set
+    }
+
     lateinit var preferences: AppPreferences
         private set
     lateinit var vfsRegistry: VfsRegistry
@@ -16,6 +21,7 @@ class DxFileManagerApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
         preferences = AppPreferences(this)
         vfsRegistry = VfsRegistry()
         trashManager = TrashManager(this)

@@ -67,6 +67,10 @@
 - **v1.0.16** (`versionCode = 17`)：
   - 長壓進入多選時間減半為 `750ms` (0.75 秒)。
   - Release 頁面：https://github.com/dx9901mk5/DX-File-Manager/releases/tag/v1.0.16
+- **待確認變更（尚未編譯 APK，接續 `v1.0.21`）**：
+  - **修復 Google 雲端硬碟更新／Token 過期後失效需重掛載問題**：
+    - 原因：`CloudAndWebDavVfsProvider` 原本只使用掛載當下靜態儲存的 `config.accessToken`（Google OAuth2 Access Token 約 1 小時或 App 更新後即失效），遇到 `HTTP 401` 時未利用已保存的 Google 帳號（`config.username`）重新向 `GoogleAuthUtil` 取得新 Token。
+    - 修正：於 `DxFileManagerApp.kt` 暴露 `instance`，在 `OAuth2AuthHelper.kt` 新增 `refreshGoogleDriveTokenSync()`（`clearToken` + `getToken`），並於 `NetworkVfsProviders.kt` 新增 `executeGoogleDriveRequest()`：遇到 `401` 或 Token 為空時自動背景靜默換取新 Token、寫回 `AppPreferences` 並重試請求，不需再手動重新掛載。
 - **v1.0.21** (`versionCode = 22`，本機測試版)：
   - **系統資料夾與 `Android/data`、`Android/obb` 檢視**：`NavigationPane.kt` 新增「系統資料夾」快速入口（`Android/data`、`Android/obb`、`系統根目錄 (/)`）；`ShizukuApkInstaller.kt` 與 `LocalVfsProvider.kt` 整合 Shizuku Shell 權限讀取受保護目錄，未授權 Shizuku 時給予明確引導提示。
   - **AI 助理新增 DeepSeek、模型選擇與深度思考開關**：`AppPreferences.kt`、`AiAssistantClient.kt`、`AiFileAssistantDialog.kt` 與 `AboutAndUpdateDialog.kt` 新增 `DeepSeek`（`deepseek-chat` / `deepseek-reasoner`）、各家預設模型切換，以及「深度思考模式 (Thinking)」開關（支援 Gemini 2.5 `thinkingBudget`、DeepSeek Reasoner、Claude `thinking`、OpenAI/Grok `reasoning_effort`）。
