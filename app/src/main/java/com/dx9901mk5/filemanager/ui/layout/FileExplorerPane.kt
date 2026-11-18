@@ -105,6 +105,7 @@ import com.dx9901mk5.filemanager.ui.ExplorerPaneState
 import com.dx9901mk5.filemanager.ui.FileViewMode
 import com.dx9901mk5.filemanager.ui.PaneMode
 import com.dx9901mk5.filemanager.ui.components.FileThumbnailIcon
+import com.dx9901mk5.filemanager.ui.components.InstalledAppIcon
 import com.dx9901mk5.filemanager.ui.gesture.SystemCrossAppDragHelper
 import com.dx9901mk5.filemanager.ui.components.IosGlassFolderIcon
 import com.dx9901mk5.filemanager.ui.dialogs.formatFileSize
@@ -1087,8 +1088,8 @@ private fun AppManagerList(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Checkbox(checked = checked, onCheckedChange = { onToggleSelect(app.packageName) })
-                    Icon(Icons.Default.Android, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.width(8.dp))
+                    InstalledAppIcon(packageName = app.packageName, iconSize = 36.dp)
+                    Spacer(Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(app.appName, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(

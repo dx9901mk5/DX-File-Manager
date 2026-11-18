@@ -243,3 +243,58 @@ private fun decodeApkIcon(context: Context, path: String): Bitmap? {
     val drawable = appInfo.loadIcon(pm)
     return drawable.toBitmap(96, 96)
 }
+
+/**
+ * 依套件名稱載入已安裝應用程式的真實圖示（搭配 LruCache 快取）。
+ */
+@Composable
+fun InstalledAppIcon(
+    packageName: String,
+    iconSize: Dp = 36.dp,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    val cacheKey = "app_pkg_$packageName"
+    val iconBmp by produceState<ImageBitmap?>(
+        initialValue = ThumbnailCache.get(cacheKey),
+        key1 = cacheKey
+    ) {
+        ThumbnailCache.get(cacheKey)?.let {
+            value = it
+            return@produceState
+        }
+        val decoded = withContext(Dispatchers.IO) {
+            runCatching {
+                context.packageManager.getApplicationIcon(packageName).toBitmap(96, 96).asImageBitmap()
+            }.getOrNull()
+        }
+        if (decoded != null) {
+            ThumbnailCache.put(cacheKey, decoded)
+            value = decoded
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .size(iconSize)
+            .clip(RoundedCornerShape(8.dp)),
+        contentAlignment = Alignment.Center
+    ) {
+        val bmp = iconBmp
+        if (bmp != null) {
+            Image(
+                bitmap = bmp,
+                contentDescription = packageName,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Default.Android,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size((iconSize * 0.72f).coerceAtLeast(20.dp))
+            )
+        }
+    }
+}
