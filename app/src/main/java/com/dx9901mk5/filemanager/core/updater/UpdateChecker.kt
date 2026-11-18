@@ -62,7 +62,7 @@ object UpdateChecker {
     suspend fun downloadApk(
         context: Context,
         downloadUrl: String,
-        onProgress: (Float) -> Unit = {}
+        onProgress: (downloadedBytes: Long, totalBytes: Long) -> Unit = { _, _ -> }
     ): Result<File> = withContext(Dispatchers.IO) {
         runCatching {
             val req = Request.Builder().url(downloadUrl).build()
@@ -71,16 +71,24 @@ object UpdateChecker {
                 val body = resp.body ?: throw IllegalStateException("空的回應內容")
                 val total = body.contentLength()
                 val outFile = File(context.cacheDir, "dx_file_manager_update.apk")
+                withContext(Dispatchers.Main) { onProgress(0L, total) }
                 body.byteStream().use { input ->
                     FileOutputStream(outFile).use { output ->
-                        val buf = ByteArray(8192)
+                        val buf = ByteArray(16384)
                         var downloaded = 0L
                         var read: Int
+                        var lastReportTime = 0L
                         while (input.read(buf).also { read = it } > 0) {
                             output.write(buf, 0, read)
                             downloaded += read
-                            if (total > 0) onProgress(downloaded.toFloat() / total.toFloat())
+                            val now = System.currentTimeMillis()
+                            if (now - lastReportTime >= 80L) {
+                                lastReportTime = now
+                                val curDownloaded = downloaded
+                                withContext(Dispatchers.Main) { onProgress(curDownloaded, total) }
+                            }
                         }
+                        withContext(Dispatchers.Main) { onProgress(downloaded, total) }
                     }
                 }
                 outFile

@@ -123,7 +123,33 @@ fun SettingsAndAboutDialog(
     var releaseInfo by remember { mutableStateOf<ReleaseInfo?>(null) }
     var updateMessage by remember { mutableStateOf<String?>(null) }
     var downloadProgress by remember { mutableFloatStateOf(0f) }
+    var downloadedBytes by remember { mutableStateOf(0L) }
+    var totalBytes by remember { mutableStateOf(-1L) }
     var downloading by remember { mutableStateOf(false) }
+
+    fun startUpdateDownload(url: String, tagName: String) {
+        downloading = true
+        downloadProgress = 0f
+        downloadedBytes = 0L
+        totalBytes = -1L
+        updateMessage = "發現新版本 $tagName，正在自動下載..."
+        scope.launch {
+            val dl = UpdateChecker.downloadApk(context, url) { downloaded, total ->
+                downloadedBytes = downloaded
+                totalBytes = total
+                if (total > 0L) {
+                    downloadProgress = (downloaded.toFloat() / total.toFloat()).coerceIn(0f, 1f)
+                }
+            }
+            downloading = false
+            dl.onSuccess { apk ->
+                updateMessage = "下載完成 ($tagName)，準備安裝..."
+                onInstallUpdateApk(apk)
+            }.onFailure {
+                updateMessage = "下載失敗：${it.message}"
+            }
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -390,16 +416,21 @@ fun SettingsAndAboutDialog(
                         enabled = !checkingUpdate && !downloading,
                         onClick = {
                             checkingUpdate = true
-                            updateMessage = null
+                            updateMessage = "正在檢查最新版本..."
                             scope.launch {
                                 val res = UpdateChecker.checkLatestRelease()
                                 checkingUpdate = false
                                 res.onSuccess { info ->
                                     releaseInfo = info
-                                    updateMessage = if (info.isNewer) {
-                                        "發現新版本 ${info.tagName}！"
+                                    if (info.isNewer) {
+                                        val apkUrl = info.apkDownloadUrl
+                                        if (apkUrl != null) {
+                                            startUpdateDownload(apkUrl, info.tagName)
+                                        } else {
+                                            updateMessage = "發現新版本 ${info.tagName}，但找不到 APK 下載連結"
+                                        }
                                     } else {
-                                        "目前已是最新版本 (${info.tagName})"
+                                        updateMessage = "目前已是最新版本 (${info.tagName})"
                                     }
                                 }.onFailure { err ->
                                     updateMessage = "檢查失敗：${err.message}"
@@ -408,7 +439,7 @@ fun SettingsAndAboutDialog(
                         },
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text(if (checkingUpdate) "檢查中..." else "檢查更新")
+                        Text(if (checkingUpdate) "檢查中..." else if (downloading) "下載中..." else "檢查更新")
                     }
                 }
 
@@ -447,26 +478,37 @@ fun SettingsAndAboutDialog(
                     Text(msg, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                 }
 
+                if (checkingUpdate) {
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+
                 val info = releaseInfo
                 if (info != null && info.isNewer && info.apkDownloadUrl != null) {
                     if (downloading) {
-                        LinearProgressIndicator(
-                            progress = { downloadProgress },
-                            modifier = Modifier.fillMaxWidth()
-                        )
+                        val downloadedMb = downloadedBytes / (1024f * 1024f)
+                        if (totalBytes > 0L) {
+                            val totalMb = totalBytes / (1024f * 1024f)
+                            val pct = (downloadProgress * 100).toInt().coerceIn(0, 100)
+                            LinearProgressIndicator(
+                                progress = { downloadProgress },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Text(
+                                text = String.format("下載進度：%d%% (%.1f MB / %.1f MB)", pct, downloadedMb, totalMb),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        } else {
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                            Text(
+                                text = String.format("下載中：已下載 %.1f MB", downloadedMb),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     } else {
                         Button(
-                            onClick = {
-                                downloading = true
-                                scope.launch {
-                                    val dl = UpdateChecker.downloadApk(context, info.apkDownloadUrl) { p ->
-                                        downloadProgress = p
-                                    }
-                                    downloading = false
-                                    dl.onSuccess { apk -> onInstallUpdateApk(apk) }
-                                        .onFailure { updateMessage = "下載失敗：${it.message}" }
-                                }
-                            },
+                            onClick = { startUpdateDownload(info.apkDownloadUrl, info.tagName) },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text("下載並更新至 ${info.tagName}")
