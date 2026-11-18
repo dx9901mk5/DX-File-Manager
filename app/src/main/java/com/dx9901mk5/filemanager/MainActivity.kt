@@ -208,6 +208,7 @@ private fun DxFileManagerScreen(
     var showWebShare by remember { mutableStateOf(false) }
     var showNewFolderForPane by remember { mutableStateOf<Int?>(null) }
     var showEmptyTrashConfirmDialog by remember { mutableStateOf(false) }
+    var pendingDeleteRequest by remember { mutableStateOf<Triple<Int, List<VfsFile>, Boolean>?>(null) }
     var showExitConfirmDialog by remember { mutableStateOf(false) }
     // Pair(paneIndex, prioritizeCreateOrCompress)
     var bottomActionBarState by remember { mutableStateOf<Pair<Int, Boolean>?>(null) }
@@ -245,6 +246,19 @@ private fun DxFileManagerScreen(
                     dragController.hoveredFolderPath = null
                     dragController.hoveredFolderPaneIndex = null
                 }
+            }
+        }
+    }
+
+    // 拖曳懸停於分區上方返回鈕滿 2 秒（顯示放大鏡特效）-> 自動跳回上層資料夾
+    LaunchedEffect(dragController.isDragging, dragController.hoveredBackButtonPane) {
+        val backPane = dragController.hoveredBackButtonPane
+        if (dragController.isDragging && (backPane == 2 || backPane == 3)) {
+            delay(2000L)
+            if (dragController.isDragging && dragController.hoveredBackButtonPane == backPane) {
+                DxHaptics.lightVibrate(activityContext, hapticView)
+                viewModel.navigateUp(backPane)
+                dragController.hoveredBackButtonPane = null
             }
         }
     }
@@ -318,8 +332,15 @@ private fun DxFileManagerScreen(
                 viewModel.performTransfer(curMount, selected, otherState.mountId, otherState.currentPath, isMove = false)
             }
             ContextMenuAction.CREATE_SHORTCUT -> targetFile?.let { viewModel.createHomeScreenShortcut(it) }
+            ContextMenuAction.INSTALL_WITH_SHIZUKU -> {
+                val apks = selected.filter { !it.isDirectory && it.name.lowercase().endsWith(".apk") }
+                    .map { File(it.path) }
+                if (apks.isNotEmpty()) {
+                    viewModel.installApksWithShizuku(apks)
+                }
+            }
             ContextMenuAction.PROPERTIES -> targetFile?.let { propertiesTarget = it }
-            ContextMenuAction.DELETE -> if (selected.isNotEmpty()) viewModel.deleteFiles(paneIdx, selected)
+            ContextMenuAction.DELETE -> if (selected.isNotEmpty()) pendingDeleteRequest = Triple(paneIdx, selected, false)
         }
     }
 
@@ -355,8 +376,8 @@ private fun DxFileManagerScreen(
                     DxShortcutAction.CUT -> if (selected.isNotEmpty()) viewModel.copyToClipboard(curPane, selected, true)
                     DxShortcutAction.PASTE -> viewModel.pasteClipboard(curPane)
                     DxShortcutAction.RENAME -> if (selected.isNotEmpty()) renameTarget = curPane to selected
-                    DxShortcutAction.DELETE_TO_TRASH -> if (selected.isNotEmpty()) viewModel.deleteFiles(curPane, selected, false)
-                    DxShortcutAction.DELETE_PERMANENT -> if (selected.isNotEmpty()) viewModel.deleteFiles(curPane, selected, true)
+                    DxShortcutAction.DELETE_TO_TRASH -> if (selected.isNotEmpty()) pendingDeleteRequest = Triple(curPane, selected, false)
+                    DxShortcutAction.DELETE_PERMANENT -> if (selected.isNotEmpty()) pendingDeleteRequest = Triple(curPane, selected, true)
                     DxShortcutAction.SEND_TO_OTHER_PANE -> handleContextAction(curPane, selected.firstOrNull(), ContextMenuAction.SEND_TO_OTHER_PANE)
                     DxShortcutAction.CYCLE_FOCUS_PANE -> viewModel.focusedPaneIndex.value = if (curPane == 2) 3 else 2
                     DxShortcutAction.TOGGLE_SIDEBAR -> viewModel.setPaneExpanded(isExpandedScreen, 1, !pane1Expanded)
@@ -385,7 +406,7 @@ private fun DxFileManagerScreen(
             keepAliveSourcePane = if (dragController.isHolding) dragController.sourcePaneIndex else null,
             hoveredExpandButtonPane = dragController.hoveredExpandButtonPane,
             onExpandButtonBoundsChanged = { idx, rect -> dragController.updateExpandButtonBounds(idx, rect) },
-            onPaneBoundsChanged = { idx, left, right -> dragController.updatePaneBounds(idx, left, right) },
+            onPaneBoundsChanged = { idx, rect -> dragController.updatePaneBounds(idx, rect) },
             pane1Content = {
                 NavigationPane(
                     localStorageSpace = storageSpace,
@@ -567,7 +588,7 @@ private fun DxFileManagerScreen(
                 },
                 onDelete = {
                     bottomActionBarState = null
-                    if (selectedList.isNotEmpty()) viewModel.deleteFiles(paneIdx, selectedList)
+                    if (selectedList.isNotEmpty()) pendingDeleteRequest = Triple(paneIdx, selectedList, false)
                 },
                 onMore = {
                     bottomActionBarState = null
@@ -600,11 +621,14 @@ private fun DxFileManagerScreen(
         }
 
         contextMenuTarget?.let { (paneIdx, targetFile) ->
-            val selCount = if (paneIdx == 2) pane2State.selectedPaths.size else pane3State.selectedPaths.size
+            val selectedList = activeFiles(paneIdx)
+            val selCount = selectedList.size
+            val hasApk = selectedList.any { !it.isDirectory && it.name.lowercase().endsWith(".apk") }
             FileContextMenuDialog(
                 targetFile = targetFile,
                 selectedCount = selCount,
                 hasClipboard = clipboard != null,
+                hasApkSelected = hasApk,
                 onAction = { action -> handleContextAction(paneIdx, targetFile, action) },
                 onDismiss = { contextMenuTarget = null }
             )
@@ -663,6 +687,42 @@ private fun DxFileManagerScreen(
                 },
                 dismissButton = {
                     TextButton(onClick = { showEmptyTrashConfirmDialog = false }) {
+                        Text("取消")
+                    }
+                }
+            )
+        }
+
+        pendingDeleteRequest?.let { (paneIdx, files, forcePermanent) ->
+            val willUseTrash = !forcePermanent && settings.recycleBinEnabled
+            AlertDialog(
+                onDismissRequest = { pendingDeleteRequest = null },
+                title = { Text(if (willUseTrash) "移至垃圾桶" else "永久刪除檔案") },
+                text = {
+                    Text(
+                        if (willUseTrash) {
+                            "確定要將選取的 ${files.size} 個項目丟入垃圾桶嗎？（垃圾桶項目會保留 30 天）"
+                        } else {
+                            "確定要永久刪除選取的 ${files.size} 個項目嗎？此動作無法復原。"
+                        }
+                    )
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            pendingDeleteRequest = null
+                            viewModel.deleteFiles(paneIdx, files, forcePermanent)
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.error,
+                            contentColor = MaterialTheme.colorScheme.onError
+                        )
+                    ) {
+                        Text(if (willUseTrash) "丟入垃圾桶" else "永久刪除")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingDeleteRequest = null }) {
                         Text("取消")
                     }
                 }

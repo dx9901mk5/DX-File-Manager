@@ -40,8 +40,15 @@ enum class AiProvider(
     GEMINI(
         "gemini",
         "Gemini",
-        "gemini-2.5-flash",
-        listOf("gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash"),
+        "gemini-3.8-flash",
+        listOf(
+            "gemini-4-hydrogen",
+            "gemini-4-argon",
+            "gemini-3.8-flash",
+            "gemini-3.6-flash",
+            "gemini-3.5-flash-lite",
+            "gemini-2.5-flash"
+        ),
         "https://aistudio.google.com/apikey"
     ),
     DEEPSEEK(

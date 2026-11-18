@@ -3,6 +3,7 @@ package com.dx9901mk5.filemanager.ui.dialogs
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -81,6 +82,20 @@ fun SettingsAndAboutDialog(
     var shizukuStatusMsg by remember { mutableStateOf<String?>(null) }
 
     DisposableEffect(Unit) {
+        ShizukuApkInstaller.ensureBinderRequested(context)
+        val binderReceivedListener = Shizuku.OnBinderReceivedListener {
+            shizukuAvailable = ShizukuApkInstaller.isShizukuAvailable()
+            shizukuReady = ShizukuApkInstaller.isShizukuReady()
+            if (shizukuReady) {
+                shizukuStatusMsg = "Shizuku 已授權就緒"
+            } else if (shizukuAvailable) {
+                shizukuStatusMsg = "偵測到 Shizuku，點擊開關即可請求授權"
+            }
+        }
+        val binderDeadListener = Shizuku.OnBinderDeadListener {
+            shizukuAvailable = false
+            shizukuReady = false
+        }
         val listener = Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
             if (requestCode == ShizukuApkInstaller.SHIZUKU_REQUEST_CODE) {
                 val granted = grantResult == PackageManager.PERMISSION_GRANTED
@@ -90,9 +105,17 @@ fun SettingsAndAboutDialog(
                 shizukuStatusMsg = if (granted) "Shizuku 授權成功" else "Shizuku 授權遭拒絕"
             }
         }
-        runCatching { Shizuku.addRequestPermissionResultListener(listener) }
+        runCatching {
+            Shizuku.addBinderReceivedListenerSticky(binderReceivedListener)
+            Shizuku.addBinderDeadListener(binderDeadListener)
+            Shizuku.addRequestPermissionResultListener(listener)
+        }
         onDispose {
-            runCatching { Shizuku.removeRequestPermissionResultListener(listener) }
+            runCatching {
+                Shizuku.removeBinderReceivedListener(binderReceivedListener)
+                Shizuku.removeBinderDeadListener(binderDeadListener)
+                Shizuku.removeRequestPermissionResultListener(listener)
+            }
         }
     }
 
@@ -123,26 +146,77 @@ fun SettingsAndAboutDialog(
                     subtitle = shizukuStatusMsg ?: when {
                         shizukuReady -> "Shizuku 已授權就緒"
                         shizukuAvailable -> "偵測到 Shizuku，開啟開關將要求授權"
-                        else -> "未偵測到 Shizuku 服務（請先啟動 Shizuku）"
+                        else -> "未偵測到 Shizuku 服務（請先於 Shizuku App 啟動服務）"
                     },
-                    checked = settings.useShizukuInstall && shizukuReady,
+                    checked = settings.useShizukuInstall,
                     onCheckedChange = { checked ->
+                        ShizukuApkInstaller.ensureBinderRequested(context)
                         shizukuAvailable = ShizukuApkInstaller.isShizukuAvailable()
                         shizukuReady = ShizukuApkInstaller.isShizukuReady()
                         if (!checked) {
                             onToggleShizukuInstall(false)
                             shizukuStatusMsg = null
                         } else if (!shizukuAvailable) {
-                            onToggleShizukuInstall(false)
-                            shizukuStatusMsg = "請先啟動 Shizuku 服務後再開啟此開關"
+                            onToggleShizukuInstall(true)
+                            shizukuStatusMsg = "已開啟設定；目前尚未偵測到 Shizuku 服務，請先啟動 Shizuku App"
                         } else if (!shizukuReady) {
+                            onToggleShizukuInstall(true)
                             ShizukuApkInstaller.requestShizukuPermission()
                             shizukuStatusMsg = "正在向 Shizuku 請求授權..."
                         } else {
                             onToggleShizukuInstall(true)
+                            shizukuStatusMsg = "Shizuku 已授權就緒"
                         }
                     }
                 )
+                if (!shizukuReady) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (shizukuAvailable) {
+                            OutlinedButton(
+                                onClick = {
+                                    ShizukuApkInstaller.requestShizukuPermission()
+                                    shizukuStatusMsg = "已送出 Shizuku 授權請求..."
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("請求 Shizuku 授權")
+                            }
+                        } else {
+                            OutlinedButton(
+                                onClick = {
+                                    val launchIntent = context.packageManager.getLaunchIntentForPackage("moe.shizuku.privileged.api")
+                                    if (launchIntent != null) {
+                                        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                        context.startActivity(launchIntent)
+                                    } else {
+                                        shizukuStatusMsg = "未安裝 Shizuku App（moe.shizuku.privileged.api）"
+                                    }
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("開啟 Shizuku App")
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    ShizukuApkInstaller.ensureBinderRequested(context)
+                                    shizukuAvailable = ShizukuApkInstaller.isShizukuAvailable()
+                                    shizukuReady = ShizukuApkInstaller.isShizukuReady()
+                                    shizukuStatusMsg = when {
+                                        shizukuReady -> "Shizuku 已授權就緒"
+                                        shizukuAvailable -> {
+                                            ShizukuApkInstaller.requestShizukuPermission()
+                                            "已偵測到 Shizuku，正在請求授權..."
+                                        }
+                                        else -> "仍未收到 Shizuku Binder（請確認系統允許關聯啟動／背景執行，或重開本 App）"
+                                    }
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("重新偵測")
+                            }
+                        }
+                    }
+                }
                 SettingSwitchRow(
                     title = "顯示隱藏資料夾與檔案",
                     subtitle = "顯示以 . 開頭的項目",
@@ -417,7 +491,8 @@ private fun SettingSwitchRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 2.dp),
+            .clickable { onCheckedChange(!checked) }
+            .padding(vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {

@@ -74,6 +74,7 @@ class CrossPaneDragController {
     var pointerRootOffset by mutableStateOf(Offset.Zero)
     var activePaneIndexDuringDrag by mutableStateOf<Int?>(null)
     var hoveredExpandButtonPane by mutableStateOf<Int?>(null)
+    var hoveredBackButtonPane by mutableStateOf<Int?>(null)
     var hoveredFolderPaneIndex by mutableStateOf<Int?>(null)
     var hoveredFolderPath by mutableStateOf<String?>(null)
     val flyingCards = mutableStateListOf<FlyingStackCard>()
@@ -82,8 +83,9 @@ class CrossPaneDragController {
     var pendingDropTarget by mutableStateOf<PendingDropRequest?>(null)
     var onRequestCrossPaneSwitch: ((targetPaneIndex: Int) -> Unit)? = null
 
-    private val paneBounds = mutableMapOf<Int, Pair<Float, Float>>()
+    private val paneBounds = mutableMapOf<Int, Rect>()
     private val expandButtonBounds = mutableMapOf<Int, Rect>()
+    private val backButtonBounds = mutableMapOf<Int, Rect>()
     private val folderBoundsByPane = mutableMapOf<Int, MutableMap<String, Rect>>()
 
     fun updateFolderBounds(paneIndex: Int, path: String, rect: Rect?) {
@@ -95,13 +97,18 @@ class CrossPaneDragController {
         folderBoundsByPane[paneIndex]?.clear()
     }
 
-    fun updatePaneBounds(paneIndex: Int, leftX: Float, rightX: Float) {
-        paneBounds[paneIndex] = leftX to rightX
+    fun updatePaneBounds(paneIndex: Int, rect: Rect) {
+        paneBounds[paneIndex] = rect
     }
 
     fun updateExpandButtonBounds(paneIndex: Int, rect: Rect?) {
         if (rect == null) expandButtonBounds.remove(paneIndex)
         else expandButtonBounds[paneIndex] = rect
+    }
+
+    fun updateBackButtonBounds(paneIndex: Int, rect: Rect?) {
+        if (rect == null) backButtonBounds.remove(paneIndex)
+        else backButtonBounds[paneIndex] = rect
     }
 
     fun prepareHold(paneIndex: Int, initialFile: VfsFile, rootOffset: Offset) {
@@ -112,6 +119,7 @@ class CrossPaneDragController {
         pointerRootOffset = rootOffset
         activePaneIndexDuringDrag = null
         hoveredExpandButtonPane = null
+        hoveredBackButtonPane = null
         hoveredFolderPaneIndex = null
         hoveredFolderPath = null
     }
@@ -124,6 +132,7 @@ class CrossPaneDragController {
         pointerRootOffset = rootOffset
         activePaneIndexDuringDrag = paneIndex
         hoveredExpandButtonPane = null
+        hoveredBackButtonPane = null
         hoveredFolderPaneIndex = null
         hoveredFolderPath = null
     }
@@ -166,8 +175,22 @@ class CrossPaneDragController {
             hoveredExpandButtonPane = null
         }
 
-        val detectedPane = paneBounds.entries.firstOrNull { (_, range) ->
-            rootOffset.x in range.first..range.second
+        // 偵測手指是否拖曳到分區上方的「返回上層」按鈕上
+        val hitBackPane = backButtonBounds.entries.firstOrNull { (_, r) ->
+            r.inflate(18f).contains(rootOffset)
+        }?.key
+        if (hitBackPane != null) {
+            hoveredBackButtonPane = hitBackPane
+            activePaneIndexDuringDrag = hitBackPane
+            hoveredFolderPaneIndex = null
+            hoveredFolderPath = null
+            return
+        } else {
+            hoveredBackButtonPane = null
+        }
+
+        val detectedPane = paneBounds.entries.firstOrNull { (_, rect) ->
+            rect.contains(rootOffset)
         }?.key
         if (detectedPane != null) {
             activePaneIndexDuringDrag = detectedPane
@@ -250,6 +273,7 @@ class CrossPaneDragController {
         isDragging = false
         activePaneIndexDuringDrag = null
         hoveredExpandButtonPane = null
+        hoveredBackButtonPane = null
         hoveredFolderPaneIndex = null
         hoveredFolderPath = null
         flyingCards.clear()

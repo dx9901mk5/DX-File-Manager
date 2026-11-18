@@ -110,7 +110,7 @@ object AiAssistantClient {
                 put("role", "user")
                 put("parts", JSONArray().put(JSONObject().put("text", "$systemPrompt\n\n使用者需求：$userPrompt")))
             }))
-            if (model.startsWith("gemini-2.5") || model.startsWith("gemini-3")) {
+            if (model.startsWith("gemini-2.5") || model.startsWith("gemini-3") || model.startsWith("gemini-4")) {
                 put(
                     "generationConfig",
                     JSONObject().put(

@@ -27,6 +27,10 @@ object ShizukuApkInstaller {
 
     const val SHIZUKU_REQUEST_CODE = 1001
 
+    fun ensureBinderRequested(context: Context) {
+        // 單進程 App 由 ShizukuProvider 自動接收 Binder，勿呼叫 enableMultiProcessSupport(false) 以免覆寫 isProviderProcess
+    }
+
     fun isShizukuAvailable(): Boolean {
         return try {
             Shizuku.pingBinder()
@@ -53,36 +57,53 @@ object ShizukuApkInstaller {
     }
 
     /**
-     * 使用 Shizuku 以 Shell 權限靜默安裝 APK (支援更新覆蓋 -r 與降級安裝 -d)
+     * 使用 Shizuku 以 Shell 權限靜默安裝 APK (透過 stdin 串流寫入 pm install -r -d -S，避開 Android 11+ FUSE/SELinux 讀檔限制)
      */
     suspend fun installApkSilently(apkFile: File): Result<String> = withContext(Dispatchers.IO) {
+        if (!isShizukuAvailable()) {
+            return@withContext Result.failure(IllegalStateException("Shizuku 服務未啟動，請先開啟 Shizuku App"))
+        }
         if (!isShizukuReady()) {
-            return@withContext Result.failure(IllegalStateException("Shizuku 未啟動或未授權"))
+            requestShizukuPermission()
+            return@withContext Result.failure(IllegalStateException("尚未取得 Shizuku 授權，請於彈窗點擊允許"))
+        }
+        if (!apkFile.exists() || !apkFile.isFile) {
+            return@withContext Result.failure(IllegalArgumentException("找不到 APK 檔案：${apkFile.absolutePath}"))
         }
         try {
-            val escapedPath = apkFile.absolutePath.replace("\"", "\\\"")
             val newProcessMethod = Shizuku::class.java.getDeclaredMethod(
                 "newProcess",
                 Array<String>::class.java,
                 Array<String>::class.java,
                 String::class.java
             ).apply { isAccessible = true }
+
+            val fileSize = apkFile.length()
             val process = newProcessMethod.invoke(
                 null,
-                arrayOf("sh", "-c", "pm install -r -d \"$escapedPath\""),
+                arrayOf("pm", "install", "-r", "-d", "-S", fileSize.toString()),
                 null,
                 null
             ) as Process
+
+            apkFile.inputStream().use { input ->
+                process.outputStream.use { out ->
+                    input.copyTo(out, bufferSize = 64 * 1024)
+                    out.flush()
+                }
+            }
+
             val output = process.inputStream.bufferedReader().readText()
             val err = process.errorStream.bufferedReader().readText()
             val exitCode = process.waitFor()
             if (exitCode == 0 && output.contains("Success", ignoreCase = true)) {
                 Result.success(output.trim())
             } else {
-                Result.failure(RuntimeException("安裝失敗 (Code $exitCode): $output $err"))
+                Result.failure(RuntimeException("Shizuku 安裝失敗 (Code $exitCode): ${output.trim()} ${err.trim()}".trim()))
             }
-        } catch (e: Exception) {
-            Result.failure(e)
+        } catch (e: Throwable) {
+            val causeMsg = e.cause?.message ?: e.message ?: e.javaClass.simpleName
+            Result.failure(RuntimeException("無法呼叫 Shizuku：$causeMsg", e))
         }
     }
 

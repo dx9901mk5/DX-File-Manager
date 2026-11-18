@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -21,10 +22,12 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -35,6 +38,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Splitscreen
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -84,7 +88,7 @@ fun ThreePaneScaffold(
     keepAliveSourcePane: Int? = null,
     hoveredExpandButtonPane: Int? = null,
     onExpandButtonBoundsChanged: (paneIndex: Int, rect: Rect?) -> Unit = { _, _ -> },
-    onPaneBoundsChanged: (paneIndex: Int, leftX: Float, rightX: Float) -> Unit = { _, _, _ -> },
+    onPaneBoundsChanged: (paneIndex: Int, rect: Rect) -> Unit = { _, _ -> },
     pane1Content: @Composable () -> Unit,
     pane2Content: @Composable (onCollapse: () -> Unit) -> Unit,
     pane3Content: @Composable (onCollapse: () -> Unit) -> Unit
@@ -94,6 +98,7 @@ fun ThreePaneScaffold(
     var pane1WidthInitialized by remember { mutableStateOf(false) }
     var pane1Width by remember { mutableStateOf(150.dp) }
     var pane2Weight by remember { mutableFloatStateOf(0.5f) }
+    var isVerticalSplit by remember { mutableStateOf(false) }
 
     val effectivePane1Expanded = if (autoCollapseUnusedPaneOnDrag != null) (autoCollapseUnusedPaneOnDrag == 1 || pane1Expanded) else pane1Expanded
     val effectivePane2Expanded = if (autoCollapseUnusedPaneOnDrag != null) autoCollapseUnusedPaneOnDrag == 2 else pane2Expanded
@@ -160,8 +165,7 @@ fun ThreePaneScaffold(
                         .clipToBounds()
                         .onGloballyPositioned { coords ->
                             if (effectivePane1Expanded) {
-                                val b = coords.boundsInRoot()
-                                onPaneBoundsChanged(1, b.left, b.right)
+                                onPaneBoundsChanged(1, coords.boundsInRoot())
                             }
                         }
                 ) {
@@ -234,56 +238,135 @@ fun ThreePaneScaffold(
                 )
             }
 
-            // 第二區與第三區容器
+            // 第二區與第三區容器（支援左右分割 / 上下分割一鍵切換）
             BoxWithConstraints(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
             ) {
                 val totalWidth = maxWidth
-                Row(Modifier.fillMaxSize()) {
-                    if (safeW2 > 0.005f || keepAliveSourcePane == 2) {
-                        val pane2WidthMod = if (safeW2 > 0.005f) Modifier.weight(safeW2) else Modifier.width(0.dp)
-                        Box(
-                            modifier = pane2WidthMod
-                                .fillMaxHeight()
-                                .clipToBounds()
-                                .onGloballyPositioned { coords ->
-                                    if (effectivePane2Expanded) {
-                                        val b = coords.boundsInRoot()
-                                        onPaneBoundsChanged(2, b.left, b.right)
+                val totalHeight = maxHeight
+                val bothExpanded = showPane3 && safeW2 > 0.02f && safeW3 > 0.02f
+                val splitRatio = if ((safeW2 + safeW3) > 0f) (safeW2 / (safeW2 + safeW3)).coerceIn(0.1f, 0.9f) else 0.5f
+
+                if (!isVerticalSplit) {
+                    Row(Modifier.fillMaxSize()) {
+                        if (safeW2 > 0.005f || keepAliveSourcePane == 2) {
+                            val pane2WidthMod = if (safeW2 > 0.005f) Modifier.weight(safeW2) else Modifier.width(0.dp)
+                            Box(
+                                modifier = pane2WidthMod
+                                    .fillMaxHeight()
+                                    .clipToBounds()
+                                    .onGloballyPositioned { coords ->
+                                        if (effectivePane2Expanded) {
+                                            onPaneBoundsChanged(2, coords.boundsInRoot())
+                                        }
                                     }
+                            ) {
+                                pane2Content { onPaneExpandedChange(2, false) }
+                            }
+                        }
+
+                        if (bothExpanded) {
+                            ResizableDivider(
+                                editable = isRatioEditMode,
+                                onDrag = { deltaPx ->
+                                    val totalPx = with(density) { totalWidth.toPx() }.coerceAtLeast(1f)
+                                    pane2Weight = (pane2Weight + (deltaPx / totalPx)).coerceIn(0.2f, 0.8f)
                                 }
-                        ) {
-                            pane2Content { onPaneExpandedChange(2, false) }
+                            )
+                        }
+
+                        if (showPane3 && (safeW3 > 0.005f || keepAliveSourcePane == 3)) {
+                            val pane3WidthMod = if (safeW3 > 0.005f) Modifier.weight(safeW3) else Modifier.width(0.dp)
+                            Box(
+                                modifier = pane3WidthMod
+                                    .fillMaxHeight()
+                                    .clipToBounds()
+                                    .onGloballyPositioned { coords ->
+                                        if (effectivePane3Expanded) {
+                                            onPaneBoundsChanged(3, coords.boundsInRoot())
+                                        }
+                                    }
+                            ) {
+                                pane3Content { onPaneExpandedChange(3, false) }
+                            }
                         }
                     }
-
-                    // 僅在第二與第三區同時展開時才顯示分隔線 2
-                    if (showPane3 && safeW2 > 0.02f && safeW3 > 0.02f) {
-                        ResizableDivider(
-                            editable = isRatioEditMode,
-                            onDrag = { deltaPx ->
-                                val totalPx = with(density) { totalWidth.toPx() }.coerceAtLeast(1f)
-                                pane2Weight = (pane2Weight + (deltaPx / totalPx)).coerceIn(0.2f, 0.8f)
-                            }
-                        )
-                    }
-
-                    if (showPane3 && (safeW3 > 0.005f || keepAliveSourcePane == 3)) {
-                        val pane3WidthMod = if (safeW3 > 0.005f) Modifier.weight(safeW3) else Modifier.width(0.dp)
-                        Box(
-                            modifier = pane3WidthMod
-                                .fillMaxHeight()
-                                .clipToBounds()
-                                .onGloballyPositioned { coords ->
-                                    if (effectivePane3Expanded) {
-                                        val b = coords.boundsInRoot()
-                                        onPaneBoundsChanged(3, b.left, b.right)
+                } else {
+                    Column(Modifier.fillMaxSize()) {
+                        if (safeW2 > 0.005f || keepAliveSourcePane == 2) {
+                            val pane2HeightMod = if (safeW2 > 0.005f) Modifier.weight(safeW2) else Modifier.height(0.dp)
+                            Box(
+                                modifier = pane2HeightMod
+                                    .fillMaxWidth()
+                                    .clipToBounds()
+                                    .onGloballyPositioned { coords ->
+                                        if (effectivePane2Expanded) {
+                                            onPaneBoundsChanged(2, coords.boundsInRoot())
+                                        }
                                     }
-                                }
-                        ) {
-                            pane3Content { onPaneExpandedChange(3, false) }
+                            ) {
+                                pane2Content { onPaneExpandedChange(2, false) }
+                            }
+                        }
+
+                        if (bothExpanded) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(2.dp)
+                                    .background(MaterialTheme.colorScheme.outlineVariant)
+                            )
+                        }
+
+                        if (showPane3 && (safeW3 > 0.005f || keepAliveSourcePane == 3)) {
+                            val pane3HeightMod = if (safeW3 > 0.005f) Modifier.weight(safeW3) else Modifier.height(0.dp)
+                            Box(
+                                modifier = pane3HeightMod
+                                    .fillMaxWidth()
+                                    .clipToBounds()
+                                    .onGloballyPositioned { coords ->
+                                        if (effectivePane3Expanded) {
+                                            onPaneBoundsChanged(3, coords.boundsInRoot())
+                                        }
+                                    }
+                            ) {
+                                pane3Content { onPaneExpandedChange(3, false) }
+                            }
+                        }
+                    }
+                }
+
+                // 第二／三分區分隔線中央：視窗分割方向切換按鈕（左右分割 <-> 上下分割）
+                if (bothExpanded) {
+                    val btnModifier = if (!isVerticalSplit) {
+                        Modifier
+                            .align(Alignment.CenterStart)
+                            .offset(x = (totalWidth * splitRatio) - 16.dp)
+                    } else {
+                        Modifier
+                            .align(Alignment.TopCenter)
+                            .offset(y = (totalHeight * splitRatio) - 16.dp)
+                    }
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.94f),
+                        border = BorderStroke(1.2.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)),
+                        shadowElevation = 6.dp,
+                        modifier = btnModifier
+                            .size(32.dp)
+                            .clickable { isVerticalSplit = !isVerticalSplit }
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Splitscreen,
+                                contentDescription = if (isVerticalSplit) "切換為左右分割" else "切換為上下分割",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .size(18.dp)
+                                    .rotate(if (isVerticalSplit) 0f else 90f)
+                            )
                         }
                     }
                 }

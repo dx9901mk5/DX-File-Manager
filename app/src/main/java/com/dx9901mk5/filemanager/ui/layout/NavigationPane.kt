@@ -11,22 +11,29 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -60,10 +67,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -107,16 +120,16 @@ fun NavigationPane(
 ) {
     val localRootPath = remember { Environment.getExternalStorageDirectory().absolutePath }
     var internalExpanded by remember { mutableStateOf(false) }
+    var expandedTreePaths by remember { mutableStateOf<Set<String>>(emptySet()) }
     var pendingRemoveBookmark by remember { mutableStateOf<String?>(null) }
+    val treeHorizontalScroll = rememberScrollState()
 
-    val rootFolders = remember(internalExpanded, showHiddenFiles) {
+    val visibleTreeNodes = remember(internalExpanded, expandedTreePaths, showHiddenFiles) {
         if (!internalExpanded) emptyList()
-        else {
-            File(localRootPath).listFiles()
-                ?.filter { it.isDirectory && (showHiddenFiles || !it.name.startsWith(".")) }
-                ?.sortedBy { it.name.lowercase() }
-                .orEmpty()
-        }
+        else buildVisibleTreeNodes(localRootPath, expandedTreePaths, showHiddenFiles)
+    }
+    val maxVisibleDepth = remember(visibleTreeNodes) {
+        visibleTreeNodes.maxOfOrNull { it.depth } ?: 0
     }
 
     Surface(
@@ -158,13 +171,24 @@ fun NavigationPane(
 
             HorizontalDivider()
 
-            LazyColumn(
+            BoxWithConstraints(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .dxVerticalOverscrollBounce()
-                    .padding(horizontal = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                    .weight(1f)
+                    .fillMaxWidth()
             ) {
+                val treeContentWidth = if (maxVisibleDepth > 0) {
+                    maxWidth + (maxVisibleDepth * 22 + 48).dp
+                } else {
+                    maxWidth
+                }
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .dxVerticalOverscrollBounce()
+                        .padding(horizontal = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                 item {
                     SectionHeader("儲存裝置")
                     val isRootHovered = dragController != null &&
@@ -240,8 +264,10 @@ fun NavigationPane(
                 }
 
                 if (internalExpanded) {
-                    items(rootFolders, key = { "root_sub_${it.absolutePath}" }) { folder ->
+                    items(visibleTreeNodes, key = { "root_sub_${it.file.absolutePath}" }) { node ->
+                        val folder = node.file
                         val folderPath = folder.absolutePath
+                        val isNodeExpanded = folderPath in expandedTreePaths
                         val isHovered = dragController != null &&
                             dragController.isDragging &&
                             dragController.hoveredFolderPaneIndex == 1 &&
@@ -253,38 +279,65 @@ fun NavigationPane(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(start = 14.dp)
-                                .scale(hoverScale)
-                                .then(
-                                    if (isHovered) Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
-                                    else Modifier
-                                )
-                                .onGloballyPositioned { coords ->
-                                    dragController?.updateFolderBounds(1, folderPath, coords.boundsInRoot())
-                                }
+                                .horizontalScroll(treeHorizontalScroll)
                         ) {
                             Row(
                                 modifier = Modifier
-                                    .fillMaxWidth()
+                                    .width(treeContentWidth)
+                                    .scale(hoverScale)
+                                    .then(
+                                        if (isHovered) Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
+                                        else Modifier
+                                    )
+                                    .onGloballyPositioned { coords ->
+                                        dragController?.updateFolderBounds(1, folderPath, coords.boundsInRoot())
+                                    }
                                     .clickable { onOpenBookmark(folderPath) }
-                                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                                    .padding(
+                                        start = (8 + node.depth * 18).dp,
+                                        end = 8.dp,
+                                        top = 5.dp,
+                                        bottom = 5.dp
+                                    ),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                if (node.hasSubFolders) {
+                                    IconButton(
+                                        onClick = {
+                                            expandedTreePaths = if (isNodeExpanded) {
+                                                expandedTreePaths - folderPath
+                                            } else {
+                                                expandedTreePaths + folderPath
+                                            }
+                                        },
+                                        modifier = Modifier.size(22.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isNodeExpanded) Icons.Default.ExpandMore else Icons.Default.ChevronRight,
+                                            contentDescription = if (isNodeExpanded) "收合資料夾" else "展開下一層資料夾",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                } else {
+                                    Spacer(Modifier.width(22.dp))
+                                }
                                 Icon(
                                     Icons.Default.Folder,
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.size(17.dp)
                                 )
-                                Spacer(Modifier.width(8.dp))
+                                Spacer(Modifier.width(6.dp))
                                 Text(
                                     text = folder.name,
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f)
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis
                                 )
+                                Spacer(Modifier.width(6.dp))
                                 NavMagnifierBadge(visible = isHovered)
                             }
                         }
@@ -442,6 +495,11 @@ fun NavigationPane(
                 item {
                     Spacer(Modifier.height(16.dp))
                 }
+            }
+            }
+
+            if (internalExpanded && treeHorizontalScroll.maxValue > 0) {
+                HorizontalTreeScrollbar(scrollState = treeHorizontalScroll)
             }
         }
     }
@@ -713,5 +771,91 @@ private fun NavRowItem(
         if (badgeCount != null) {
             Badge { Text(badgeCount.toString()) }
         }
+    }
+}
+
+private data class TreeFolderNode(
+    val file: File,
+    val depth: Int,
+    val hasSubFolders: Boolean
+)
+
+private fun buildVisibleTreeNodes(
+    rootPath: String,
+    expandedPaths: Set<String>,
+    showHiddenFiles: Boolean
+): List<TreeFolderNode> {
+    val result = mutableListOf<TreeFolderNode>()
+    fun walk(dir: File, depth: Int) {
+        if (depth > 12) return
+        val children = dir.listFiles()
+            ?.filter { it.isDirectory && (showHiddenFiles || !it.name.startsWith(".")) }
+            ?.sortedBy { it.name.lowercase() }
+            .orEmpty()
+        for (child in children) {
+            val hasSub = child.listFiles()?.any {
+                it.isDirectory && (showHiddenFiles || !it.name.startsWith("."))
+            } == true
+            result.add(TreeFolderNode(file = child, depth = depth, hasSubFolders = hasSub))
+            if (child.absolutePath in expandedPaths) {
+                walk(child, depth + 1)
+            }
+        }
+    }
+    walk(File(rootPath), 0)
+    return result
+}
+
+@Composable
+private fun HorizontalTreeScrollbar(scrollState: androidx.compose.foundation.ScrollState) {
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+            .height(14.dp)
+            .background(
+                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
+                RoundedCornerShape(7.dp)
+            )
+            .pointerInput(scrollState.maxValue) {
+                detectTapGestures { offset ->
+                    val maxScroll = scrollState.maxValue.toFloat()
+                    if (maxScroll > 0f && size.width > 0) {
+                        val fraction = (offset.x / size.width.toFloat()).coerceIn(0f, 1f)
+                        scope.launch { scrollState.scrollTo((fraction * maxScroll).roundToInt()) }
+                    }
+                }
+            }
+            .pointerInput(scrollState.maxValue) {
+                detectHorizontalDragGestures { change, dragAmount ->
+                    change.consume()
+                    val maxScroll = scrollState.maxValue.toFloat()
+                    if (maxScroll > 0f && size.width > 0) {
+                        val delta = (dragAmount / size.width.toFloat()) * maxScroll * 1.4f
+                        val next = (scrollState.value + delta).roundToInt().coerceIn(0, scrollState.maxValue)
+                        scope.launch { scrollState.scrollTo(next) }
+                    }
+                }
+            },
+        contentAlignment = Alignment.CenterStart
+    ) {
+        val trackWidthPx = with(density) { maxWidth.toPx() }.coerceAtLeast(1f)
+        val thumbFraction = (trackWidthPx / (trackWidthPx + scrollState.maxValue)).coerceIn(0.22f, 0.75f)
+        val thumbWidthPx = trackWidthPx * thumbFraction
+        val movablePx = (trackWidthPx - thumbWidthPx).coerceAtLeast(0f)
+        val offsetPx = if (scrollState.maxValue > 0) {
+            (scrollState.value.toFloat() / scrollState.maxValue.toFloat()) * movablePx
+        } else 0f
+
+        Box(
+            modifier = Modifier
+                .offset { IntOffset(offsetPx.roundToInt(), 0) }
+                .width(with(density) { thumbWidthPx.toDp() })
+                .height(10.dp)
+                .padding(horizontal = 2.dp)
+                .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(5.dp))
+        )
     }
 }

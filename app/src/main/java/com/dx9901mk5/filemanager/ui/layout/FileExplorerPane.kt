@@ -1,13 +1,17 @@
 package com.dx9901mk5.filemanager.ui.layout
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -368,13 +372,45 @@ fun FileExplorerPane(
                         .padding(horizontal = 10.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = onNavigateUp, modifier = Modifier.size(28.dp)) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "上一層",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp)
-                        )
+                    val isBackHovered = dragController.isDragging &&
+                        dragController.hoveredBackButtonPane == state.paneIndex
+                    val backHoverScale by animateFloatAsState(
+                        targetValue = if (isBackHovered) 1.35f else 1f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        ),
+                        label = "BackButtonHoverScale"
+                    )
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .scale(backHoverScale)
+                            .then(
+                                if (isBackHovered) {
+                                    Modifier
+                                        .background(
+                                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
+                                            CircleShape
+                                        )
+                                        .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                                } else {
+                                    Modifier
+                                }
+                            )
+                            .onGloballyPositioned { coords ->
+                                dragController.updateBackButtonBounds(state.paneIndex, coords.boundsInRoot())
+                            }
+                    ) {
+                        IconButton(onClick = onNavigateUp, modifier = Modifier.size(28.dp)) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "上一層",
+                                tint = if (isBackHovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                        FolderMagnifierBadge(visible = isBackHovered)
                     }
                     Row(
                         modifier = Modifier
@@ -665,109 +701,155 @@ fun FileExplorerPane(
                                 modifier = Modifier.align(Alignment.Center)
                             )
                         }
-                        state.viewMode != FileViewMode.LIST -> {
-                            val cellMinSize = if (state.viewMode == FileViewMode.LARGE_GRID) 132.dp else 88.dp
-                            val gridIconDp = if (state.viewMode == FileViewMode.LARGE_GRID) 56.dp else 36.dp
-                            LazyVerticalGrid(
-                                state = gridState,
-                                columns = GridCells.Adaptive(minSize = cellMinSize),
-                                contentPadding = PaddingValues(
-                                    start = 6.dp,
-                                    end = 6.dp,
-                                    top = 6.dp,
-                                    bottom = bottomClearanceDp
-                                ),
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .dxVerticalOverscrollBounce(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                gridItems(filteredFiles, key = { it.path }) { file ->
-                                    val isSelected = file.path in state.selectedPaths
-                                    val isHoveredTarget = dragController.isDragging &&
-                                        file.isDirectory &&
-                                        dragController.hoveredFolderPaneIndex == state.paneIndex &&
-                                        dragController.hoveredFolderPath == file.path
-                                    val hoverScale by animateFloatAsState(
-                                        targetValue = if (isHoveredTarget) 1.15f else 1f,
-                                        label = "GridFolderHoverScale"
-                                    )
-                                    FileGridItem(
-                                        file = file,
-                                        isSelected = isSelected,
-                                        isHoveredTarget = isHoveredTarget,
-                                        iconSizeDp = gridIconDp,
-                                        modifier = Modifier
-                                            .scale(hoverScale)
-                                            .onGloballyPositioned { coords ->
-                                                val b = coords.boundsInRoot()
-                                                itemRootBounds[file.path] = b
-                                                if (file.isDirectory) {
-                                                    dragController.updateFolderBounds(state.paneIndex, file.path, b)
-                                                }
-                                            }
-                                            .clickable {
-                                                if (dragController.isHolding || dragController.isDragging) return@clickable
-                                                onFocusPane()
-                                                if (state.isMultiSelectMode) {
-                                                    onToggleSelect(file.path)
-                                                } else if (file.isDirectory) {
-                                                    onNavigateToPath(file.path)
-                                                } else {
-                                                    onOpenFile(file)
-                                                }
-                                            }
-                                    )
-                                }
-                            }
-                        }
                         else -> {
-                            LazyColumn(
-                                state = listState,
-                                contentPadding = PaddingValues(bottom = bottomClearanceDp),
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .dxVerticalOverscrollBounce()
-                            ) {
-                                items(filteredFiles, key = { it.path }) { file ->
-                                    val isSelected = file.path in state.selectedPaths
-                                    val isHoveredTarget = dragController.isDragging &&
-                                        file.isDirectory &&
-                                        dragController.hoveredFolderPaneIndex == state.paneIndex &&
-                                        dragController.hoveredFolderPath == file.path
-                                    val hoverScale by animateFloatAsState(
-                                        targetValue = if (isHoveredTarget) 1.15f else 1f,
-                                        label = "FolderHoverScale"
-                                    )
-
-                                    FileRowItem(
-                                        file = file,
-                                        isSelected = isSelected,
-                                        isMultiSelectMode = state.isMultiSelectMode,
-                                        isHoveredTarget = isHoveredTarget,
-                                        iconScale = state.iconScale,
+                            LaunchedEffect(state.currentPath) {
+                                itemRootBounds.clear()
+                                dragController.clearFolderBounds(state.paneIndex)
+                            }
+                            AnimatedContent(
+                                targetState = state.currentPath to state.viewMode,
+                                transitionSpec = {
+                                    val oldPath = initialState.first
+                                    val newPath = targetState.first
+                                    if (oldPath == newPath) {
+                                        fadeIn(tween(180)) togetherWith fadeOut(tween(150))
+                                    } else {
+                                        val isEnteringFolder = newPath.length >= oldPath.length
+                                        if (isEnteringFolder) {
+                                            // 進入資料夾：1 秒展開回彈特效
+                                            (scaleIn(
+                                                initialScale = 0.68f,
+                                                animationSpec = spring(
+                                                    dampingRatio = 0.60f,
+                                                    stiffness = 65f
+                                                )
+                                            ) + fadeIn(tween(380))) togetherWith
+                                                (scaleOut(
+                                                    targetScale = 1.08f,
+                                                    animationSpec = tween(900, easing = FastOutSlowInEasing)
+                                                ) + fadeOut(tween(650)))
+                                        } else {
+                                            // 離開資料夾：1 秒收合回彈特效
+                                            (scaleIn(
+                                                initialScale = 1.12f,
+                                                animationSpec = spring(
+                                                    dampingRatio = 0.60f,
+                                                    stiffness = 65f
+                                                )
+                                            ) + fadeIn(tween(380))) togetherWith
+                                                (scaleOut(
+                                                    targetScale = 0.68f,
+                                                    animationSpec = tween(1000, easing = FastOutSlowInEasing)
+                                                ) + fadeOut(tween(850)))
+                                        }
+                                    }
+                                },
+                                label = "FolderTransition"
+                            ) { (_, animViewMode) ->
+                                if (animViewMode != FileViewMode.LIST) {
+                                    val cellMinSize = if (animViewMode == FileViewMode.LARGE_GRID) 132.dp else 88.dp
+                                    val gridIconDp = if (animViewMode == FileViewMode.LARGE_GRID) 56.dp else 36.dp
+                                    LazyVerticalGrid(
+                                        state = gridState,
+                                        columns = GridCells.Adaptive(minSize = cellMinSize),
+                                        contentPadding = PaddingValues(
+                                            start = 6.dp,
+                                            end = 6.dp,
+                                            top = 6.dp,
+                                            bottom = bottomClearanceDp
+                                        ),
                                         modifier = Modifier
-                                            .scale(hoverScale)
-                                            .onGloballyPositioned { coords ->
-                                                val b = coords.boundsInRoot()
-                                                itemRootBounds[file.path] = b
-                                                if (file.isDirectory) {
-                                                    dragController.updateFolderBounds(state.paneIndex, file.path, b)
-                                                }
-                                            }
-                                            .clickable {
-                                                if (dragController.isHolding || dragController.isDragging) return@clickable
-                                                onFocusPane()
-                                                if (state.isMultiSelectMode) {
-                                                    onToggleSelect(file.path)
-                                                } else if (file.isDirectory) {
-                                                    onNavigateToPath(file.path)
-                                                } else {
-                                                    onOpenFile(file)
-                                                }
-                                            }
-                                    )
+                                            .fillMaxSize()
+                                            .dxVerticalOverscrollBounce(),
+                                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        gridItems(filteredFiles, key = { it.path }) { file ->
+                                            val isSelected = file.path in state.selectedPaths
+                                            val isHoveredTarget = dragController.isDragging &&
+                                                file.isDirectory &&
+                                                dragController.hoveredFolderPaneIndex == state.paneIndex &&
+                                                dragController.hoveredFolderPath == file.path
+                                            val hoverScale by animateFloatAsState(
+                                                targetValue = if (isHoveredTarget) 1.15f else 1f,
+                                                label = "GridFolderHoverScale"
+                                            )
+                                            FileGridItem(
+                                                file = file,
+                                                isSelected = isSelected,
+                                                isHoveredTarget = isHoveredTarget,
+                                                iconSizeDp = gridIconDp,
+                                                modifier = Modifier
+                                                    .scale(hoverScale)
+                                                    .onGloballyPositioned { coords ->
+                                                        val b = coords.boundsInRoot()
+                                                        itemRootBounds[file.path] = b
+                                                        if (file.isDirectory) {
+                                                            dragController.updateFolderBounds(state.paneIndex, file.path, b)
+                                                        }
+                                                    }
+                                                    .clickable {
+                                                        if (dragController.isHolding || dragController.isDragging) return@clickable
+                                                        onFocusPane()
+                                                        if (state.isMultiSelectMode) {
+                                                            onToggleSelect(file.path)
+                                                        } else if (file.isDirectory) {
+                                                            onNavigateToPath(file.path)
+                                                        } else {
+                                                            onOpenFile(file)
+                                                        }
+                                                    }
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    LazyColumn(
+                                        state = listState,
+                                        contentPadding = PaddingValues(bottom = bottomClearanceDp),
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .dxVerticalOverscrollBounce()
+                                    ) {
+                                        items(filteredFiles, key = { it.path }) { file ->
+                                            val isSelected = file.path in state.selectedPaths
+                                            val isHoveredTarget = dragController.isDragging &&
+                                                file.isDirectory &&
+                                                dragController.hoveredFolderPaneIndex == state.paneIndex &&
+                                                dragController.hoveredFolderPath == file.path
+                                            val hoverScale by animateFloatAsState(
+                                                targetValue = if (isHoveredTarget) 1.15f else 1f,
+                                                label = "FolderHoverScale"
+                                            )
+
+                                            FileRowItem(
+                                                file = file,
+                                                isSelected = isSelected,
+                                                isMultiSelectMode = state.isMultiSelectMode,
+                                                isHoveredTarget = isHoveredTarget,
+                                                iconScale = state.iconScale,
+                                                modifier = Modifier
+                                                    .scale(hoverScale)
+                                                    .onGloballyPositioned { coords ->
+                                                        val b = coords.boundsInRoot()
+                                                        itemRootBounds[file.path] = b
+                                                        if (file.isDirectory) {
+                                                            dragController.updateFolderBounds(state.paneIndex, file.path, b)
+                                                        }
+                                                    }
+                                                    .clickable {
+                                                        if (dragController.isHolding || dragController.isDragging) return@clickable
+                                                        onFocusPane()
+                                                        if (state.isMultiSelectMode) {
+                                                            onToggleSelect(file.path)
+                                                        } else if (file.isDirectory) {
+                                                            onNavigateToPath(file.path)
+                                                        } else {
+                                                            onOpenFile(file)
+                                                        }
+                                                    }
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }

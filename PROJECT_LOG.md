@@ -5,6 +5,7 @@
 - **GitHub 儲存庫**：https://github.com/dx9901mk5/DX_fileManager
 - **Application ID**：`com.dx9901mk5.filemanager`
 - **APK 產出名稱**：`DX_fileManager-v<versionName>-release.apk`（自下一版起自動帶入版本號）
+- **開發與發布規範（重要）**：以後所有修改皆**先使用本機 Android SDK 編譯產出簽名 APK**，先存至 `D:\Google雲端硬碟\Antigravity\DX檔案管理器\測試用`（並同步保留於 `release_apks/`）；待使用者測試確認可發布正式版後，再複製至 `D:\Google雲端硬碟\Antigravity\DX檔案管理器\正式發布`，並詢問是否上傳至 GitHub 發布 Release。
 
 ---
 
@@ -67,6 +68,25 @@
 - **v1.0.16** (`versionCode = 17`)：
   - 長壓進入多選時間減半為 `750ms` (0.75 秒)。
   - Release 頁面：https://github.com/dx9901mk5/DX-File-Manager/releases/tag/v1.0.16
+- **v1.1.8** (`versionCode = 30`，本機測試版)：
+  - **多選「更多」選單新增「透過 Shizuku 安裝 APK」**：在 `FileOperationDialogs.kt`、`FileManagerViewModel.kt` 與 `MainActivity.kt` 新增 `INSTALL_WITH_SHIZUKU` 動作；只要選取的項目包含 `.apk` 檔案，點擊底部「更多」即可直接透過 Shizuku 批次靜默安裝（支援單檔與多檔依序安裝）。
+- **v1.1.7** (`versionCode = 29`，本機測試版)：
+  - **徹底修復 Shizuku 無法接收 Binder 的根本原因**：透過 ADB Logcat 查獲 `shizuku_server (uid=2000)` 傳送 Binder 時被 `AndroidManifest.xml` 中 `ShizukuProvider` 的 `android:permission="android.permission.INTERACT_CROSS_USER_FULL"` 拒絕（`SecurityException: Permission Denial`）。移除該錯誤權限限制後，Shizuku 即恢復正常連線與授權彈窗。
+- **v1.1.6** (`versionCode = 28`，本機測試版)：
+  - **修復 `ShizukuProvider.enableMultiProcessSupport(false)` 覆寫 `isProviderProcess` 導致無法接收 Binder 的問題**：移除 `DxFileManagerApp.kt` 與 `ShizukuApkInstaller.kt` 中的錯誤多進程標記呼叫，恢復單進程 `ShizukuProvider` 正常接收 Shizuku Binder。
+- **v1.1.5** (`versionCode = 27`，本機測試版)：
+  - **AI 模型清單新增 `gemini-4-hydrogen`**：於 `AppPreferences.kt` 補上 `gemini-4-hydrogen`（與 `gemini-4-argon`、`gemini-3.8-flash` 等並列）。
+  - **設定頁 Shizuku 診斷與「重新偵測」按鈕**：於 `AboutAndUpdateDialog.kt` 補上「重新偵測」按鈕與關聯啟動提示，方便在 OriginOS 等系統上即時重測 `Shizuku.pingBinder()` 並觸發授權。
+- **v1.1.4** (`versionCode = 26`，本機測試版)：
+  - **修復設定頁「Shizuku 靜默安裝」與「顯示隱藏資料夾與檔案」開關無法點擊／無法呼叫問題**：
+    - 在 `DxFileManagerApp.kt` 啟動時與 `ShizukuApkInstaller.ensureBinderRequested()` 主動呼叫 `ShizukuProvider.requestBinderForNonProviderProcess`，並於 `AboutAndUpdateDialog.kt` 註冊 `addBinderReceivedListenerSticky` / `addBinderDeadListener` 即時偵測 Shizuku 連線；開關開啟時保留設定狀態並提供一鍵「請求 Shizuku 授權」或「開啟 Shizuku App」按鈕。
+    - `SettingSwitchRow` 改為整列皆可點擊切換（不再受限於小圓點觸控區），確保「顯示隱藏資料夾與檔案」等所有設定開關點擊即切換。
+- **v1.1.3** (`versionCode = 25`，本機測試版)：
+  - **第二、三分區分隔線中央「左右分割 ⇄ 上下分割」切換按鈕**：於 `ThreePaneScaffold.kt` 第二與第三分區分隔線中央加入圓形浮動切換按鈕，可一鍵切換為上下分割或左右分割；`CrossPaneDragController.kt` 同步改用完整 `Rect` 判定分區命中範圍，確保上下分割模式下跨區拖曳與放開確認完全正常。
+- **v1.1.2** (`versionCode = 24`，本機編譯版)：
+  - **第一區根目錄多層樹狀無限展開 ＋ 底部水平滑動條**：`NavigationPane.kt` 新增 `TreeFolderNode` 與 `buildVisibleTreeNodes()`，支援從「內部儲存空間」逐層展開進入各子資料夾（最多 12 層防迴圈）；所有樹狀列共用 `horizontalScroll` 水平捲動，並於第一區底部顯示可點擊／拖曳的 `HorizontalTreeScrollbar` 滑動條，方便查看深層展開的資料夾名稱。
+  - **修復 Shizuku 靜默安裝 APK 失敗**：`AndroidManifest.xml` 加入 `<queries>` 宣告 `moe.shizuku.privileged.api` 可見性；`ShizukuApkInstaller.kt` 改用 `pm install -r -d -S <size>` 透過 stdin 串流寫入 APK，避開 Android 11+ FUSE/SELinux 無法直接讀取 `/storage/emulated/0/...` 路徑之問題。
+  - **更新 Gemini 最新模型清單**：`AppPreferences.kt` 與 `AiAssistantClient.kt` 更新為 `gemini-4-argon`、`gemini-3.8-flash`（預設）、`gemini-3.6-flash`、`gemini-3.5-flash-lite`、`gemini-2.5-flash`。
 - **v1.1.1** (`versionCode = 23`，本機編譯版)：
   - **修復 Google 雲端硬碟更新／Token 過期後失效需重掛載問題**：
     - 原因：`CloudAndWebDavVfsProvider` 原本只使用掛載當下靜態儲存的 `config.accessToken`（Google OAuth2 Access Token 約 1 小時或 App 更新後即失效），遇到 `HTTP 401` 時未利用已保存的 Google 帳號（`config.username`）重新向 `GoogleAuthUtil` 取得新 Token。
@@ -157,9 +177,12 @@
 - **GitHub 帳號與發布狀態**：
   - GitHub 最後成功發布於 Releases 的版本：`v1.0.17` (`versionCode = 18`)。
   - 目前帳號 `dx9901mk5` 因系統停權（`403 Your account is suspended`）暫無法 `git push`；已透過 `help.github.com` 送出帳號恢復申訴，工單編號 **`#5015727`**（通知寄往 `dx9901mk5@gmail.com`）。待恢復後可將本機 `main`（含 `v1.0.18`～`v1.0.21`）推送至 `origin`。
-- **本機編譯與 Google 雲端硬碟發布通道（目前替代方案）**：
-  - **最新本機簽名 APK**：`v1.1.1` (`versionCode = 23`)，`release_apks/DX_fileManager-v1.1.1-release.apk`（固定簽名 `app/release.keystore`）。
-  - **本機編譯注意事項（Windows 中文路徑）**：因專案路徑含中文字元導致 Kotlin 編譯器 `.argfile` 跳脫失敗且 Google Drive 同步會鎖定 `build/`，需先 `robocopy` 原始碼（排除 `build .gradle .git release_apks`）至純英文暫存路徑執行 `gradle assembleRelease`，再複製 APK 回 `release_apks/`。
+- **本機編譯與發布通道**：
+  - **最新本機簽名測試版 APK**：`v1.1.9` (`versionCode = 31`)，位於 `測試用/DX_fileManager-v1.1.9-release.apk`（固定簽名 `app/release.keystore`）。本次新增：刪除／移至垃圾桶二次確認、多選拖曳停在分區上方返回鈕 2 秒回上層（含放大鏡特效）、進入／離開資料夾 1 秒展開／收合回彈動畫。
+  - **本機編譯環境與注意事項（Windows 中文路徑）**：
+    - `ANDROID_HOME`：`D:\Android\Sdk`（`adb.exe` 位於 `D:\Android\Sdk\platform-tools\adb.exe`）
+    - `JAVA_HOME`：`C:\jdk-17\jdk-17.0.21+9`、`Gradle`：`C:\gradle-8.7\gradle-8.7\bin\gradle.bat`
+    - 因專案路徑含中文字元且 Google Drive 同步會鎖定 `build/`，需先 `robocopy` 原始碼至純英文暫存路徑 `C:\dx_build_tmp`（`local.properties` 設為 `sdk.dir=D:/Android/Sdk`）執行 `gradle assembleRelease --no-daemon`，再複製 APK 回 `測試用/` 與 `release_apks/`。
   - **Google 雲端硬碟「測試用」資料夾**（已設為知道連結者可瀏覽）：https://drive.google.com/drive/folders/1h_I2rDnRJvTYe2V0_04AM9hAnk17wO5x （已上傳 `v1.0.18`、`v1.0.19`、`v1.0.20`、`v1.0.21`）。
   - **Google 雲端硬碟「正式發布」資料夾**（已設為知道連結者可瀏覽）：https://drive.google.com/drive/folders/1JrrkNtKZZIGEvpLaHuXRxGiCRJPQO6Vu
 - **OAuth 整合現況**：

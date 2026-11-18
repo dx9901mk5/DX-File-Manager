@@ -498,6 +498,34 @@ class FileManagerViewModel(application: Application) : AndroidViewModel(applicat
         openWithSystemChooser(localFile, file.mimeType)
     }
 
+    fun installApksWithShizuku(apkFiles: List<File>) {
+        if (apkFiles.isEmpty()) return
+        viewModelScope.launch {
+            if (!ShizukuApkInstaller.isShizukuAvailable()) {
+                toast("Shizuku 服務未啟動，請先開啟 Shizuku App")
+                return@launch
+            }
+            if (!ShizukuApkInstaller.isShizukuReady()) {
+                ShizukuApkInstaller.requestShizukuPermission()
+                toast("請先在彈窗允許 Shizuku 授權後再試一次")
+                return@launch
+            }
+            var okCount = 0
+            var lastErr: String? = null
+            apkFiles.forEach { apk ->
+                toast("正在透過 Shizuku 安裝 ${apk.name}...")
+                ShizukuApkInstaller.installApkSilently(apk)
+                    .onSuccess { okCount++ }
+                    .onFailure { lastErr = it.message }
+            }
+            if (okCount == apkFiles.size) {
+                toast("透過 Shizuku 成功安裝 $okCount 個 APK！")
+            } else {
+                toast("Shizuku 安裝完成 $okCount/${apkFiles.size} 個（${lastErr ?: "部分失敗"}）")
+            }
+        }
+    }
+
     fun installApkWithShizukuOrFallback(apkFile: File) {
         viewModelScope.launch {
             if (settings.value.useShizukuInstall && ShizukuApkInstaller.isShizukuReady()) {

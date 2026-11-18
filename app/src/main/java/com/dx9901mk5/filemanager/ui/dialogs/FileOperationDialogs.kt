@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddToHomeScreen
+import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.ContentCopy
@@ -65,6 +66,7 @@ enum class ContextMenuAction {
     OPEN_DIRECTORY,
     SEND_TO_OTHER_PANE,
     CREATE_SHORTCUT,
+    INSTALL_WITH_SHIZUKU,
     PROPERTIES,
     DELETE
 }
@@ -80,6 +82,7 @@ fun FileContextMenuDialog(
     targetFile: VfsFile?,
     selectedCount: Int,
     hasClipboard: Boolean,
+    hasApkSelected: Boolean = false,
     onAction: (ContextMenuAction) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -87,8 +90,10 @@ fun FileContextMenuDialog(
         it.endsWith(".zip") || it.endsWith(".7z") || it.endsWith(".tar") || it.endsWith(".gz") || it.endsWith(".tgz")
     } == true
     val isEncrypted = targetFile?.name?.lowercase()?.endsWith(".dxe") == true
+    val showShizukuInstall = hasApkSelected || (targetFile?.isDirectory == false && targetFile.name.lowercase().endsWith(".apk"))
 
     val options = listOfNotNull(
+        if (showShizukuInstall) MenuOption(ContextMenuAction.INSTALL_WITH_SHIZUKU, "透過 Shizuku 安裝 APK", Icons.Default.Android) else null,
         MenuOption(ContextMenuAction.MULTI_SELECT, "1. 多選 (Multi-select)", Icons.Default.CheckBox),
         MenuOption(ContextMenuAction.RENAME, "2. 重新命名 (Rename)", Icons.Default.DriveFileRenameOutline),
         MenuOption(ContextMenuAction.COPY, "3. 複製 (Copy)", Icons.Default.ContentCopy),
