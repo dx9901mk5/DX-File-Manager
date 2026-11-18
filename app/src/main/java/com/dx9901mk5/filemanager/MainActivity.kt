@@ -1073,7 +1073,7 @@ private fun DxFileManagerScreen(
                         showFreeformGuideDialog = false
                         SystemCrossAppDragHelper.openNewWindow(activityContext)
                     }) {
-                        Text("開啟小視窗")
+                        Text("開新視窗")
                     }
                 },
                 dismissButton = {
