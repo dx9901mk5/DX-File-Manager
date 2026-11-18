@@ -71,6 +71,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalView
 import com.dx9901mk5.filemanager.ui.gesture.DxHaptics
 import com.dx9901mk5.filemanager.ui.gesture.DxSoundEffects
+import com.dx9901mk5.filemanager.ui.gesture.SystemCrossAppDragHelper
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -539,6 +540,51 @@ private fun DxFileManagerScreen(
 
         // 全域雙指堆疊拖曳預覽層
         DragAndDropOverlay(dragController)
+
+        // 跨 App 多選拖曳批次傳遞佇列（如 LINE 一次僅接收單檔時，由此接手逐一或整批傳送剩餘檔案）
+        val batchQueue = SystemCrossAppDragHelper.batchQueueFiles
+        if (batchQueue.isNotEmpty()) {
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.96f),
+                shadowElevation = 8.dp,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 12.dp, vertical = 12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "批次傳送剩餘 ${batchQueue.size} 檔",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Button(
+                        onClick = {
+                            val next = batchQueue.removeAt(0)
+                            SystemCrossAppDragHelper.shareFilesViaSystem(activityContext, listOf(next))
+                        }
+                    ) {
+                        Text("逐一傳下個")
+                    }
+                    TextButton(
+                        onClick = {
+                            val rest = batchQueue.toList()
+                            SystemCrossAppDragHelper.clearBatchQueue()
+                            SystemCrossAppDragHelper.shareFilesViaSystem(activityContext, rest)
+                        }
+                    ) {
+                        Text("全部一次傳")
+                    }
+                    IconButton(onClick = { SystemCrossAppDragHelper.clearBatchQueue() }) {
+                        Icon(Icons.Default.Close, contentDescription = "關閉批次傳送")
+                    }
+                }
+            }
+        }
 
         // 長壓 1.5 秒多選底部操作選單（第二指多選或開始拖曳時自動隱藏；原地放開優先顯示新增資料夾/壓縮）
         val activeBarPane = bottomActionBarState?.first
