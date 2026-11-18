@@ -249,10 +249,11 @@ private fun DxFileManagerScreen(
     var smallWinPane1Expanded by remember { mutableStateOf(false) }
 
     // 記憶用戶在小視窗模式下調整的寬高比例
+    val smallWindowSaveContext = LocalContext.current
     LaunchedEffect(isSmallWindowMode, configuration.screenWidthDp, configuration.screenHeightDp) {
         if (isSmallWindowMode && configuration.screenWidthDp in 240..640 && configuration.screenHeightDp in 280..780) {
             SystemCrossAppDragHelper.saveSmallWindowSizeDp(
-                activityContext,
+                smallWindowSaveContext,
                 configuration.screenWidthDp,
                 configuration.screenHeightDp
             )
