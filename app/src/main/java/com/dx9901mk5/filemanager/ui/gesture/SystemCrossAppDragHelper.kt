@@ -85,9 +85,14 @@ object SystemCrossAppDragHelper {
         val launchBounds = Rect(left, top, left + winW, top + winH)
 
         val intent = Intent(context, MainActivity::class.java).apply {
+            data = Uri.parse("dxfilemanager://window/$nextSlot")
             putExtra("extra_window_slot", nextSlot)
             putExtra("extra_small_window_mode", true)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
+            addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_NEW_DOCUMENT or
+                    Intent.FLAG_ACTIVITY_MULTIPLE_TASK
+            )
         }
         val options = ActivityOptions.makeBasic().setLaunchBounds(launchBounds)
         runCatching { context.startActivity(intent, options.toBundle()) }

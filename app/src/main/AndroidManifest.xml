@@ -43,7 +43,10 @@
         android:theme="@style/Theme.DxFileManager"
         android:usesCleartextTraffic="true">
 
-        <!-- Samsung DeX / 多視窗自由縮放支援 -->
+        <!-- Samsung DeX / 多視窗自由縮放與多視窗同時執行支援 -->
+        <meta-data
+            android:name="android.allow_multiple_resumed_activities"
+            android:value="true" />
         <meta-data
             android:name="com.samsung.android.sdk.multiwindow.enable"
             android:value="true" />
