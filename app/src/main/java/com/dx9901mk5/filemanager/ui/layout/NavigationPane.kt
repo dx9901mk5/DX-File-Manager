@@ -37,6 +37,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.AudioFile
@@ -110,6 +111,7 @@ fun NavigationPane(
     onGoHome: () -> Unit,
     onOpenSettings: () -> Unit,
     onToggleDualPane: () -> Unit,
+    onOpenNewWindow: () -> Unit = {},
     onOpenLocalRoot: () -> Unit,
     onOpenCloudMount: (VfsMountConfig) -> Unit,
     onRemoveCloudMount: (String) -> Unit,
@@ -164,6 +166,13 @@ fun NavigationPane(
                     Icon(
                         Icons.Default.Splitscreen,
                         contentDescription = "切換雙欄",
+                        tint = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+                IconButton(onClick = onOpenNewWindow) {
+                    Icon(
+                        Icons.AutoMirrored.Filled.OpenInNew,
+                        contentDescription = "開新視窗",
                         tint = MaterialTheme.colorScheme.onBackground
                     )
                 }

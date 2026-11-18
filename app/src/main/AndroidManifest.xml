@@ -43,12 +43,29 @@
         android:theme="@style/Theme.DxFileManager"
         android:usesCleartextTraffic="true">
 
+        <!-- Samsung DeX / 多視窗自由縮放支援 -->
+        <meta-data
+            android:name="com.samsung.android.sdk.multiwindow.enable"
+            android:value="true" />
+        <meta-data
+            android:name="com.samsung.android.keepalive.density"
+            android:value="true" />
+        <meta-data
+            android:name="com.samsung.android.multidisplay.keep_process_alive"
+            android:value="true" />
+
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation"
             android:exported="true"
-            android:launchMode="singleTask"
+            android:launchMode="standard"
             android:windowSoftInputMode="adjustResize">
+            <layout
+                android:defaultWidth="920dp"
+                android:defaultHeight="660dp"
+                android:gravity="center"
+                android:minWidth="300dp"
+                android:minHeight="340dp" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

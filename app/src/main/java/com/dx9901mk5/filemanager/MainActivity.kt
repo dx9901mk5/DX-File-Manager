@@ -9,6 +9,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
+import android.provider.OpenableColumns
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -64,11 +65,13 @@ import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSiz
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalView
 import com.dx9901mk5.filemanager.ui.gesture.DxHaptics
 import com.dx9901mk5.filemanager.ui.gesture.DxSoundEffects
@@ -101,7 +104,11 @@ import com.dx9901mk5.filemanager.ui.gesture.CopyOrMoveDialog
 import com.dx9901mk5.filemanager.ui.gesture.CrossPaneDragController
 import com.dx9901mk5.filemanager.ui.gesture.DragAndDropOverlay
 import com.dx9901mk5.filemanager.ui.gesture.DxShortcutAction
+import com.dx9901mk5.filemanager.ui.gesture.PendingDropRequest
 import com.dx9901mk5.filemanager.ui.gesture.dxKeyboardShortcuts
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.dx9901mk5.filemanager.ui.layout.FileExplorerPane
 import com.dx9901mk5.filemanager.ui.layout.NavigationPane
 import com.dx9901mk5.filemanager.ui.layout.ThreePaneScaffold
@@ -231,6 +238,66 @@ private fun DxFileManagerScreen(
 
     val activityContext = LocalContext.current
     val hapticView = LocalView.current
+    val uiScope = rememberCoroutineScope()
+
+    // 接收來自另一個 DX_fileManager 視窗或外部 App 拖曳放開的檔案
+    DisposableEffect(hapticView, focusedPane, pane2State.currentPath, pane3State.currentPath, pane2State.mountId, pane3State.mountId) {
+        SystemCrossAppDragHelper.attachWindowDropReceiver(
+            view = hapticView,
+            onDxFilesDropped = { droppedFiles ->
+                val targetPane = if (focusedPane == 3 && pane3Expanded) 3 else 2
+                val targetState = if (targetPane == 3) pane3State else pane2State
+                DxHaptics.lightVibrate(activityContext, hapticView)
+                dragController.pendingDropTarget = PendingDropRequest(
+                    files = droppedFiles,
+                    sourcePaneIndex = targetPane,
+                    targetPaneIndex = targetPane,
+                    targetMountId = targetState.mountId,
+                    targetDirPath = targetState.currentPath
+                )
+            },
+            onExternalUrisDropped = { uris ->
+                val targetPane = if (focusedPane == 3 && pane3Expanded) 3 else 2
+                val targetState = if (targetPane == 3) pane3State else pane2State
+                if (targetState.mountId != "local") return@attachWindowDropReceiver
+                val destDir = File(targetState.currentPath)
+                if (!destDir.exists() || !destDir.isDirectory) return@attachWindowDropReceiver
+                uiScope.launch {
+                    val savedCount = withContext(Dispatchers.IO) {
+                        var count = 0
+                        for (uri in uris) {
+                            runCatching {
+                                val cr = activityContext.contentResolver
+                                var displayName = "dropped_${System.currentTimeMillis()}"
+                                cr.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                                    if (c.moveToFirst()) {
+                                        c.getString(0)?.takeIf { it.isNotBlank() }?.let { displayName = it }
+                                    }
+                                }
+                                var outFile = File(destDir, displayName)
+                                if (outFile.exists()) {
+                                    val dot = displayName.lastIndexOf('.')
+                                    val base = if (dot > 0) displayName.substring(0, dot) else displayName
+                                    val ext = if (dot > 0) displayName.substring(dot) else ""
+                                    outFile = File(destDir, "${base}_${System.currentTimeMillis()}$ext")
+                                }
+                                cr.openInputStream(uri)?.use { input ->
+                                    outFile.outputStream().use { output -> input.copyTo(output) }
+                                }
+                                count++
+                            }
+                        }
+                        count
+                    }
+                    if (savedCount > 0) {
+                        DxHaptics.lightVibrate(activityContext, hapticView)
+                        viewModel.navigateToPath(targetPane, destDir.absolutePath, "local", "內部儲存空間")
+                    }
+                }
+            }
+        )
+        onDispose { hapticView.setOnDragListener(null) }
+    }
 
     // 拖曳懸停於任一資料夾上方滿 2 秒（顯示放大鏡特效）-> 自動進入該資料夾，放開手指才詢問複製或移動
     LaunchedEffect(dragController.isDragging, dragController.hoveredFolderPaneIndex, dragController.hoveredFolderPath) {
@@ -427,6 +494,7 @@ private fun DxFileManagerScreen(
                     },
                     onOpenSettings = { showSettingsDialog = true },
                     onToggleDualPane = { viewModel.setPaneExpanded(isExpandedScreen, 3, !pane3Expanded) },
+                    onOpenNewWindow = { SystemCrossAppDragHelper.openNewWindow(activityContext) },
                     onOpenLocalRoot = {
                         viewModel.navigateToPath(
                             focusedPane,

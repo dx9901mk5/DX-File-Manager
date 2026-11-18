@@ -15,23 +15,102 @@ import android.view.View
 import android.webkit.MimeTypeMap
 import androidx.compose.runtime.mutableStateListOf
 import androidx.core.content.FileProvider
+import com.dx9901mk5.filemanager.MainActivity
 import com.dx9901mk5.filemanager.core.vfs.VfsFile
 import java.io.File
 import java.net.URLConnection
 import java.util.Locale
 
 /**
- * Android 系統級跨 App 拖曳輔助器：
+ * Android 系統級跨 App / 跨視窗拖曳輔助器：
  * 透過 FileProvider URI + View.DRAG_FLAG_GLOBAL | DRAG_FLAG_GLOBAL_URI_READ，
- * 讓雙 App 並排／多視窗模式下可直接將圖片、文件等檔案拖曳投放至通訊軟體、Office、瀏覽器或社群 App；
- * 若目標位置未消費拖曳事件（例如拖到對話清單而非輸入框）或一次僅接收單一檔案（如 LINE），
- * 自動由檔案管理器接手批次分享傳遞。
+ * 支援三星 DeX / 多開自由小視窗間互相拖曳交互，以及拖曳至通訊軟體、Office、瀏覽器等 App；
+ * 若目標位置未消費拖曳事件或一次僅接收單檔（如 LINE），自動由檔案管理器接手批次分享傳遞。
  */
 object SystemCrossAppDragHelper {
+    data class DxDragSession(
+        val sourceViewIdentity: Int,
+        val files: List<VfsFile>,
+        @Volatile var acceptedByDxWindow: Boolean = false,
+        @Volatile var leftSourceWindow: Boolean = false
+    )
+
     val batchQueueFiles = mutableStateListOf<VfsFile>()
 
     fun clearBatchQueue() {
         batchQueueFiles.clear()
+    }
+
+    fun openNewWindow(context: Context) {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_MULTIPLE_TASK or
+                    Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT
+            )
+        }
+        runCatching { context.startActivity(intent) }
+    }
+
+    fun attachWindowDropReceiver(
+        view: View,
+        onDxFilesDropped: (List<VfsFile>) -> Unit,
+        onExternalUrisDropped: (List<Uri>) -> Unit
+    ) {
+        val myIdentity = System.identityHashCode(view)
+        view.setOnDragListener { v, event ->
+            val session = event.localState as? DxDragSession
+            when (event.action) {
+                DragEvent.ACTION_DRAG_STARTED -> true
+                DragEvent.ACTION_DRAG_EXITED -> {
+                    if (session != null && session.sourceViewIdentity == myIdentity) {
+                        session.leftSourceWindow = true
+                    }
+                    true
+                }
+                DragEvent.ACTION_DRAG_ENTERED -> {
+                    if (session != null && session.sourceViewIdentity == myIdentity) {
+                        session.leftSourceWindow = false
+                    }
+                    true
+                }
+                DragEvent.ACTION_DROP -> {
+                    if (session != null) {
+                        if (session.sourceViewIdentity == myIdentity) {
+                            return@setOnDragListener false
+                        }
+                        session.acceptedByDxWindow = true
+                        onDxFilesDropped(session.files)
+                        return@setOnDragListener true
+                    }
+                    val clip = event.clipData ?: return@setOnDragListener false
+                    val uris = buildList {
+                        for (i in 0 until clip.itemCount) {
+                            clip.getItemAt(i).uri?.let { add(it) }
+                        }
+                    }
+                    if (uris.isEmpty()) return@setOnDragListener false
+                    onExternalUrisDropped(uris)
+                    true
+                }
+                DragEvent.ACTION_DRAG_ENDED -> {
+                    if (session != null &&
+                        session.sourceViewIdentity == myIdentity &&
+                        session.leftSourceWindow &&
+                        !session.acceptedByDxWindow
+                    ) {
+                        if (!event.result) {
+                            shareFilesViaSystem(v.context, session.files)
+                        } else if (session.files.size > 1) {
+                            batchQueueFiles.clear()
+                            batchQueueFiles.addAll(session.files.drop(1))
+                        }
+                    }
+                    true
+                }
+                else -> false
+            }
+        }
     }
 
     fun startSystemDrag(
@@ -79,45 +158,15 @@ object SystemCrossAppDragHelper {
             count = urisAndMimes.size
         )
 
-        val draggedVfsFiles = localFiles.map { it.first }
-        var leftOurWindow = false
-        view.setOnDragListener { v, event ->
-            when (event.action) {
-                DragEvent.ACTION_DRAG_STARTED -> true
-                DragEvent.ACTION_DRAG_EXITED -> {
-                    leftOurWindow = true
-                    true
-                }
-                DragEvent.ACTION_DRAG_ENTERED -> {
-                    leftOurWindow = false
-                    true
-                }
-                DragEvent.ACTION_DRAG_ENDED -> {
-                    v.setOnDragListener(null)
-                    if (leftOurWindow) {
-                        if (!event.result) {
-                            // 對方視窗未消費拖曳（例如丟到對話視窗空白處而非輸入框）-> 自動改走系統分享傳送至對話框
-                            shareFilesViaSystem(context, draggedVfsFiles)
-                        } else if (draggedVfsFiles.size > 1) {
-                            // 對方視窗已接收第 1 個檔案；若通訊軟體（如 LINE）一次只吃單檔，提供剩餘批次佇列接續傳送
-                            batchQueueFiles.clear()
-                            batchQueueFiles.addAll(draggedVfsFiles.drop(1))
-                        }
-                    }
-                    true
-                }
-                else -> false
-            }
-        }
+        val session = DxDragSession(
+            sourceViewIdentity = System.identityHashCode(view),
+            files = localFiles.map { it.first }
+        )
 
         val flags = View.DRAG_FLAG_GLOBAL or View.DRAG_FLAG_GLOBAL_URI_READ
-        val started = runCatching {
-            view.startDragAndDrop(clipData, shadowBuilder, null, flags)
+        return runCatching {
+            view.startDragAndDrop(clipData, shadowBuilder, session, flags)
         }.getOrDefault(false)
-        if (!started) {
-            view.setOnDragListener(null)
-        }
-        return started
     }
 
     fun shareFilesViaSystem(context: Context, files: List<VfsFile>): Boolean {

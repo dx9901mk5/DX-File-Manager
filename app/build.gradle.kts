@@ -20,8 +20,8 @@ android {
         applicationId = "com.dx9901mk5.filemanager"
         minSdk = 29
         targetSdk = 35
-        versionCode = 34
-        versionName = "1.2.2"
+        versionCode = 35
+        versionName = "1.2.3"
         base.archivesName.set("DX_fileManager-v${versionName}")
 
         buildConfigField(
