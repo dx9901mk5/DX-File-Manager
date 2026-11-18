@@ -65,11 +65,11 @@
             android:resizeableActivity="true"
             android:windowSoftInputMode="adjustResize">
             <layout
-                android:defaultWidth="320dp"
-                android:defaultHeight="440dp"
+                android:defaultWidth="280dp"
+                android:defaultHeight="380dp"
                 android:gravity="center"
-                android:minWidth="260dp"
-                android:minHeight="300dp" />
+                android:minWidth="220dp"
+                android:minHeight="280dp" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

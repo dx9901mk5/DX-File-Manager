@@ -1,5 +1,6 @@
 package com.dx9901mk5.filemanager.ui.gesture
 
+import android.app.ActivityManager
 import android.app.ActivityOptions
 import android.content.ClipData
 import android.content.ClipDescription
@@ -40,37 +41,79 @@ object SystemCrossAppDragHelper {
 
     val batchQueueFiles = mutableStateListOf<VfsFile>()
 
-    private val activeWindowSlots = mutableSetOf<Int>()
+    private const val WINDOWING_MODE_FREEFORM = 5
+
+    // taskId -> slot (2..9)
+    private val taskSlotMap = mutableMapOf<Int, Int>()
 
     @Synchronized
-    fun allocateWindowSlot(preferredSlot: Int? = null): Int {
-        if (preferredSlot != null && preferredSlot in 2..9 && preferredSlot !in activeWindowSlots) {
-            activeWindowSlots.add(preferredSlot)
+    private fun pruneDeadTasks(context: Context) {
+        val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return
+        val aliveIds = runCatching {
+            am.appTasks.mapNotNull { it.taskInfo?.taskId }.toSet()
+        }.getOrNull() ?: return
+        if (aliveIds.isNotEmpty()) {
+            taskSlotMap.keys.retainAll(aliveIds)
+        }
+    }
+
+    @Synchronized
+    fun allocateWindowSlot(
+        context: Context,
+        taskId: Int,
+        preferredSlot: Int? = null,
+        isMainLauncher: Boolean = false
+    ): Int {
+        pruneDeadTasks(context)
+        taskSlotMap[taskId]?.let { return it }
+
+        val usedSlots = taskSlotMap.values.toSet()
+        if (isMainLauncher && 2 !in usedSlots) {
+            taskSlotMap[taskId] = 2
+            return 2
+        }
+        if (preferredSlot != null && preferredSlot in 2..9 && preferredSlot !in usedSlots) {
+            taskSlotMap[taskId] = preferredSlot
             return preferredSlot
         }
-        val free = (2..9).firstOrNull { it !in activeWindowSlots } ?: 9
-        activeWindowSlots.add(free)
-        return free
+        val next = computeNextSlot(usedSlots) ?: 9
+        taskSlotMap[taskId] = next
+        return next
     }
 
     @Synchronized
-    fun releaseWindowSlot(slot: Int) {
-        activeWindowSlots.remove(slot)
+    fun releaseWindowSlot(taskId: Int) {
+        taskSlotMap.remove(taskId)
     }
 
     @Synchronized
-    fun activeWindowCount(): Int = activeWindowSlots.size
+    fun activeWindowCount(context: Context): Int {
+        pruneDeadTasks(context)
+        return taskSlotMap.size
+    }
 
     @Synchronized
-    fun peekNextWindowSlot(): Int? = (2..9).firstOrNull { it !in activeWindowSlots }
+    fun peekNextWindowSlot(context: Context): Int? {
+        pruneDeadTasks(context)
+        return computeNextSlot(taskSlotMap.values.toSet())
+    }
+
+    private fun computeNextSlot(usedSlots: Set<Int>): Int? {
+        if (usedSlots.size >= 8) return null
+        val maxUsed = usedSlots.maxOrNull() ?: 1
+        for (slot in (maxUsed + 1)..9) {
+            if (slot !in usedSlots) return slot
+        }
+        return (2..9).firstOrNull { it !in usedSlots }
+    }
 
     private const val PREF_SMALL_WIN = "dx_small_window_prefs"
     private const val KEY_WIN_W_DP = "small_win_w_dp"
     private const val KEY_WIN_H_DP = "small_win_h_dp"
 
     fun saveSmallWindowSizeDp(context: Context, widthDp: Int, heightDp: Int) {
-        val w = widthDp.coerceIn(260, 640)
-        val h = heightDp.coerceIn(300, 760)
+        val w = widthDp.coerceIn(220, 640)
+        val h = heightDp.coerceIn(280, 760)
         context.getSharedPreferences(PREF_SMALL_WIN, Context.MODE_PRIVATE)
             .edit()
             .putInt(KEY_WIN_W_DP, w)
@@ -80,8 +123,8 @@ object SystemCrossAppDragHelper {
 
     fun getSavedSmallWindowSizeDp(context: Context): Pair<Int, Int> {
         val prefs = context.getSharedPreferences(PREF_SMALL_WIN, Context.MODE_PRIVATE)
-        val w = prefs.getInt(KEY_WIN_W_DP, 300).coerceIn(260, 640)
-        val h = prefs.getInt(KEY_WIN_H_DP, 420).coerceIn(300, 760)
+        val w = prefs.getInt(KEY_WIN_W_DP, 260).coerceIn(220, 640)
+        val h = prefs.getInt(KEY_WIN_H_DP, 360).coerceIn(280, 760)
         return w to h
     }
 
@@ -90,7 +133,7 @@ object SystemCrossAppDragHelper {
     }
 
     fun openNewWindow(context: Context) {
-        val nextSlot = peekNextWindowSlot()
+        val nextSlot = peekNextWindowSlot(context)
         if (nextSlot == null) {
             Toast.makeText(context, "最多同時開啟 8 個小視窗（第 2～9 分區）", Toast.LENGTH_SHORT).show()
             return
@@ -98,10 +141,10 @@ object SystemCrossAppDragHelper {
         val dm = context.resources.displayMetrics
         val density = dm.density
         val (savedWDp, savedHDp) = getSavedSmallWindowSizeDp(context)
-        val winW = (savedWDp * density).toInt().coerceAtMost((dm.widthPixels * 0.68f).toInt())
-        val winH = (savedHDp * density).toInt().coerceAtMost((dm.heightPixels * 0.68f).toInt())
+        val winW = (savedWDp * density).toInt().coerceAtMost((dm.widthPixels * 0.62f).toInt())
+        val winH = (savedHDp * density).toInt().coerceAtMost((dm.heightPixels * 0.65f).toInt())
         val cascade = ((nextSlot - 2) % 4)
-        val stepPx = (28 * density).toInt()
+        val stepPx = (24 * density).toInt()
         val left = ((dm.widthPixels - winW) / 2 + (cascade - 1) * stepPx).coerceAtLeast(16)
         val top = ((dm.heightPixels - winH) / 2 + (cascade - 1) * stepPx).coerceAtLeast(48)
         val launchBounds = Rect(left, top, left + winW, top + winH)
@@ -116,7 +159,14 @@ object SystemCrossAppDragHelper {
                     Intent.FLAG_ACTIVITY_MULTIPLE_TASK
             )
         }
-        val options = ActivityOptions.makeBasic().setLaunchBounds(launchBounds)
+        val options = ActivityOptions.makeBasic().apply {
+            setLaunchBounds(launchBounds)
+            // 明確指定 WINDOWING_MODE_FREEFORM (5)，避免一般平板模式預設全螢幕開啟
+            runCatching {
+                javaClass.getMethod("setLaunchWindowingMode", Int::class.javaPrimitiveType)
+                    .invoke(this, WINDOWING_MODE_FREEFORM)
+            }
+        }
         runCatching { context.startActivity(intent, options.toBundle()) }
             .onFailure {
                 runCatching { context.startActivity(intent) }
