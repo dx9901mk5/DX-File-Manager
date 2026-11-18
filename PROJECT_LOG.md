@@ -178,7 +178,7 @@
   - GitHub 最後成功發布於 Releases 的版本：`v1.0.17` (`versionCode = 18`)。
   - 目前帳號 `dx9901mk5` 因系統停權（`403 Your account is suspended`）暫無法 `git push`；已透過 `help.github.com` 送出帳號恢復申訴，工單編號 **`#5015727`**（通知寄往 `dx9901mk5@gmail.com`）。待恢復後可將本機 `main`（含 `v1.0.18`～`v1.0.21`）推送至 `origin`。
 - **本機編譯與發布通道**：
-  - **最新本機簽名測試版 APK**：`v1.2.5` (`versionCode = 37`)，位於 `測試用/DX_fileManager-v1.2.5-release.apk`（固定簽名 `app/release.keystore`）。修正部分系統（One UI / OriginOS）未建立獨立第二個 App Task 的問題：於 `openNewWindow` 加上 `FLAG_ACTIVITY_NEW_DOCUMENT` ＋ 唯一 `data` URI（`dxfilemanager://window/<slot>`），並在 `AndroidManifest.xml` 加入 `android.allow_multiple_resumed_activities`，確保每個視窗皆為獨立 Task 且可同時活躍互動。
+  - **最新本機簽名測試版 APK**：`v1.2.6` (`versionCode = 38`)，位於 `測試用/DX_fileManager-v1.2.6-release.apk`（固定簽名 `app/release.keystore`）。縮小預設小視窗尺寸（`300dp × 420dp`、最小可縮至 `260dp × 300dp`），並透過 `SharedPreferences` 自動記憶用戶上次調整的小視窗寬高比例供下次開新視窗套用。
   - **本機編譯環境與注意事項（Windows 中文路徑）**：
     - `ANDROID_HOME`：`D:\Android\Sdk`（`adb.exe` 位於 `D:\Android\Sdk\platform-tools\adb.exe`）
     - `JAVA_HOME`：`C:\jdk-17\jdk-17.0.21+9`、`Gradle`：`C:\gradle-8.7\gradle-8.7\bin\gradle.bat`

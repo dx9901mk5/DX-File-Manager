@@ -64,6 +64,27 @@ object SystemCrossAppDragHelper {
     @Synchronized
     fun peekNextWindowSlot(): Int? = (2..9).firstOrNull { it !in activeWindowSlots }
 
+    private const val PREF_SMALL_WIN = "dx_small_window_prefs"
+    private const val KEY_WIN_W_DP = "small_win_w_dp"
+    private const val KEY_WIN_H_DP = "small_win_h_dp"
+
+    fun saveSmallWindowSizeDp(context: Context, widthDp: Int, heightDp: Int) {
+        val w = widthDp.coerceIn(260, 640)
+        val h = heightDp.coerceIn(300, 760)
+        context.getSharedPreferences(PREF_SMALL_WIN, Context.MODE_PRIVATE)
+            .edit()
+            .putInt(KEY_WIN_W_DP, w)
+            .putInt(KEY_WIN_H_DP, h)
+            .apply()
+    }
+
+    fun getSavedSmallWindowSizeDp(context: Context): Pair<Int, Int> {
+        val prefs = context.getSharedPreferences(PREF_SMALL_WIN, Context.MODE_PRIVATE)
+        val w = prefs.getInt(KEY_WIN_W_DP, 300).coerceIn(260, 640)
+        val h = prefs.getInt(KEY_WIN_H_DP, 420).coerceIn(300, 760)
+        return w to h
+    }
+
     fun clearBatchQueue() {
         batchQueueFiles.clear()
     }
@@ -76,10 +97,11 @@ object SystemCrossAppDragHelper {
         }
         val dm = context.resources.displayMetrics
         val density = dm.density
-        val winW = (380 * density).toInt().coerceAtMost((dm.widthPixels * 0.72f).toInt())
-        val winH = (520 * density).toInt().coerceAtMost((dm.heightPixels * 0.72f).toInt())
+        val (savedWDp, savedHDp) = getSavedSmallWindowSizeDp(context)
+        val winW = (savedWDp * density).toInt().coerceAtMost((dm.widthPixels * 0.68f).toInt())
+        val winH = (savedHDp * density).toInt().coerceAtMost((dm.heightPixels * 0.68f).toInt())
         val cascade = ((nextSlot - 2) % 4)
-        val stepPx = (36 * density).toInt()
+        val stepPx = (28 * density).toInt()
         val left = ((dm.widthPixels - winW) / 2 + (cascade - 1) * stepPx).coerceAtLeast(16)
         val top = ((dm.heightPixels - winH) / 2 + (cascade - 1) * stepPx).coerceAtLeast(48)
         val launchBounds = Rect(left, top, left + winW, top + winH)

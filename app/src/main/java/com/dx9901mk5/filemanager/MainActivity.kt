@@ -248,6 +248,17 @@ private fun DxFileManagerScreen(
     var isRatioEditMode by remember { mutableStateOf(false) }
     var smallWinPane1Expanded by remember { mutableStateOf(false) }
 
+    // 記憶用戶在小視窗模式下調整的寬高比例
+    LaunchedEffect(isSmallWindowMode, configuration.screenWidthDp, configuration.screenHeightDp) {
+        if (isSmallWindowMode && configuration.screenWidthDp in 240..640 && configuration.screenHeightDp in 280..780) {
+            SystemCrossAppDragHelper.saveSmallWindowSizeDp(
+                activityContext,
+                configuration.screenWidthDp,
+                configuration.screenHeightDp
+            )
+        }
+    }
+
     val pane1Expanded = if (isSmallWindowMode) {
         smallWinPane1Expanded
     } else if (isExpandedScreen || isLandscape) {
