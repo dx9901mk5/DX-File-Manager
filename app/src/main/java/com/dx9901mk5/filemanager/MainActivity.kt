@@ -268,10 +268,12 @@ private fun DxFileManagerScreen(
     }
     var customWinWidthDp by remember { mutableStateOf(initialSavedSize.first) }
     var customWinHeightDp by remember { mutableStateOf(initialSavedSize.second) }
-    val isEmbeddedScaledSmallWindow = isSmallWindowMode && configuration.screenWidthDp > 640
+    val hostActivity = smallWindowSaveContext as? Activity
+    val isSystemMultiWin = hostActivity?.isInMultiWindowMode == true
+    val isEmbeddedScaledSmallWindow = isSmallWindowMode && !isSystemMultiWin && configuration.screenWidthDp >= 440
 
-    LaunchedEffect(isSmallWindowMode, configuration.screenWidthDp, configuration.screenHeightDp) {
-        if (isSmallWindowMode && configuration.screenWidthDp in 220..640 && configuration.screenHeightDp in 280..760) {
+    LaunchedEffect(isSmallWindowMode, isSystemMultiWin, configuration.screenWidthDp, configuration.screenHeightDp) {
+        if (isSmallWindowMode && isSystemMultiWin && configuration.screenWidthDp in 220..640 && configuration.screenHeightDp in 280..760) {
             SystemCrossAppDragHelper.saveSmallWindowSizeDp(
                 smallWindowSaveContext,
                 configuration.screenWidthDp,
