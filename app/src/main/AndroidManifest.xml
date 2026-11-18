@@ -59,6 +59,7 @@
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation"
             android:exported="true"
             android:launchMode="standard"
+            android:resizeableActivity="true"
             android:windowSoftInputMode="adjustResize">
             <layout
                 android:defaultWidth="920dp"

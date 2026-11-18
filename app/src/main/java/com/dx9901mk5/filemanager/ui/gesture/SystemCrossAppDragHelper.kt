@@ -1,5 +1,6 @@
 package com.dx9901mk5.filemanager.ui.gesture
 
+import android.app.ActivityOptions
 import android.content.ClipData
 import android.content.ClipDescription
 import android.content.Context
@@ -8,6 +9,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Point
+import android.graphics.Rect
 import android.graphics.RectF
 import android.net.Uri
 import android.view.DragEvent
@@ -72,16 +74,26 @@ object SystemCrossAppDragHelper {
             Toast.makeText(context, "最多同時開啟 8 個小視窗（第 2～9 分區）", Toast.LENGTH_SHORT).show()
             return
         }
+        val dm = context.resources.displayMetrics
+        val density = dm.density
+        val winW = (380 * density).toInt().coerceAtMost((dm.widthPixels * 0.72f).toInt())
+        val winH = (520 * density).toInt().coerceAtMost((dm.heightPixels * 0.72f).toInt())
+        val cascade = ((nextSlot - 2) % 4)
+        val stepPx = (36 * density).toInt()
+        val left = ((dm.widthPixels - winW) / 2 + (cascade - 1) * stepPx).coerceAtLeast(16)
+        val top = ((dm.heightPixels - winH) / 2 + (cascade - 1) * stepPx).coerceAtLeast(48)
+        val launchBounds = Rect(left, top, left + winW, top + winH)
+
         val intent = Intent(context, MainActivity::class.java).apply {
             putExtra("extra_window_slot", nextSlot)
             putExtra("extra_small_window_mode", true)
-            addFlags(
-                Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_MULTIPLE_TASK or
-                    Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT
-            )
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
         }
-        runCatching { context.startActivity(intent) }
+        val options = ActivityOptions.makeBasic().setLaunchBounds(launchBounds)
+        runCatching { context.startActivity(intent, options.toBundle()) }
+            .onFailure {
+                runCatching { context.startActivity(intent) }
+            }
     }
 
     fun attachWindowDropReceiver(
