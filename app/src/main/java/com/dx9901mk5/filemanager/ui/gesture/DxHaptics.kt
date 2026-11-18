@@ -13,10 +13,7 @@ object DxHaptics {
      * 進入多選狀態的大振動提示 (長壓滿 1.5 秒)
      */
     fun strongVibrate(context: Context, view: View? = null) {
-        view?.performHapticFeedback(
-            HapticFeedbackConstants.LONG_PRESS,
-            HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
-        )
+        view?.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
         vibrate(context, durationMs = 95L, amplitude = 255)
     }
 
@@ -24,10 +21,7 @@ object DxHaptics {
      * 後續多選疊加的小震動提示 (第二指點擊加入)
      */
     fun lightVibrate(context: Context, view: View? = null) {
-        view?.performHapticFeedback(
-            HapticFeedbackConstants.KEYBOARD_TAP,
-            HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
-        )
+        view?.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
         vibrate(context, durationMs = 30L, amplitude = 120)
     }
 
@@ -40,10 +34,7 @@ object DxHaptics {
         } else {
             HapticFeedbackConstants.LONG_PRESS
         }
-        view?.performHapticFeedback(
-            constant,
-            HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING
-        )
+        view?.performHapticFeedback(constant)
         runCatching {
             val vibrator: Vibrator? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager

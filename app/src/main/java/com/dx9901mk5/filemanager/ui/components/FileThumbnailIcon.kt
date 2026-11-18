@@ -233,10 +233,14 @@ private fun decodeVideoThumbnail(path: String, targetPx: Int): Bitmap? {
     }
 }
 
-@Suppress("DEPRECATION")
 private fun decodeApkIcon(context: Context, path: String): Bitmap? {
     val pm: PackageManager = context.packageManager
-    val pkgInfo = pm.getPackageArchiveInfo(path, 0) ?: return null
+    val pkgInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        pm.getPackageArchiveInfo(path, PackageManager.PackageInfoFlags.of(0))
+    } else {
+        @Suppress("DEPRECATION")
+        pm.getPackageArchiveInfo(path, 0)
+    } ?: return null
     val appInfo = pkgInfo.applicationInfo ?: return null
     appInfo.sourceDir = path
     appInfo.publicSourceDir = path

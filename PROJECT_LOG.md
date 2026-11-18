@@ -178,7 +178,7 @@
   - GitHub 最後成功發布於 Releases 的版本：`v1.0.17` (`versionCode = 18`)。
   - 目前帳號 `dx9901mk5` 因系統停權（`403 Your account is suspended`）暫無法 `git push`；已透過 `help.github.com` 送出帳號恢復申訴，工單編號 **`#5015727`**（通知寄往 `dx9901mk5@gmail.com`）。待恢復後可將本機 `main`（含 `v1.0.18`～`v1.0.21`）推送至 `origin`。
 - **本機編譯與發布通道**：
-  - **最新本機簽名測試版 APK**：`v1.2.1` (`versionCode = 33`)，位於 `測試用/DX_fileManager-v1.2.1-release.apk`（固定簽名 `app/release.keystore`）。新增「應用程式」分頁顯示各 App 真實圖示（`InstalledAppIcon` + `LruCache`），並含 `v1.2.0` 跨 App 分割視窗拖曳自動分享與多選批次傳送佇列。
+  - **最新本機簽名測試版 APK**：`v1.2.2` (`versionCode = 34`)，位於 `測試用/DX_fileManager-v1.2.2-release.apk`（固定簽名 `app/release.keystore`）。為準備 Google Play 上架，升級 AGP `8.7.3`、Compose BOM `2024.12.01`、`core-ktx 1.15.0`、`work-runtime-ktx 2.10.0`、`play-services-auth 21.3.0`、`commons-compress 1.27.1`，並更新 `DxHaptics` 與 `FileThumbnailIcon` 棄用 API。
   - **本機編譯環境與注意事項（Windows 中文路徑）**：
     - `ANDROID_HOME`：`D:\Android\Sdk`（`adb.exe` 位於 `D:\Android\Sdk\platform-tools\adb.exe`）
     - `JAVA_HOME`：`C:\jdk-17\jdk-17.0.21+9`、`Gradle`：`C:\gradle-8.7\gradle-8.7\bin\gradle.bat`
