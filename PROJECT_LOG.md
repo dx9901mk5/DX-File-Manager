@@ -188,3 +188,15 @@
 - **OAuth 整合現況**：
   - **Google 雲端硬碟**：已完成 Google Cloud Console（`dx-file-manager-514912`）Android OAuth 用戶端設定。
   - **OneDrive (Azure)**：已完成升級並建立 `DX_fileManager` 應用程式註冊（Client ID：`5bea5b7f-d2fa-44e1-889d-bad83d2a3e77`、Redirect URI：`dxfilemanager://oauth2redirect`、`Files.ReadWrite.All` + `offline_access` + `User.Read`），且 `OAuth2AuthHelper.kt` 已改為 PKCE `response_type=code` 授權碼自動換取 Token。
+
+---
+
+## 5. Google Play 商店上架規劃紀錄（2026-11-18）
+- **雙版本分流策略（`full` 側載版 vs. `play` 商店版）**：
+  - **`play` 版必須移除**：`REQUEST_INSTALL_PACKAGES` 權限、App 內建自我更新下載 APK 按鈕（改由 Play 商店自動更新）。
+  - **`MANAGE_EXTERNAL_STORAGE`**：檔案管理器屬官方允許類別，需於 Play Console 填寫聲明並附 YouTube 不公開示範影片（範例檔案與腳本已備妥於 `示範影片/`）。
+  - **`QUERY_ALL_PACKAGES`（參考 Solid Explorer `pl.solidexplorer2` 做法）**：檔案管理器若具備裝置應用程式管理核心功能（瀏覽已安裝 App 資訊＋匯出備份 APK），可依「檔案管理／裝置管理核心功能」提出聲明並附影片佐證；**穩妥策略**為新帳號初審先上不含 `QUERY_ALL_PACKAGES` 的乾淨版，正式過審後再於下一版補申請加回（或連同示範影片一起送審）。
+  - **Shizuku 獨立外掛 APK 架構**：Play 版主體移除 `rikka.shizuku` 與安裝邏輯，改以同簽名權限（`protectionLevel="signature"`）的 Bound Service / Provider 偵測 GitHub 獨立發布的外掛 APK（如 `DX_Shizuku_Plugin.apk`），安裝外掛後主體選單自動出現 Shizuku 功能。
+  - **Google Drive 100 人上限擴充**：未過 Google Auth Platform 驗證＋CASA Tier 2 資安評估前上限為 100 位授權用戶（測試與初期上架夠用，後續達標再送 ADA 認可實驗室進行 CASA Tier 2 審查）。
+  - **新個人開發者帳號門檻**：須完成 **封閉測試（至少 12 位測試人員連續測試滿 14 天）** 後，由 Play Console 自動解鎖「申請正式發布權限」。
+  - **打包輸出**：使用 `gradle bundleRelease` 產出 `.aab`（並建議開啟 `isMinifyEnabled = true`）。
