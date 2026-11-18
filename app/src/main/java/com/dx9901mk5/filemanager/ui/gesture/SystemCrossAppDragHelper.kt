@@ -110,6 +110,19 @@ object SystemCrossAppDragHelper {
     private const val PREF_SMALL_WIN = "dx_small_window_prefs"
     private const val KEY_WIN_W_DP = "small_win_w_dp"
     private const val KEY_WIN_H_DP = "small_win_h_dp"
+    private const val KEY_SUPPRESS_FREEFORM_GUIDE = "suppress_freeform_guide"
+
+    fun isFreeformGuideSuppressed(context: Context): Boolean {
+        return context.getSharedPreferences(PREF_SMALL_WIN, Context.MODE_PRIVATE)
+            .getBoolean(KEY_SUPPRESS_FREEFORM_GUIDE, false)
+    }
+
+    fun setFreeformGuideSuppressed(context: Context, suppressed: Boolean) {
+        context.getSharedPreferences(PREF_SMALL_WIN, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_SUPPRESS_FREEFORM_GUIDE, suppressed)
+            .apply()
+    }
 
     fun saveSmallWindowSizeDp(context: Context, widthDp: Int, heightDp: Int) {
         val w = widthDp.coerceIn(220, 640)

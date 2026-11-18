@@ -52,6 +52,7 @@ import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -240,6 +241,8 @@ private fun DxFileManagerScreen(
     var showEmptyTrashConfirmDialog by remember { mutableStateOf(false) }
     var pendingDeleteRequest by remember { mutableStateOf<Triple<Int, List<VfsFile>, Boolean>?>(null) }
     var showExitConfirmDialog by remember { mutableStateOf(false) }
+    var showFreeformGuideDialog by remember { mutableStateOf(false) }
+    var dontShowFreeformGuideAgain by remember { mutableStateOf(false) }
     // Pair(paneIndex, prioritizeCreateOrCompress)
     var bottomActionBarState by remember { mutableStateOf<Pair<Int, Boolean>?>(null) }
 
@@ -556,7 +559,14 @@ private fun DxFileManagerScreen(
                     onOpenSettings = { showSettingsDialog = true },
                     onToggleDualPane = { viewModel.setPaneExpanded(isExpandedScreen, 3, !pane3Expanded) },
                     showDualPaneToggle = !isSmallWindowMode,
-                    onOpenNewWindow = { SystemCrossAppDragHelper.openNewWindow(activityContext) },
+                    onOpenNewWindow = {
+                        if (SystemCrossAppDragHelper.isFreeformGuideSuppressed(activityContext)) {
+                            SystemCrossAppDragHelper.openNewWindow(activityContext)
+                        } else {
+                            dontShowFreeformGuideAgain = false
+                            showFreeformGuideDialog = true
+                        }
+                    },
                     onOpenLocalRoot = {
                         viewModel.navigateToPath(
                             focusedPane,
@@ -994,6 +1004,71 @@ private fun DxFileManagerScreen(
                 dismissButton = {
                     TextButton(onClick = { showExitConfirmDialog = false }) {
                         Text("取消")
+                    }
+                }
+            )
+        }
+
+        if (showFreeformGuideDialog) {
+            AlertDialog(
+                onDismissRequest = { showFreeformGuideDialog = false },
+                title = { Text("多重視窗（自由小視窗）說明") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "若要在一般平板／折疊機模式下直接彈出可自由縮放的多個小視窗（最多 8 個），請先至手機「設定 → 系統管理／其他設定 → 開發人員選項」開啟以下兩項：",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            text = "1. 將活動強制設為可調整大小\n2. 啟用自由形式視窗",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            text = "（若使用三星 DeX 或系統桌面模式，通常已自動支援）",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(
+                            modifier = Modifier
+                                .clickable { dontShowFreeformGuideAgain = !dontShowFreeformGuideAgain }
+                                .padding(top = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = dontShowFreeformGuideAgain,
+                                onCheckedChange = { dontShowFreeformGuideAgain = it }
+                            )
+                            Text("不再提醒此說明", style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = {
+                        if (dontShowFreeformGuideAgain) {
+                            SystemCrossAppDragHelper.setFreeformGuideSuppressed(activityContext, true)
+                        }
+                        showFreeformGuideDialog = false
+                        SystemCrossAppDragHelper.openNewWindow(activityContext)
+                    }) {
+                        Text("開啟小視窗")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = {
+                        if (dontShowFreeformGuideAgain) {
+                            SystemCrossAppDragHelper.setFreeformGuideSuppressed(activityContext, true)
+                        }
+                        showFreeformGuideDialog = false
+                        runCatching {
+                            val devIntent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            activityContext.startActivity(devIntent)
+                        }
+                    }) {
+                        Text("前往開發人員選項")
                     }
                 }
             )
