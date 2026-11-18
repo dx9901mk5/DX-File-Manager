@@ -20,6 +20,7 @@ import android.widget.Toast
 import androidx.compose.runtime.mutableStateListOf
 import androidx.core.content.FileProvider
 import com.dx9901mk5.filemanager.MainActivity
+import com.dx9901mk5.filemanager.core.shortcut.ShortcutHelper
 import com.dx9901mk5.filemanager.core.vfs.VfsFile
 import java.io.File
 import java.net.URLConnection
@@ -234,7 +235,10 @@ object SystemCrossAppDragHelper {
                         !session.acceptedByDxWindow
                     ) {
                         if (!event.result) {
-                            shareFilesViaSystem(v.context, session.files)
+                            // 拖曳至桌面放開（系統桌面不消費 ACTION_DROP，event.result 為 false）：建立桌面捷徑
+                            ShortcutHelper.pinFilesToDesktop(v.context, session.files) {
+                                shareFilesViaSystem(v.context, session.files)
+                            }
                         } else if (session.files.size > 1) {
                             batchQueueFiles.clear()
                             batchQueueFiles.addAll(session.files.drop(1))
@@ -252,14 +256,15 @@ object SystemCrossAppDragHelper {
         context: Context,
         files: List<VfsFile>
     ): Boolean {
-        val localFiles = files
-            .filter { !it.isDirectory && it.mountId == "local" }
+        val localEntries = files
+            .filter { it.mountId == "local" }
             .mapNotNull { vf ->
                 val f = File(vf.path)
-                if (f.exists() && f.isFile) vf to f else null
+                if (f.exists()) vf to f else null
             }
-        if (localFiles.isEmpty()) return false
+        if (localEntries.isEmpty()) return false
 
+        val localFiles = localEntries.filter { it.second.isFile }
         val authority = "${context.packageName}.fileprovider"
         val urisAndMimes = localFiles.mapNotNull { (_, file) ->
             runCatching {
@@ -268,33 +273,36 @@ object SystemCrossAppDragHelper {
                 uri to mime
             }.getOrNull()
         }
-        if (urisAndMimes.isEmpty()) return false
 
-        val mimeTypes = (urisAndMimes.map { it.second } + ClipDescription.MIMETYPE_TEXT_URILIST)
-            .distinct()
-            .toTypedArray()
-        val label = if (localFiles.size == 1) {
-            localFiles.first().first.name
+        val label = if (localEntries.size == 1) {
+            localEntries.first().first.name
         } else {
-            "${localFiles.size} 個檔案"
+            "${localEntries.size} 個項目"
         }
 
-        val firstUri: Uri = urisAndMimes.first().first
-        val clipDescription = ClipDescription(label, mimeTypes)
-        val clipData = ClipData(clipDescription, ClipData.Item(firstUri))
-        for (i in 1 until urisAndMimes.size) {
-            clipData.addItem(ClipData.Item(urisAndMimes[i].first))
+        val clipData = if (urisAndMimes.isNotEmpty()) {
+            val mimeTypes = (urisAndMimes.map { it.second } + ClipDescription.MIMETYPE_TEXT_URILIST)
+                .distinct()
+                .toTypedArray()
+            val firstUri: Uri = urisAndMimes.first().first
+            ClipData(ClipDescription(label, mimeTypes), ClipData.Item(firstUri)).apply {
+                for (i in 1 until urisAndMimes.size) {
+                    addItem(ClipData.Item(urisAndMimes[i].first))
+                }
+            }
+        } else {
+            ClipData.newPlainText(label, localEntries.joinToString("\n") { it.second.absolutePath })
         }
 
         val shadowBuilder = DxFileDragShadowBuilder(
             density = context.resources.displayMetrics.density,
             label = label,
-            count = urisAndMimes.size
+            count = localEntries.size
         )
 
         val session = DxDragSession(
             sourceViewIdentity = System.identityHashCode(view),
-            files = localFiles.map { it.first }
+            files = localEntries.map { it.first }
         )
 
         val flags = View.DRAG_FLAG_GLOBAL or View.DRAG_FLAG_GLOBAL_URI_READ

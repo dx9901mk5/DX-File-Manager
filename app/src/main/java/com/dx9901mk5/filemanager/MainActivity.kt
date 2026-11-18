@@ -141,12 +141,7 @@ class MainActivity : ComponentActivity() {
             isMainLauncher = isMainLauncher
         )
 
-        intent.getStringExtra("shortcut_path")?.let { path ->
-            val target = File(path)
-            if (target.exists() && target.isDirectory) {
-                viewModel.navigateToPath(2, target.absolutePath)
-            }
-        }
+        handleShortcutIntent(intent)
 
         setContent {
             val settings by viewModel.settings.collectAsState()
@@ -178,6 +173,32 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         OAuth2AuthHelper.handleRedirectIntent(intent)
+        handleShortcutIntent(intent)
+    }
+
+    private fun handleShortcutIntent(intent: Intent?) {
+        val path = intent?.getStringExtra("shortcut_path") ?: return
+        val target = File(path)
+        if (!target.exists()) return
+        if (target.isDirectory) {
+            viewModel.navigateToPath(2, target.absolutePath)
+        } else {
+            target.parentFile?.let { parent ->
+                if (parent.exists() && parent.isDirectory) {
+                    viewModel.navigateToPath(2, parent.absolutePath)
+                }
+            }
+            viewModel.openFile(
+                VfsFile(
+                    name = target.name,
+                    path = target.absolutePath,
+                    isDirectory = false,
+                    size = target.length(),
+                    lastModified = target.lastModified(),
+                    mountId = "local"
+                )
+            )
+        }
     }
 
     private fun ensureNotificationPermission() {

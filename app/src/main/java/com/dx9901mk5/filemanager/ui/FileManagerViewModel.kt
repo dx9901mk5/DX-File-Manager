@@ -7,6 +7,7 @@ import android.os.Environment
 import android.widget.Toast
 import androidx.core.content.FileProvider
 import androidx.core.content.pm.ShortcutInfoCompat
+import com.dx9901mk5.filemanager.core.shortcut.ShortcutHelper
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.lifecycle.AndroidViewModel
@@ -559,21 +560,9 @@ class FileManagerViewModel(application: Application) : AndroidViewModel(applicat
     }
 
     fun createHomeScreenShortcut(file: VfsFile) {
-        if (!ShortcutManagerCompat.isRequestPinShortcutSupported(app)) {
+        ShortcutHelper.pinFilesToDesktop(app, listOf(file)) {
             toast("目前桌面不支援釘選捷徑")
-            return
         }
-        val intent = Intent(app, MainActivity::class.java).apply {
-            action = Intent.ACTION_VIEW
-            putExtra("shortcut_path", file.path)
-        }
-        val shortcut = ShortcutInfoCompat.Builder(app, "dx_shortcut_${file.path.hashCode()}")
-            .setShortLabel(file.name)
-            .setIcon(IconCompat.createWithResource(app, android.R.drawable.sym_def_app_icon))
-            .setIntent(intent)
-            .build()
-        ShortcutManagerCompat.requestPinShortcut(app, shortcut, null)
-        toast("已請求建立桌面捷徑：${file.name}")
     }
 
     fun exportSelectedApps(packageNames: List<String>) {

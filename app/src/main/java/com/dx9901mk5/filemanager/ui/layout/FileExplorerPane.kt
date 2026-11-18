@@ -264,6 +264,46 @@ fun FileExplorerPane(
                                     overflow = TextOverflow.Ellipsis
                                 )
                             }
+                            val isBackHovered = dragController.isDragging &&
+                                dragController.hoveredBackButtonPane == state.paneIndex
+                            val backHoverScale by animateFloatAsState(
+                                targetValue = if (isBackHovered) 1.35f else 1f,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMedium
+                                ),
+                                label = "BackButtonHoverScale"
+                            )
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .scale(backHoverScale)
+                                    .then(
+                                        if (isBackHovered) {
+                                            Modifier
+                                                .background(
+                                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
+                                                    CircleShape
+                                                )
+                                                .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                                        } else {
+                                            Modifier
+                                        }
+                                    )
+                                    .onGloballyPositioned { coords ->
+                                        dragController.updateBackButtonBounds(state.paneIndex, coords.boundsInRoot())
+                                    }
+                            ) {
+                                IconButton(onClick = onNavigateUp, modifier = Modifier.size(30.dp)) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = "上一層",
+                                        tint = if (isBackHovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                FolderMagnifierBadge(visible = isBackHovered)
+                            }
                             IconButton(onClick = { showSearchBar = !showSearchBar }, modifier = Modifier.size(30.dp)) {
                                 Icon(
                                     Icons.Default.Search,
@@ -375,46 +415,6 @@ fun FileExplorerPane(
                         .padding(horizontal = 10.dp, vertical = 2.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val isBackHovered = dragController.isDragging &&
-                        dragController.hoveredBackButtonPane == state.paneIndex
-                    val backHoverScale by animateFloatAsState(
-                        targetValue = if (isBackHovered) 1.35f else 1f,
-                        animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessMedium
-                        ),
-                        label = "BackButtonHoverScale"
-                    )
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier
-                            .scale(backHoverScale)
-                            .then(
-                                if (isBackHovered) {
-                                    Modifier
-                                        .background(
-                                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f),
-                                            CircleShape
-                                        )
-                                        .border(1.5.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                                } else {
-                                    Modifier
-                                }
-                            )
-                            .onGloballyPositioned { coords ->
-                                dragController.updateBackButtonBounds(state.paneIndex, coords.boundsInRoot())
-                            }
-                    ) {
-                        IconButton(onClick = onNavigateUp, modifier = Modifier.size(28.dp)) {
-                            Icon(
-                                Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "上一層",
-                                tint = if (isBackHovered) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                        FolderMagnifierBadge(visible = isBackHovered)
-                    }
                     Row(
                         modifier = Modifier
                             .weight(1f)
