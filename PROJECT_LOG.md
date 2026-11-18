@@ -169,6 +169,7 @@
 - 區網網頁分享伺服器：`DxWebShareServer.kt`
 - 壓縮加密與垃圾桶：`ArchiveAndCryptoManager.kt`、`TrashDatabase.kt`、`TrashManager.kt`、`TrashCleanupWorker.kt`
 - Shizuku 與更新檢查：`ShizukuApkInstaller.kt`、`UpdateChecker.kt`
+- 桌面捷徑與縮圖：`ShortcutHelper.kt`
 - CI/CD 自動編譯發布：`.github/workflows/build.yml`
 
 ---
@@ -178,11 +179,13 @@
   - GitHub 最後成功發布於 Releases 的版本：`v1.0.17` (`versionCode = 18`)。
   - 目前帳號 `dx9901mk5` 因系統停權（`403 Your account is suspended`）暫無法 `git push`；已透過 `help.github.com` 送出帳號恢復申訴，工單編號 **`#5015727`**（通知寄往 `dx9901mk5@gmail.com`）。待恢復後可將本機 `main`（含 `v1.0.18`～`v2.0.1`）推送至 `origin`。
 - **本機編譯與發布通道**：
-  - **最新本機簽名測試版 APK**：`v2.0.1` (`versionCode = 201`)，位於 `測試用/DX_fileManager-v2.0.1-release.apk` 與 `release_apks/DX_fileManager-v2.0.1-release.apk`（固定簽名 `app/release.keystore`，`55,838,914 bytes`）。
-  - **近期關鍵更新摘要（v1.2.7 → v1.2.8 → v2.0.1）**：
+  - **最新本機簽名測試版 APK**：`v2.1.1` (`versionCode = 211`)，位於 `測試用/DX_fileManager-v2.1.1-release.apk` 與 `release_apks/DX_fileManager-v2.1.1-release.apk`（固定簽名 `app/release.keystore`，`55,871,682 bytes`）。
+  - **近期關鍵更新摘要（v1.2.7 → v2.1.1）**：
     - `v1.2.7`：於 `SystemCrossAppDragHelper.openNewWindow` 補上 `WINDOWING_MODE_FREEFORM (5)` 反射設定並縮小預設啟動尺寸（`260dp × 360dp`、Manifest `280dp × 380dp`）；改以 `ActivityManager.appTasks` 核對存活 Task（`taskSlotMap`），修正主視窗與多開分區編號錯亂問題。
-    - `v1.2.8`：`AboutAndUpdateDialog.kt` 與 `UpdateChecker.kt` 改為檢查更新發現新版本即自動開始下載、於主執行緒節流更新進度條與已下載 MB / 百分比（支援無 `Content-Length` 時切換動態進度條），完成後自動觸發安裝。
-    - `v2.0.1`：針對折疊機（如 Vivo `V2545A` / OriginOS）忽略第三方 Freeform 啟動參數的情況，將內建縮小卡片條件改為 `isSmallWindowMode && !isSystemMultiWin && configuration.screenWidthDp >= 440`，開新視窗先以小視窗卡片呈現並可拖曳右下角手把調整與記憶寬高比例；進入系統小視窗/分屏後自動展開填滿。
+    - `v1.2.8`：`AboutAndUpdateDialog.kt` 與 `UpdateChecker.kt` 改為檢查更新發現新版本即自動開始下載、於主執行緒節流更新進度條與已下載 MB / 百分比，完成後自動觸發安裝。
+    - `v2.0.2`：恢復原生 `WINDOWING_MODE_FREEFORM` 方案 1 自由小視窗模式；`UpdateChecker.kt` 新增 Google 雲端硬碟「正式版／測試版」資料夾備援解析與直接下載（因應 GitHub API 停權 404）。
+    - `v2.0.3`：點擊「開新視窗」時新增「多重視窗（自由小視窗）說明」對話框，引導開啟開發人員選項「將活動強制設為可調整大小」與「啟用自由形式視窗」，附「前往開發人員選項」快捷鈕與「不再提醒」選項。
+    - `v2.1.1`：新增 `ShortcutHelper.kt`，檔案／資料夾拖曳至桌面放開時自動建立桌面捷徑（圖片／影片使用縮圖、壓縮檔與文書／音訊／APK 呈現專屬類型圖示），並補齊點擊桌面捷徑定位及開啟檔案；將「上一層（←）」按鈕移至上方圓角膠囊列內（資料夾名稱右側），方便小視窗點擊。
   - **本機編譯環境與注意事項（Windows 中文路徑）**：
     - Android SDK：`C:\Users\dx990\AppData\Local\Android\Sdk`（`adb.exe` 可直接於終端呼叫）
     - 因專案路徑含中文字元且 Google Drive 同步會鎖定 `build/`，需先 `robocopy` 原始碼至純英文暫存路徑 `C:\dx_build_tmp`（`local.properties` 設為 `sdk.dir=C:/Users/dx990/AppData/Local/Android/Sdk`）執行 `gradle assembleRelease --no-daemon`，再複製 APK 回 `測試用/` 與 `release_apks/`。
