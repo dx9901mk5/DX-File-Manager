@@ -111,6 +111,7 @@ fun NavigationPane(
     onGoHome: () -> Unit,
     onOpenSettings: () -> Unit,
     onToggleDualPane: () -> Unit,
+    showDualPaneToggle: Boolean = true,
     onOpenNewWindow: () -> Unit = {},
     onOpenLocalRoot: () -> Unit,
     onOpenCloudMount: (VfsMountConfig) -> Unit,
@@ -162,12 +163,14 @@ fun NavigationPane(
                         tint = MaterialTheme.colorScheme.onBackground
                     )
                 }
-                IconButton(onClick = onToggleDualPane) {
-                    Icon(
-                        Icons.Default.Splitscreen,
-                        contentDescription = "切換雙欄",
-                        tint = MaterialTheme.colorScheme.onBackground
-                    )
+                if (showDualPaneToggle) {
+                    IconButton(onClick = onToggleDualPane) {
+                        Icon(
+                            Icons.Default.Splitscreen,
+                            contentDescription = "切換雙欄",
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
                 }
                 IconButton(onClick = onOpenNewWindow) {
                     Icon(

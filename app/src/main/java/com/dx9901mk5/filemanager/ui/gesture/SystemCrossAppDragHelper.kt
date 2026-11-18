@@ -13,6 +13,7 @@ import android.net.Uri
 import android.view.DragEvent
 import android.view.View
 import android.webkit.MimeTypeMap
+import android.widget.Toast
 import androidx.compose.runtime.mutableStateListOf
 import androidx.core.content.FileProvider
 import com.dx9901mk5.filemanager.MainActivity
@@ -37,12 +38,43 @@ object SystemCrossAppDragHelper {
 
     val batchQueueFiles = mutableStateListOf<VfsFile>()
 
+    private val activeWindowSlots = mutableSetOf<Int>()
+
+    @Synchronized
+    fun allocateWindowSlot(preferredSlot: Int? = null): Int {
+        if (preferredSlot != null && preferredSlot in 2..9 && preferredSlot !in activeWindowSlots) {
+            activeWindowSlots.add(preferredSlot)
+            return preferredSlot
+        }
+        val free = (2..9).firstOrNull { it !in activeWindowSlots } ?: 9
+        activeWindowSlots.add(free)
+        return free
+    }
+
+    @Synchronized
+    fun releaseWindowSlot(slot: Int) {
+        activeWindowSlots.remove(slot)
+    }
+
+    @Synchronized
+    fun activeWindowCount(): Int = activeWindowSlots.size
+
+    @Synchronized
+    fun peekNextWindowSlot(): Int? = (2..9).firstOrNull { it !in activeWindowSlots }
+
     fun clearBatchQueue() {
         batchQueueFiles.clear()
     }
 
     fun openNewWindow(context: Context) {
+        val nextSlot = peekNextWindowSlot()
+        if (nextSlot == null) {
+            Toast.makeText(context, "最多同時開啟 8 個小視窗（第 2～9 分區）", Toast.LENGTH_SHORT).show()
+            return
+        }
         val intent = Intent(context, MainActivity::class.java).apply {
+            putExtra("extra_window_slot", nextSlot)
+            putExtra("extra_small_window_mode", true)
             addFlags(
                 Intent.FLAG_ACTIVITY_NEW_TASK or
                     Intent.FLAG_ACTIVITY_MULTIPLE_TASK or

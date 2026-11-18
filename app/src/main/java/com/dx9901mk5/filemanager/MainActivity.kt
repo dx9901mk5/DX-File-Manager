@@ -117,6 +117,7 @@ import java.io.File
 
 class MainActivity : ComponentActivity() {
     private val viewModel: FileManagerViewModel by viewModels()
+    private var assignedWindowSlot: Int = 2
 
     private val requestNotificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { _ -> }
@@ -128,6 +129,10 @@ class MainActivity : ComponentActivity() {
         ensureStoragePermission()
         ensureNotificationPermission()
         OAuth2AuthHelper.handleRedirectIntent(intent)
+
+        val preferredSlot = intent.getIntExtra("extra_window_slot", -1).takeIf { it in 2..9 }
+        val launchedAsSmallWindow = intent.getBooleanExtra("extra_small_window_mode", false)
+        assignedWindowSlot = SystemCrossAppDragHelper.allocateWindowSlot(preferredSlot)
 
         intent.getStringExtra("shortcut_path")?.let { path ->
             val target = File(path)
@@ -141,6 +146,7 @@ class MainActivity : ComponentActivity() {
             val windowSizeClass = calculateWindowSizeClass(this)
             val isExpandedScreen = windowSizeClass.widthSizeClass != WindowWidthSizeClass.Compact
             val isLargeTablet = windowSizeClass.widthSizeClass == WindowWidthSizeClass.Expanded
+            val isSmallWindowMode = isInMultiWindowMode || launchedAsSmallWindow || assignedWindowSlot > 2
 
             DxFileManagerTheme(
                 darkTheme = settings.darkTheme,
@@ -149,10 +155,17 @@ class MainActivity : ComponentActivity() {
                 DxFileManagerScreen(
                     viewModel = viewModel,
                     isExpandedScreen = isExpandedScreen,
-                    isLargeTablet = isLargeTablet
+                    isLargeTablet = isLargeTablet,
+                    windowSlot = assignedWindowSlot,
+                    isSmallWindowMode = isSmallWindowMode
                 )
             }
         }
+    }
+
+    override fun onDestroy() {
+        SystemCrossAppDragHelper.releaseWindowSlot(assignedWindowSlot)
+        super.onDestroy()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -184,7 +197,9 @@ class MainActivity : ComponentActivity() {
 private fun DxFileManagerScreen(
     viewModel: FileManagerViewModel,
     isExpandedScreen: Boolean,
-    isLargeTablet: Boolean
+    isLargeTablet: Boolean,
+    windowSlot: Int = 2,
+    isSmallWindowMode: Boolean = false
 ) {
     val settings by viewModel.settings.collectAsState()
     val pane2State by viewModel.pane2State.collectAsState()
@@ -229,12 +244,31 @@ private fun DxFileManagerScreen(
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val showPane3 = true
+    val showPane3 = !isSmallWindowMode
     var isRatioEditMode by remember { mutableStateOf(false) }
+    var smallWinPane1Expanded by remember { mutableStateOf(false) }
 
-    val pane1Expanded = if (isExpandedScreen || isLandscape) settings.pane1ExpandedTablet else settings.pane1ExpandedCompact
-    val pane2Expanded = if (isExpandedScreen || isLandscape) settings.pane2ExpandedTablet else settings.pane2ExpandedCompact
-    val pane3Expanded = if (isExpandedScreen || isLandscape) settings.pane3ExpandedTablet else settings.pane3ExpandedCompact
+    val pane1Expanded = if (isSmallWindowMode) {
+        smallWinPane1Expanded
+    } else if (isExpandedScreen || isLandscape) {
+        settings.pane1ExpandedTablet
+    } else {
+        settings.pane1ExpandedCompact
+    }
+    val pane2Expanded = if (isSmallWindowMode) {
+        true
+    } else if (isExpandedScreen || isLandscape) {
+        settings.pane2ExpandedTablet
+    } else {
+        settings.pane2ExpandedCompact
+    }
+    val pane3Expanded = if (isSmallWindowMode) {
+        false
+    } else if (isExpandedScreen || isLandscape) {
+        settings.pane3ExpandedTablet
+    } else {
+        settings.pane3ExpandedCompact
+    }
 
     val activityContext = LocalContext.current
     val hapticView = LocalView.current
@@ -470,7 +504,13 @@ private fun DxFileManagerScreen(
             pane1Expanded = pane1Expanded,
             pane2Expanded = pane2Expanded,
             pane3Expanded = pane3Expanded,
-            onPaneExpandedChange = { idx, exp -> viewModel.setPaneExpanded(isExpandedScreen, idx, exp) },
+            onPaneExpandedChange = { idx, exp ->
+                if (isSmallWindowMode) {
+                    if (idx == 1) smallWinPane1Expanded = exp
+                } else {
+                    viewModel.setPaneExpanded(isExpandedScreen, idx, exp)
+                }
+            },
             autoCollapseUnusedPaneOnDrag = dragController.activePaneIndexDuringDrag,
             keepAliveSourcePane = if (dragController.isHolding) dragController.sourcePaneIndex else null,
             hoveredExpandButtonPane = dragController.hoveredExpandButtonPane,
@@ -494,6 +534,7 @@ private fun DxFileManagerScreen(
                     },
                     onOpenSettings = { showSettingsDialog = true },
                     onToggleDualPane = { viewModel.setPaneExpanded(isExpandedScreen, 3, !pane3Expanded) },
+                    showDualPaneToggle = !isSmallWindowMode,
                     onOpenNewWindow = { SystemCrossAppDragHelper.openNewWindow(activityContext) },
                     onOpenLocalRoot = {
                         viewModel.navigateToPath(
@@ -555,7 +596,9 @@ private fun DxFileManagerScreen(
                     onToggleSystemApps = { viewModel.toggleSystemApps() },
                     onExportSelectedApps = { viewModel.exportSelectedApps(selectedAppPackages.toList()) },
                     onRestoreTrashItem = { viewModel.restoreTrashItem(it) },
-                    onEmptyTrash = { showEmptyTrashConfirmDialog = true }
+                    onEmptyTrash = { showEmptyTrashConfirmDialog = true },
+                    windowPartitionLabel = if (isSmallWindowMode) "第 $windowSlot 分區" else null,
+                    isSmallWindowMode = isSmallWindowMode
                 )
             },
             pane3Content = { onCollapse ->
@@ -602,7 +645,9 @@ private fun DxFileManagerScreen(
                     onToggleSystemApps = { viewModel.toggleSystemApps() },
                     onExportSelectedApps = { viewModel.exportSelectedApps(selectedAppPackages.toList()) },
                     onRestoreTrashItem = { viewModel.restoreTrashItem(it) },
-                    onEmptyTrash = { showEmptyTrashConfirmDialog = true }
+                    onEmptyTrash = { showEmptyTrashConfirmDialog = true },
+                    windowPartitionLabel = if (isSmallWindowMode) "第 $windowSlot 分區" else null,
+                    isSmallWindowMode = isSmallWindowMode
                 )
             }
         )

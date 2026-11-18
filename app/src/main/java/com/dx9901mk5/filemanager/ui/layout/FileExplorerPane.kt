@@ -156,7 +156,9 @@ fun FileExplorerPane(
     onToggleSystemApps: () -> Unit,
     onExportSelectedApps: () -> Unit,
     onRestoreTrashItem: (TrashItemEntity) -> Unit,
-    onEmptyTrash: () -> Unit
+    onEmptyTrash: () -> Unit,
+    windowPartitionLabel: String? = null,
+    isSmallWindowMode: Boolean = false
 ) {
     var showSearchBar by remember { mutableStateOf(false) }
     var rubberBandRect by remember { mutableStateOf<Rect?>(null) }
@@ -248,7 +250,7 @@ fun FileExplorerPane(
                                 modifier = Modifier.padding(horizontal = 6.dp)
                             ) {
                                 Text(
-                                    text = currentTitle,
+                                    text = if (windowPartitionLabel != null) "[$windowPartitionLabel] $currentTitle" else currentTitle,
                                     style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                                     color = MaterialTheme.colorScheme.onSurface,
                                     maxLines = 1,
@@ -619,7 +621,7 @@ fun FileExplorerPane(
                             onPrimaryFingerDrag = { localOffset, hoveredPath ->
                                 onHideBottomActionBar()
                                 val rootOffset = listContainerRootOffset + localOffset
-                                val isMultiWin = (context as? Activity)?.isInMultiWindowMode == true
+                                val isMultiWin = isSmallWindowMode || (context as? Activity)?.isInMultiWindowMode == true
                                 val marginPx = if (isMultiWin) 24f else -4f
                                 val w = hapticView.width.toFloat()
                                 val h = hapticView.height.toFloat()
