@@ -25,10 +25,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,15 +34,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
-import kotlin.math.roundToInt
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -261,16 +254,10 @@ private fun DxFileManagerScreen(
     var isRatioEditMode by remember { mutableStateOf(false) }
     var smallWinPane1Expanded by remember { mutableStateOf(false) }
 
-    // 記憶用戶在小視窗模式下調整的寬高比例
+    // 記憶用戶在原生小視窗模式下調整的寬高比例
     val smallWindowSaveContext = LocalContext.current
-    val initialSavedSize = remember(smallWindowSaveContext) {
-        SystemCrossAppDragHelper.getSavedSmallWindowSizeDp(smallWindowSaveContext)
-    }
-    var customWinWidthDp by remember { mutableStateOf(initialSavedSize.first) }
-    var customWinHeightDp by remember { mutableStateOf(initialSavedSize.second) }
     val hostActivity = smallWindowSaveContext as? Activity
     val isSystemMultiWin = hostActivity?.isInMultiWindowMode == true
-    val isEmbeddedScaledSmallWindow = isSmallWindowMode && !isSystemMultiWin && configuration.screenWidthDp >= 440
 
     LaunchedEffect(isSmallWindowMode, isSystemMultiWin, configuration.screenWidthDp, configuration.screenHeightDp) {
         if (isSmallWindowMode && isSystemMultiWin && configuration.screenWidthDp in 220..640 && configuration.screenHeightDp in 280..760) {
@@ -527,8 +514,7 @@ private fun DxFileManagerScreen(
                 }
             }
     ) {
-        val scaffoldContent: @Composable () -> Unit = {
-            ThreePaneScaffold(
+        ThreePaneScaffold(
             isExpandedScreen = isExpandedScreen,
             isLargeTablet = isLargeTablet,
             showPane3 = showPane3,
@@ -685,69 +671,7 @@ private fun DxFileManagerScreen(
                     isSmallWindowMode = isSmallWindowMode
                 )
             }
-            )
-        }
-
-        if (isEmbeddedScaledSmallWindow) {
-            val density = LocalDensity.current
-            val maxAvailW = (configuration.screenWidthDp - 32).coerceAtLeast(240)
-            val maxAvailH = (configuration.screenHeightDp - 48).coerceAtLeast(300)
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Surface(
-                    modifier = Modifier
-                        .width(customWinWidthDp.coerceIn(220, maxAvailW).dp)
-                        .height(customWinHeightDp.coerceIn(280, maxAvailH).dp),
-                    shape = RoundedCornerShape(18.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 6.dp,
-                    shadowElevation = 14.dp,
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
-                ) {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        scaffoldContent()
-                        // 右下角自由縮放手把，拖曳後自動記憶小視窗比例
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .size(28.dp)
-                                .pointerInput(Unit) {
-                                    detectDragGestures(
-                                        onDragEnd = {
-                                            SystemCrossAppDragHelper.saveSmallWindowSizeDp(
-                                                smallWindowSaveContext,
-                                                customWinWidthDp,
-                                                customWinHeightDp
-                                            )
-                                        }
-                                    ) { change, dragAmount ->
-                                        change.consume()
-                                        val dxDp = with(density) { dragAmount.x.toDp().value }.roundToInt()
-                                        val dyDp = with(density) { dragAmount.y.toDp().value }.roundToInt()
-                                        customWinWidthDp = (customWinWidthDp + dxDp).coerceIn(220, maxAvailW)
-                                        customWinHeightDp = (customWinHeightDp + dyDp).coerceIn(280, maxAvailH)
-                                    }
-                                }
-                                .padding(6.dp),
-                            contentAlignment = Alignment.BottomEnd
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(10.dp)
-                                    .background(
-                                        MaterialTheme.colorScheme.primary.copy(alpha = 0.65f),
-                                        RoundedCornerShape(3.dp)
-                                    )
-                            )
-                        }
-                    }
-                }
-            }
-        } else {
-            scaffoldContent()
-        }
+        )
 
         // 全域雙指堆疊拖曳預覽層
         DragAndDropOverlay(dragController)

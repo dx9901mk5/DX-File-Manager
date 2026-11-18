@@ -19,44 +19,117 @@ data class ReleaseInfo(
 )
 
 object UpdateChecker {
-    private val client = OkHttpClient()
+    private val client = OkHttpClient.Builder()
+        .followRedirects(true)
+        .followSslRedirects(true)
+        .build()
+
+    private const val DRIVE_RELEASE_FOLDER_ID = "1JrrkNtKZZIGEvpLaHuXRxGiCRJPQO6Vu"
+    private const val DRIVE_TEST_FOLDER_ID = "1h_I2rDnRJvTYe2V0_04AM9hAnk17wO5x"
+
+    private val driveEntryRegex = Regex(
+        """/file/d/([A-Za-z0-9_-]+)/view[^>]*>.*?class="flip-entry-title">([^<]+\.apk)</div>""",
+        setOf(RegexOption.DOT_MATCHES_ALL, RegexOption.IGNORE_CASE)
+    )
+    private val versionInNameRegex = Regex("""v?(\d+(?:\.\d+)+)""", RegexOption.IGNORE_CASE)
 
     suspend fun checkLatestRelease(): Result<ReleaseInfo> = withContext(Dispatchers.IO) {
         runCatching {
-            val req = Request.Builder()
-                .url(BuildConfig.GITHUB_API_LATEST)
-                .header("Accept", "application/vnd.github+json")
-                .build()
+            val candidates = mutableListOf<ReleaseInfo>()
 
-            client.newCall(req).execute().use { resp ->
-                if (!resp.isSuccessful) {
-                    throw IllegalStateException("GitHub API 回應錯誤: HTTP ${resp.code}")
-                }
-                val json = JSONObject(resp.body?.string() ?: "{}")
-                val tag = json.optString("tag_name", BuildConfig.VERSION_NAME)
-                val body = json.optString("body", "")
-                val htmlUrl = json.optString("html_url", BuildConfig.GITHUB_REPO_URL)
-                val assets = json.optJSONArray("assets")
-                var apkUrl: String? = null
-                if (assets != null) {
-                    for (i in 0 until assets.length()) {
-                        val asset = assets.getJSONObject(i)
-                        val name = asset.optString("name")
-                        if (name.endsWith(".apk", ignoreCase = true)) {
-                            apkUrl = asset.optString("browser_download_url")
-                            break
+            // 1. 嘗試 GitHub Releases API
+            runCatching {
+                val req = Request.Builder()
+                    .url(BuildConfig.GITHUB_API_LATEST)
+                    .header("Accept", "application/vnd.github+json")
+                    .header("User-Agent", "DX-FileManager")
+                    .build()
+
+                client.newCall(req).execute().use { resp ->
+                    if (resp.isSuccessful) {
+                        val json = JSONObject(resp.body?.string() ?: "{}")
+                        val tag = json.optString("tag_name", BuildConfig.VERSION_NAME)
+                        val body = json.optString("body", "")
+                        val htmlUrl = json.optString("html_url", BuildConfig.GITHUB_REPO_URL)
+                        val assets = json.optJSONArray("assets")
+                        var apkUrl: String? = null
+                        if (assets != null) {
+                            for (i in 0 until assets.length()) {
+                                val asset = assets.getJSONObject(i)
+                                val name = asset.optString("name")
+                                if (name.endsWith(".apk", ignoreCase = true)) {
+                                    apkUrl = asset.optString("browser_download_url")
+                                    break
+                                }
+                            }
+                        }
+                        if (apkUrl != null) {
+                            candidates += ReleaseInfo(
+                                tagName = tag,
+                                releaseNotes = body,
+                                apkDownloadUrl = apkUrl,
+                                htmlUrl = htmlUrl,
+                                isNewer = isNewerVersion(tag, BuildConfig.VERSION_NAME)
+                            )
                         }
                     }
                 }
+            }
+
+            // 2. 檢查 Google 雲端硬碟（正式版資料夾、測試版資料夾）
+            fetchLatestFromDriveFolder(DRIVE_RELEASE_FOLDER_ID, "正式版雲端硬碟")?.let { candidates += it }
+            fetchLatestFromDriveFolder(DRIVE_TEST_FOLDER_ID, "測試版雲端硬碟")?.let { candidates += it }
+
+            if (candidates.isEmpty()) {
+                throw IllegalStateException("無法取得線上版本資訊，請檢查網路連線")
+            }
+
+            candidates.maxWithOrNull { a, b ->
+                when {
+                    isNewerVersion(a.tagName, b.tagName) -> 1
+                    isNewerVersion(b.tagName, a.tagName) -> -1
+                    else -> 0
+                }
+            }!!
+        }
+    }
+
+    private fun fetchLatestFromDriveFolder(folderId: String, sourceLabel: String): ReleaseInfo? {
+        return runCatching {
+            val folderUrl = "https://drive.google.com/embeddedfolderview?id=$folderId#list"
+            val req = Request.Builder()
+                .url(folderUrl)
+                .header("User-Agent", "Mozilla/5.0")
+                .build()
+            client.newCall(req).execute().use { resp ->
+                if (!resp.isSuccessful) return null
+                val html = resp.body?.string() ?: return null
+                val parsed = driveEntryRegex.findAll(html).mapNotNull { match ->
+                    val fileId = match.groupValues[1]
+                    val fileName = match.groupValues[2].trim()
+                    val verMatch = versionInNameRegex.find(fileName) ?: return@mapNotNull null
+                    val tag = "v${verMatch.groupValues[1]}"
+                    Triple(fileId, fileName, tag)
+                }.toList()
+
+                val latest = parsed.maxWithOrNull { a, b ->
+                    when {
+                        isNewerVersion(a.third, b.third) -> 1
+                        isNewerVersion(b.third, a.third) -> -1
+                        else -> 0
+                    }
+                } ?: return null
+
+                val (fileId, fileName, tag) = latest
                 ReleaseInfo(
                     tagName = tag,
-                    releaseNotes = body,
-                    apkDownloadUrl = apkUrl,
-                    htmlUrl = htmlUrl,
+                    releaseNotes = "來源：$sourceLabel ($fileName)",
+                    apkDownloadUrl = "https://drive.usercontent.google.com/download?id=$fileId&export=download&confirm=t",
+                    htmlUrl = "https://drive.google.com/drive/folders/$folderId",
                     isNewer = isNewerVersion(tag, BuildConfig.VERSION_NAME)
                 )
             }
-        }
+        }.getOrNull()
     }
 
     suspend fun downloadApk(
