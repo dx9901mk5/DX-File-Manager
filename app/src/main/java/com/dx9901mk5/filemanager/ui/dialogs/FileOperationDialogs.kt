@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
+import com.dx9901mk5.filemanager.core.settings.LocalDxStrings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -92,35 +93,36 @@ fun FileContextMenuDialog(
     val isEncrypted = targetFile?.name?.lowercase()?.endsWith(".dxe") == true
     val showShizukuInstall = hasApkSelected || (targetFile?.isDirectory == false && targetFile.name.lowercase().endsWith(".apk"))
 
+    val s = LocalDxStrings.current
     val options = listOfNotNull(
-        if (showShizukuInstall) MenuOption(ContextMenuAction.INSTALL_WITH_SHIZUKU, "透過 Shizuku 安裝 APK", Icons.Default.Android) else null,
-        MenuOption(ContextMenuAction.MULTI_SELECT, "1. 多選 (Multi-select)", Icons.Default.CheckBox),
-        MenuOption(ContextMenuAction.RENAME, "2. 重新命名 (Rename)", Icons.Default.DriveFileRenameOutline),
-        MenuOption(ContextMenuAction.COPY, "3. 複製 (Copy)", Icons.Default.ContentCopy),
-        if (hasClipboard) MenuOption(ContextMenuAction.PASTE, "4. 貼上 (Paste)", Icons.Default.ContentPaste) else null,
+        if (showShizukuInstall) MenuOption(ContextMenuAction.INSTALL_WITH_SHIZUKU, s.installWithShizuku, Icons.Default.Android) else null,
+        MenuOption(ContextMenuAction.MULTI_SELECT, s.selectAll, Icons.Default.CheckBox),
+        MenuOption(ContextMenuAction.RENAME, s.rename, Icons.Default.DriveFileRenameOutline),
+        MenuOption(ContextMenuAction.COPY, s.copy, Icons.Default.ContentCopy),
+        if (hasClipboard) MenuOption(ContextMenuAction.PASTE, s.paste, Icons.Default.ContentPaste) else null,
         MenuOption(
             ContextMenuAction.COMPRESS_OR_EXTRACT,
-            if (isArchive) "5. 解壓縮 (Extract)" else "5. 壓縮 (Compress)",
+            s.compress,
             Icons.Default.Archive
         ),
         MenuOption(
             ContextMenuAction.ENCRYPT_OR_DECRYPT,
-            if (isEncrypted) "6. 解密 .dxe (Decrypt)" else "6. AES-256 加密 (Encrypt)",
+            s.encryptDecrypt,
             Icons.Default.Lock
         ),
-        MenuOption(ContextMenuAction.OPEN_WITH, "7. 開啟方式 (Open With)", Icons.Default.OpenInNew),
-        MenuOption(ContextMenuAction.OPEN_DIRECTORY, "8. 開啟所在目錄", Icons.Default.FolderOpen),
-        MenuOption(ContextMenuAction.SEND_TO_OTHER_PANE, "9. 傳送到另一面板", Icons.Default.SwapHoriz),
-        MenuOption(ContextMenuAction.CREATE_SHORTCUT, "10. 在桌面建立捷徑", Icons.Default.AddToHomeScreen),
-        MenuOption(ContextMenuAction.PROPERTIES, "11. 屬性與雜湊值", Icons.Default.Info),
-        MenuOption(ContextMenuAction.DELETE, "刪除項目", Icons.Default.Delete)
+        MenuOption(ContextMenuAction.OPEN_WITH, s.open, Icons.Default.OpenInNew),
+        MenuOption(ContextMenuAction.OPEN_DIRECTORY, s.goHome, Icons.Default.FolderOpen),
+        MenuOption(ContextMenuAction.SEND_TO_OTHER_PANE, s.sendToOtherPane, Icons.Default.SwapHoriz),
+        MenuOption(ContextMenuAction.CREATE_SHORTCUT, s.pinDesktopShortcut, Icons.Default.AddToHomeScreen),
+        MenuOption(ContextMenuAction.PROPERTIES, s.properties, Icons.Default.Info),
+        MenuOption(ContextMenuAction.DELETE, s.delete, Icons.Default.Delete)
     )
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = targetFile?.name ?: "已選取 $selectedCount 個項目",
+                text = targetFile?.name ?: s.selectedCountLabel(selectedCount),
                 maxLines = 1
             )
         },

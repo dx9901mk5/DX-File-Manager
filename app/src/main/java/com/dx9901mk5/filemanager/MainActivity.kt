@@ -63,12 +63,15 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import com.dx9901mk5.filemanager.core.settings.DarkBackgroundStyle
+import com.dx9901mk5.filemanager.core.settings.LocalDxStrings
+import com.dx9901mk5.filemanager.core.settings.dxStringsFor
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.WindowWidthSizeClass
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -151,7 +154,8 @@ class MainActivity : ComponentActivity() {
         handleShortcutIntent(intent)
 
         setContent {
-            val settings by viewModel.settings.collectAsState()
+            val s = LocalDxStrings.current
+    val settings by viewModel.settings.collectAsState()
             val windowSizeClass = calculateWindowSizeClass(this)
             val isExpandedScreen = windowSizeClass.widthSizeClass != WindowWidthSizeClass.Compact
             val isLargeTablet = windowSizeClass.widthSizeClass == WindowWidthSizeClass.Expanded
@@ -161,13 +165,14 @@ class MainActivity : ComponentActivity() {
                 darkTheme = settings.darkTheme,
                 darkBackgroundStyle = settings.darkBackgroundStyle
             ) {
-                DxFileManagerScreen(
-                    viewModel = viewModel,
-                    isExpandedScreen = isExpandedScreen,
-                    isLargeTablet = isLargeTablet,
-                    windowSlot = assignedWindowSlot,
-                    isSmallWindowMode = isSmallWindowMode
-                )
+                CompositionLocalProvider(LocalDxStrings provides dxStringsFor(settings.language)) {
+                    DxFileManagerScreen(
+                        viewModel = viewModel,
+                        isExpandedScreen = isExpandedScreen,
+                        isLargeTablet = isLargeTablet,
+                        windowSlot = assignedWindowSlot,
+                        isSmallWindowMode = isSmallWindowMode
+                    )
 
                 activeShortcutGroup.value?.let { (groupTitle, groupFiles) ->
                     AlertDialog(
@@ -232,10 +237,11 @@ class MainActivity : ComponentActivity() {
                         },
                         confirmButton = {
                             TextButton(onClick = { activeShortcutGroup.value = null }) {
-                                Text("關閉")
+                                Text(LocalDxStrings.current.done)
                             }
                         }
                     )
+                }
                 }
             }
         }
@@ -314,6 +320,7 @@ private fun DxFileManagerScreen(
     windowSlot: Int = 2,
     isSmallWindowMode: Boolean = false
 ) {
+    val s = LocalDxStrings.current
     val settings by viewModel.settings.collectAsState()
     val pane2State by viewModel.pane2State.collectAsState()
     val pane3State by viewModel.pane3State.collectAsState()
@@ -745,7 +752,7 @@ private fun DxFileManagerScreen(
                     onExportSelectedApps = { viewModel.exportSelectedApps(selectedAppPackages.toList()) },
                     onRestoreTrashItem = { viewModel.restoreTrashItem(it) },
                     onEmptyTrash = { showEmptyTrashConfirmDialog = true },
-                    windowPartitionLabel = if (isSmallWindowMode) "第 $windowSlot 分區" else null,
+                    windowPartitionLabel = if (isSmallWindowMode) s.partitionLabel(windowSlot) else null,
                     isSmallWindowMode = isSmallWindowMode
                 )
             },
@@ -794,7 +801,7 @@ private fun DxFileManagerScreen(
                     onExportSelectedApps = { viewModel.exportSelectedApps(selectedAppPackages.toList()) },
                     onRestoreTrashItem = { viewModel.restoreTrashItem(it) },
                     onEmptyTrash = { showEmptyTrashConfirmDialog = true },
-                    windowPartitionLabel = if (isSmallWindowMode) "第 $windowSlot 分區" else null,
+                    windowPartitionLabel = if (isSmallWindowMode) s.partitionLabel(windowSlot) else null,
                     isSmallWindowMode = isSmallWindowMode
                 )
             }
@@ -1120,19 +1127,19 @@ private fun DxFileManagerScreen(
         if (showExitConfirmDialog) {
             AlertDialog(
                 onDismissRequest = { showExitConfirmDialog = false },
-                title = { Text("退出應用程式") },
-                text = { Text("目前已在根目錄，確定要退出 DX檔案管理器 嗎？") },
+                title = { Text(s.exitAppTitle) },
+                text = { Text(s.exitAppMessage) },
                 confirmButton = {
                     Button(onClick = {
                         showExitConfirmDialog = false
                         (activityContext as? Activity)?.finish()
                     }) {
-                        Text("退出")
+                        Text(s.exitAction)
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { showExitConfirmDialog = false }) {
-                        Text("取消")
+                        Text(s.cancel)
                     }
                 }
             )
@@ -1141,21 +1148,21 @@ private fun DxFileManagerScreen(
         if (showFreeformGuideDialog) {
             AlertDialog(
                 onDismissRequest = { showFreeformGuideDialog = false },
-                title = { Text("多重視窗（自由小視窗）說明") },
+                title = { Text(s.freeformGuideTitle) },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            text = "若要在一般平板／折疊機模式下直接彈出可自由縮放的多個小視窗（最多 8 個），請先至手機「設定 → 系統管理／其他設定 → 開發人員選項」開啟以下兩項：",
+                            text = s.freeformGuideBody,
                             style = MaterialTheme.typography.bodySmall
                         )
                         Text(
-                            text = "1. 將活動強制設為可調整大小\n2. 啟用自由形式視窗",
+                            text = s.freeformGuideItems,
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.primary
                         )
                         Text(
-                            text = "（若使用三星 DeX 或系統桌面模式，通常已自動支援）",
+                            text = s.freeformGuideNote,
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1169,7 +1176,7 @@ private fun DxFileManagerScreen(
                                 checked = dontShowFreeformGuideAgain,
                                 onCheckedChange = { dontShowFreeformGuideAgain = it }
                             )
-                            Text("不再提醒此說明", style = MaterialTheme.typography.bodySmall)
+                            Text(s.freeformDontRemind, style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 },
@@ -1181,7 +1188,7 @@ private fun DxFileManagerScreen(
                         showFreeformGuideDialog = false
                         SystemCrossAppDragHelper.openNewWindow(activityContext)
                     }) {
-                        Text("開新視窗")
+                        Text(s.freeformOpenNewWindow)
                     }
                 },
                 dismissButton = {
@@ -1197,7 +1204,7 @@ private fun DxFileManagerScreen(
                             activityContext.startActivity(devIntent)
                         }
                     }) {
-                        Text("前往開發人員選項")
+                        Text(s.freeformGoDevSettings)
                     }
                 }
             )
@@ -1219,6 +1226,7 @@ private fun MultiSelectBottomActionBar(
     onMore: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val s = LocalDxStrings.current
     Surface(
         shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.96f),
@@ -1233,28 +1241,28 @@ private fun MultiSelectBottomActionBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "已選 $selectedCount",
+                text = s.selectedCountLabel(selectedCount),
                 style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(horizontal = 4.dp)
             )
             if (prioritizeCreateOrCompress) {
-                BottomBarActionButton(Icons.Default.CreateNewFolder, "新增資料夾", highlight = true, onClick = onNewFolder)
-                BottomBarActionButton(Icons.Default.Archive, "壓縮", highlight = true, onClick = onCompress)
-                BottomBarActionButton(Icons.Default.ContentCopy, "複製", onClick = onCopy)
-                BottomBarActionButton(Icons.Default.DriveFileMove, "移動", onClick = onMove)
-                BottomBarActionButton(Icons.Default.OpenInNew, "開啟", onClick = onOpen)
+                BottomBarActionButton(Icons.Default.CreateNewFolder, s.newFolder, highlight = true, onClick = onNewFolder)
+                BottomBarActionButton(Icons.Default.Archive, s.compress, highlight = true, onClick = onCompress)
+                BottomBarActionButton(Icons.Default.ContentCopy, s.copy, onClick = onCopy)
+                BottomBarActionButton(Icons.Default.DriveFileMove, s.move, onClick = onMove)
+                BottomBarActionButton(Icons.Default.OpenInNew, s.open, onClick = onOpen)
             } else {
-                BottomBarActionButton(Icons.Default.ContentCopy, "複製", onClick = onCopy)
-                BottomBarActionButton(Icons.Default.DriveFileMove, "移動", onClick = onMove)
-                BottomBarActionButton(Icons.Default.OpenInNew, "開啟", onClick = onOpen)
-                BottomBarActionButton(Icons.Default.Archive, "壓縮", onClick = onCompress)
-                BottomBarActionButton(Icons.Default.CreateNewFolder, "新增資料夾", onClick = onNewFolder)
+                BottomBarActionButton(Icons.Default.ContentCopy, s.copy, onClick = onCopy)
+                BottomBarActionButton(Icons.Default.DriveFileMove, s.move, onClick = onMove)
+                BottomBarActionButton(Icons.Default.OpenInNew, s.open, onClick = onOpen)
+                BottomBarActionButton(Icons.Default.Archive, s.compress, onClick = onCompress)
+                BottomBarActionButton(Icons.Default.CreateNewFolder, s.newFolder, onClick = onNewFolder)
             }
-            BottomBarActionButton(Icons.Default.AddToHomeScreen, "桌面捷徑", onClick = onCreateShortcut)
-            BottomBarActionButton(Icons.Default.Delete, "刪除", isDestructive = true, onClick = onDelete)
-            BottomBarActionButton(Icons.Default.MoreHoriz, "更多", onClick = onMore)
-            BottomBarActionButton(Icons.Default.Close, "取消", onClick = onDismiss)
+            BottomBarActionButton(Icons.Default.AddToHomeScreen, s.pinDesktopShortcut, onClick = onCreateShortcut)
+            BottomBarActionButton(Icons.Default.Delete, s.delete, isDestructive = true, onClick = onDelete)
+            BottomBarActionButton(Icons.Default.MoreHoriz, s.more, onClick = onMore)
+            BottomBarActionButton(Icons.Default.Close, s.cancel, onClick = onDismiss)
         }
     }
 }

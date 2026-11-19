@@ -2,6 +2,7 @@ package com.dx9901mk5.filemanager.ui.layout
 
 import android.view.animation.AnticipateInterpolator
 import android.view.animation.OvershootInterpolator
+import com.dx9901mk5.filemanager.core.settings.LocalDxStrings
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.SizeTransform
@@ -171,6 +172,7 @@ fun FileExplorerPane(
     var rubberBandRect by remember { mutableStateOf<Rect?>(null) }
     var listContainerRootOffset by remember { mutableStateOf(Offset.Zero) }
     val context = LocalContext.current
+    val s = LocalDxStrings.current
     val hapticView = LocalView.current
 
     val itemRootBounds = remember { mutableStateMapOf<String, Rect>() }
@@ -264,7 +266,7 @@ fun FileExplorerPane(
                                     overflow = TextOverflow.Ellipsis
                                 )
                                 Text(
-                                    text = "$folderCount 個資料夾, $fileCount 個檔案",
+                                    text = s.folderFileCountLabel(folderCount, fileCount),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     maxLines = 1,
@@ -376,7 +378,7 @@ fun FileExplorerPane(
                                             modifier = Modifier.size(14.dp)
                                         )
                                         Text(
-                                            text = if (clipboardCount > 1) "貼上($clipboardCount)" else "貼上",
+                                            text = if (clipboardCount > 1) "${s.paste}($clipboardCount)" else s.paste,
                                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
                                             color = MaterialTheme.colorScheme.onPrimary,
                                             maxLines = 1
@@ -484,17 +486,17 @@ fun FileExplorerPane(
                         FilterChip(
                             selected = state.activeCategory == FileCategory.MEDIA,
                             onClick = { onSwitchCategory(FileCategory.MEDIA) },
-                            label = { Text("全部") }
+                            label = { Text(s.filterAll) }
                         )
                         FilterChip(
                             selected = state.activeCategory == FileCategory.IMAGES,
                             onClick = { onSwitchCategory(FileCategory.IMAGES) },
-                            label = { Text("照片") }
+                            label = { Text(s.filterPhotos) }
                         )
                         FilterChip(
                             selected = state.activeCategory == FileCategory.VIDEOS,
                             onClick = { onSwitchCategory(FileCategory.VIDEOS) },
-                            label = { Text("影片") }
+                            label = { Text(s.filterVideos) }
                         )
                     }
                 }
@@ -528,7 +530,7 @@ fun FileExplorerPane(
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                text = "全選 (${state.selectedPaths.size}/${filteredFiles.size})",
+                                text = "${s.selectAll} (${state.selectedPaths.size}/${filteredFiles.size})",
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -768,7 +770,7 @@ fun FileExplorerPane(
                                 }
                                 filteredFiles.isEmpty() && !state.isLoading -> {
                                     Text(
-                                        text = "此資料夾沒有檔案",
+                                        text = s.emptyFolderText,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.align(Alignment.Center)
                                     )
@@ -1034,7 +1036,7 @@ private fun FileRowItem(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Text(
-                    text = if (file.isDirectory) "資料夾" else formatFileSize(file.size),
+                    text = if (file.isDirectory) LocalDxStrings.current.folderLabel else formatFileSize(file.size),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

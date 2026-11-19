@@ -153,7 +153,7 @@ fun SettingsAndAboutDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("設定與關於我") },
+        title = { Text(s.settingsTitle) },
         text = {
             Column(
                 modifier = Modifier
@@ -162,8 +162,8 @@ fun SettingsAndAboutDialog(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 SettingSwitchRow(
-                    title = "啟用垃圾桶 (30 天自動清除)",
-                    subtitle = "刪除本地檔案時暫存至 .dx_trash",
+                    title = s.recycleBinTitle,
+                    subtitle = s.recycleBinSubtitle,
                     checked = settings.recycleBinEnabled,
                     onCheckedChange = onToggleRecycleBin
                 )
@@ -244,14 +244,14 @@ fun SettingsAndAboutDialog(
                     }
                 }
                 SettingSwitchRow(
-                    title = "顯示隱藏資料夾與檔案",
-                    subtitle = "顯示以 . 開頭的項目",
+                    title = s.showHiddenTitle,
+                    subtitle = s.showHiddenSubtitle,
                     checked = settings.showHiddenFiles,
                     onCheckedChange = onToggleShowHidden
                 )
                 SettingSwitchRow(
                     title = s.darkThemeTitle,
-                    subtitle = "關閉則切換為淺色模式",
+                    subtitle = s.darkThemeSubtitle,
                     checked = settings.darkTheme,
                     onCheckedChange = onToggleDarkTheme
                 )
@@ -439,18 +439,18 @@ fun SettingsAndAboutDialog(
                         },
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("GitHub 專案")
+                        Text(s.githubProject)
                     }
                     Button(
                         enabled = !checkingUpdate && !downloading,
                         onClick = {
-                            runUpdateCheck("正在檢查最新版本...") {
+                            runUpdateCheck(s.checkingUpdate) {
                                 UpdateChecker.checkLatestRelease()
                             }
                         },
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text(if (checkingUpdate) "檢查中..." else if (downloading) "下載中..." else "檢查更新")
+                        Text(if (checkingUpdate) s.checkingUpdate else if (downloading) s.downloadingUpdate else s.checkUpdate)
                     }
                 }
 
@@ -458,24 +458,24 @@ fun SettingsAndAboutDialog(
                     OutlinedButton(
                         enabled = !checkingUpdate && !downloading,
                         onClick = {
-                            runUpdateCheck("正在檢查測試版雲端...") {
+                            runUpdateCheck(s.checkingUpdate) {
                                 UpdateChecker.checkDriveRelease(isTestChannel = true)
                             }
                         },
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("檢查測試版雲端")
+                        Text(s.checkTestCloud)
                     }
                     OutlinedButton(
                         enabled = !checkingUpdate && !downloading,
                         onClick = {
-                            runUpdateCheck("正在檢查正式版雲端...") {
+                            runUpdateCheck(s.checkingUpdate) {
                                 UpdateChecker.checkDriveRelease(isTestChannel = false)
                             }
                         },
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("檢查正式版雲端")
+                        Text(s.checkReleaseCloud)
                     }
                 }
 
@@ -538,7 +538,7 @@ fun SettingsAndAboutDialog(
             }
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) { Text("完成") }
+            TextButton(onClick = onDismiss) { Text(s.done) }
         }
     )
 }

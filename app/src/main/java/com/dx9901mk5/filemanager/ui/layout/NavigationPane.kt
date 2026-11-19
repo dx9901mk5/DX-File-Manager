@@ -1,6 +1,8 @@
 package com.dx9901mk5.filemanager.ui.layout
 
 import android.os.Environment
+import com.dx9901mk5.filemanager.core.settings.DxStrings
+import com.dx9901mk5.filemanager.core.settings.LocalDxStrings
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -121,6 +123,7 @@ fun NavigationPane(
     onOpenBookmark: (String) -> Unit,
     onRemoveBookmark: (String) -> Unit = {}
 ) {
+    val s = LocalDxStrings.current
     val localRootPath = remember { Environment.getExternalStorageDirectory().absolutePath }
     var internalExpanded by remember { mutableStateOf(false) }
     var expandedTreePaths by remember { mutableStateOf<Set<String>>(emptySet()) }
@@ -152,14 +155,14 @@ fun NavigationPane(
                 IconButton(onClick = onOpenSettings) {
                     Icon(
                         Icons.Default.Settings,
-                        contentDescription = "設定與關於",
+                        contentDescription = s.settingsTitle,
                         tint = MaterialTheme.colorScheme.onBackground
                     )
                 }
                 IconButton(onClick = onGoHome) {
                     Icon(
                         Icons.Default.Home,
-                        contentDescription = "首頁",
+                        contentDescription = s.goHome,
                         tint = MaterialTheme.colorScheme.onBackground
                     )
                 }
@@ -167,7 +170,7 @@ fun NavigationPane(
                     IconButton(onClick = onToggleDualPane) {
                         Icon(
                             Icons.Default.Splitscreen,
-                            contentDescription = "切換雙欄",
+                            contentDescription = s.toggleDualPane,
                             tint = MaterialTheme.colorScheme.onBackground
                         )
                     }
@@ -175,7 +178,7 @@ fun NavigationPane(
                 IconButton(onClick = onOpenNewWindow) {
                     Icon(
                         Icons.AutoMirrored.Filled.OpenInNew,
-                        contentDescription = "開新視窗",
+                        contentDescription = s.openNewWindow,
                         tint = MaterialTheme.colorScheme.onBackground
                     )
                 }
@@ -202,7 +205,7 @@ fun NavigationPane(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                 item {
-                    SectionHeader("儲存裝置")
+                    SectionHeader(s.storageDevices)
                     val isRootHovered = dragController != null &&
                         dragController.isDragging &&
                         dragController.hoveredFolderPaneIndex == 1 &&
@@ -236,7 +239,7 @@ fun NavigationPane(
                                     Icon(Icons.Default.Smartphone, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                                     Spacer(Modifier.width(8.dp))
                                     Text(
-                                        "內部儲存空間",
+                                        s.internalStorage,
                                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
                                         color = MaterialTheme.colorScheme.onSurface,
                                         modifier = Modifier.weight(1f)
@@ -261,7 +264,10 @@ fun NavigationPane(
                                     )
                                     Spacer(Modifier.height(4.dp))
                                     Text(
-                                        text = "可用 ${formatFileSize(localStorageSpace.availableBytes)} / 共 ${formatFileSize(localStorageSpace.totalBytes)}",
+                                        text = s.availableTotalSpace(
+                                            formatFileSize(localStorageSpace.availableBytes),
+                                            formatFileSize(localStorageSpace.totalBytes)
+                                        ),
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -357,13 +363,13 @@ fun NavigationPane(
                 }
 
                 item {
-                    SectionHeader("系統資料夾")
+                    SectionHeader(s.systemFoldersSection)
                 }
                 items(
                     listOf(
                         "Android/data" to "$localRootPath/Android/data",
                         "Android/obb" to "$localRootPath/Android/obb",
-                        "系統根目錄 (/)" to "/"
+                        s.systemRoot to "/"
                     ),
                     key = { "sys_${it.second}" }
                 ) { (label, sysPath) ->
@@ -404,11 +410,11 @@ fun NavigationPane(
                 item {
                     NavRowItem(
                         icon = Icons.Default.Add,
-                        label = "新增雲端 / 網路掛載",
+                        label = s.addCloudMount,
                         onClick = onOpenCloudWizard
                     )
                     HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
-                    SectionHeader("檔案分類 & 專區")
+                    SectionHeader(s.categoriesSection)
                 }
 
                 val categories = listOf(
@@ -433,7 +439,7 @@ fun NavigationPane(
                         CategoryCustomIcon(category)
                         Spacer(Modifier.width(10.dp))
                         Text(
-                            text = category.title,
+                            text = localizedCategoryTitle(category, s),
                             style = MaterialTheme.typography.bodyMedium,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -447,7 +453,7 @@ fun NavigationPane(
 
                 item {
                     HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
-                    SectionHeader("書籤（長壓可移除）")
+                    SectionHeader(s.bookmarksSection)
                 }
 
                 items(bookmarks, key = { "bm_$it" }) { path ->
@@ -870,4 +876,27 @@ private fun HorizontalTreeScrollbar(scrollState: androidx.compose.foundation.Scr
                 .background(MaterialTheme.colorScheme.primary, RoundedCornerShape(5.dp))
         )
     }
+}
+
+private fun localizedCategoryTitle(category: FileCategory, s: DxStrings): String = when (category) {
+    FileCategory.MEDIA -> s.categoryMedia
+    FileCategory.IMAGES -> s.filterPhotos
+    FileCategory.VIDEOS -> s.filterVideos
+    FileCategory.AUDIO -> s.categoryAudio
+    FileCategory.DOCUMENTS -> s.categoryDocs
+    FileCategory.APKS -> s.categoryApps
+    FileCategory.ARCHIVES -> s.compress
+    FileCategory.RECENT -> when (s.done) {
+        "Done" -> "Recent Files"
+        "完了" -> "最近のファイル"
+        "完成" -> if (s.selectAll == "全选") "最近的文件" else "最近的檔案"
+        else -> category.title
+    }
+    FileCategory.APPS -> when (s.done) {
+        "Done" -> "Installed Apps"
+        "完了" -> "インストール済みアプリ"
+        "完成" -> if (s.selectAll == "全选") "应用程序" else "應用程式"
+        else -> category.title
+    }
+    FileCategory.TRASH -> s.categoryTrash
 }

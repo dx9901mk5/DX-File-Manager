@@ -179,9 +179,10 @@
   - GitHub 最後成功發布於 Releases 的版本：`v1.0.17` (`versionCode = 18`)。
   - 目前帳號 `dx9901mk5` 因系統停權（`403 Your account is suspended`）暫無法 `git push`；已透過 `help.github.com` 送出帳號恢復申訴，工單編號 **`#5015727`**（通知寄往 `dx9901mk5@gmail.com`）。待恢復後可將本機 `main`（含 `v1.0.18`～`v2.0.1`）推送至 `origin`。
 - **本機編譯與發布通道**：
-  - **最新本機簽名測試版 APK**：`v2.1.5` (`versionCode = 215`)，位於 `測試用/DX_fileManager-v2.1.5-release.apk` 與 `release_apks/DX_fileManager-v2.1.5-release.apk`（`55,888,326 bytes`）。
+  - **最新本機簽名測試版 APK**：`v2.1.6` (`versionCode = 216`)，位於 `測試用/DX_fileManager-v2.1.6-release.apk` 與 `release_apks/DX_fileManager-v2.1.6-release.apk`（`55,921,098 bytes`）。
   - **最新已驗證正式版 APK**：`v2.1.4` (`versionCode = 214`)，位於 `正式發布/DX_fileManager-v2.1.4-正式版.apk`（`55,888,066 bytes`）。
-  - **近期關鍵更新摘要（v1.2.7 → v2.1.5）**：
+  - **近期關鍵更新摘要（v1.2.7 → v2.1.6）**：
+    - `v2.1.6`：全面擴充並串接四國語言介面（繁體中文、简体中文、English、日本語），於 `DxI18n.kt` 建立 `LocalDxStrings`，使導覽側邊欄、檔案面板、多選底部操作列、右鍵選單及設定更新對話框支援即時切換語言。
     - `v2.1.5`：依 Google Play Adaptive App Quality Guidelines 補齊自適應與大螢幕相容規範（`AndroidManifest.xml` 加入 `touchscreen required="false"`、`enableOnBackInvokedCallback="true"` 與完整 `configChanges`，`themes.xml` / `values-v30/themes.xml` 設定 `windowLayoutInDisplayCutoutMode` 消除橫向黑邊）；重構 `FileExplorerPane.kt` 資料夾切換動畫層級（不因 `isLoading` 或空資料夾卸載打斷），實作進入 1 秒由中心展開＋`OvershootInterpolator` 回彈、離開 1 秒 `AnticipateInterpolator` 回彈收合特效。
     - `v2.1.4`：修正「檢查測試版雲端／檢查正式版雲端」點擊後直接跳轉 Google 雲端硬碟網頁的問題，改為呼叫 `UpdateChecker.checkDriveRelease` 自動解析對應雲端資料夾內最新 APK 版本並自動下載與顯示進度條（`downloadApk` 新增 `text/html` 防呆）；修正 vivo OriginOS 小視窗拖曳至桌面放開時 `event.result == true` 導致未觸發建立捷徑的問題，並將小視窗邊緣手勢距離放寬至 `28dp`；支援任何檔案與資料夾拖曳或從功能表／底部操作列「在桌面建立捷徑」，多選複合類別時自動批次建立桌面捷徑；於 `TwoFingerStackGesture.kt` 新增「多選滑過停住超過 350ms 後再移動即鎖定為純拖曳模式、不再多選經過檔案」手勢。
     - `v2.1.3`：修復小視窗模式拖曳至桌面空白處偶發未觸發建立捷徑的問題（放寬邊界偵測至 `36px` 並支援純資料夾／混合多選項目拖出，移除 `ACTION_DRAG_ENDED` 對 `leftSourceWindow` 的嚴格攔截）；新增「多選拖曳至啟動器桌面自動集中為一個捷徑資料夾」功能（圖示為金黃玻璃資料夾內嵌 2×2 實景縮圖／類型圖示 + 數量徽章，點擊捷徑開啟「桌面捷徑資料夾」列表）。
