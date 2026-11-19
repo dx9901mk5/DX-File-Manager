@@ -22,14 +22,41 @@ import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
 import com.dx9901mk5.filemanager.MainActivity
 import com.dx9901mk5.filemanager.core.vfs.VfsFile
+import org.json.JSONArray
 import java.io.File
 import java.util.Locale
 import java.util.concurrent.Executors
 
 object ShortcutHelper {
     private const val ICON_SIZE = 192
+    private const val PREF_GROUPS = "dx_shortcut_groups"
     private val worker = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
+
+    fun getShortcutGroup(context: Context, groupId: String): List<VfsFile> {
+        val raw = context.getSharedPreferences(PREF_GROUPS, Context.MODE_PRIVATE)
+            .getString(groupId, null) ?: return emptyList()
+        return runCatching {
+            val arr = JSONArray(raw)
+            buildList {
+                for (i in 0 until arr.length()) {
+                    val f = File(arr.getString(i))
+                    if (f.exists()) {
+                        add(
+                            VfsFile(
+                                name = f.name,
+                                path = f.absolutePath,
+                                isDirectory = f.isDirectory,
+                                size = if (f.isDirectory) 0L else f.length(),
+                                lastModified = f.lastModified(),
+                                mountId = "local"
+                            )
+                        )
+                    }
+                }
+            }
+        }.getOrDefault(emptyList())
+    }
 
     fun pinFilesToDesktop(context: Context, files: List<VfsFile>, onUnsupported: () -> Unit = {}) {
         val appCtx = context.applicationContext
@@ -45,32 +72,103 @@ object ShortcutHelper {
         }
 
         worker.execute {
-            localFiles.forEach { (file, displayName) ->
-                val bmp = createShortcutBitmap(appCtx, file)
-                val shortcutIntent = Intent(appCtx, MainActivity::class.java).apply {
-                    action = Intent.ACTION_VIEW
-                    putExtra("shortcut_path", file.absolutePath)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                }
-                val shortcut = ShortcutInfoCompat.Builder(appCtx, "dx_shortcut_${file.absolutePath.hashCode()}")
-                    .setShortLabel(displayName.take(24))
-                    .setLongLabel(displayName)
-                    .setIcon(IconCompat.createWithBitmap(bmp))
-                    .setIntent(shortcutIntent)
-                    .build()
+            if (localFiles.size == 1) {
+                val (file, displayName) = localFiles.first()
+                val shortcut = buildFileShortcut(appCtx, file, displayName)
                 mainHandler.post {
-                    ShortcutManagerCompat.requestPinShortcut(appCtx, shortcut, null)
+                    val ok = ShortcutManagerCompat.requestPinShortcut(appCtx, shortcut, null)
+                    val msg = if (ok) {
+                        "已請求建立桌面捷徑：$displayName"
+                    } else {
+                        "啟動器拒絕建立桌面捷徑，請確認系統權限（桌面捷徑）"
+                    }
+                    Toast.makeText(appCtx, msg, Toast.LENGTH_SHORT).show()
                 }
-            }
-            mainHandler.post {
-                val msg = if (localFiles.size == 1) {
-                    "已請求建立桌面捷徑：${localFiles.first().second}"
-                } else {
-                    "已請求建立 ${localFiles.size} 個桌面捷徑"
+            } else {
+                // 多選（含複合性檔案類別／資料夾）：批次依序產生對應圖示／縮圖的桌面捷徑
+                val shortcuts = localFiles.map { (file, displayName) ->
+                    buildFileShortcut(appCtx, file, displayName)
                 }
-                Toast.makeText(appCtx, msg, Toast.LENGTH_SHORT).show()
+                mainHandler.post {
+                    Toast.makeText(
+                        appCtx,
+                        "正在批次建立 ${shortcuts.size} 個桌面捷徑...",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    shortcuts.forEachIndexed { idx, shortcut ->
+                        mainHandler.postDelayed({
+                            ShortcutManagerCompat.requestPinShortcut(appCtx, shortcut, null)
+                        }, idx * 280L)
+                    }
+                }
             }
         }
+    }
+
+    private fun buildFileShortcut(
+        appCtx: Context,
+        file: File,
+        displayName: String
+    ): ShortcutInfoCompat {
+        val bmp = createShortcutBitmap(appCtx, file)
+        val shortcutIntent = Intent(appCtx, MainActivity::class.java).apply {
+            action = Intent.ACTION_VIEW
+            putExtra("shortcut_path", file.absolutePath)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        }
+        return ShortcutInfoCompat.Builder(appCtx, "dx_shortcut_${file.absolutePath.hashCode()}")
+            .setShortLabel(displayName.take(24))
+            .setLongLabel(displayName)
+            .setIcon(IconCompat.createWithBitmap(bmp))
+            .setIntent(shortcutIntent)
+            .build()
+    }
+
+    private fun createGroupedFolderBitmap(context: Context, files: List<File>): Bitmap {
+        val out = Bitmap.createBitmap(ICON_SIZE, ICON_SIZE, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(out)
+
+        // 資料夾頂部標籤與半透明磨砂金黃外框
+        val tabPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#D97706") }
+        canvas.drawRoundRect(RectF(14f, 12f, 92f, 44f), 12f, 12f, tabPaint)
+
+        val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#1E2430") }
+        canvas.drawRoundRect(RectF(10f, 26f, ICON_SIZE - 10f, ICON_SIZE - 10f), 32f, 32f, bgPaint)
+
+        val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.parseColor("#FFC83D")
+            style = Paint.Style.STROKE
+            strokeWidth = 5f
+        }
+        canvas.drawRoundRect(RectF(12f, 28f, ICON_SIZE - 12f, ICON_SIZE - 12f), 30f, 30f, borderPaint)
+
+        // 2x2 縮圖 / 類型圖示格
+        val slotPositions = listOf(
+            RectF(26f, 42f, 90f, 106f),
+            RectF(102f, 42f, 166f, 106f),
+            RectF(26f, 114f, 90f, 178f),
+            RectF(102f, 114f, 166f, 178f)
+        )
+        val imgPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        files.take(4).forEachIndexed { idx, f ->
+            val subBmp = createShortcutBitmap(context, f)
+            canvas.drawBitmap(subBmp, null, slotPositions[idx], imgPaint)
+        }
+
+        // 右上角數量徽章
+        val badgePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#FFC83D") }
+        canvas.drawCircle(ICON_SIZE - 26f, 28f, 20f, badgePaint)
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            textAlign = Paint.Align.CENTER
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textSize = 22f
+        }
+        val countStr = files.size.toString()
+        val tb = Rect()
+        textPaint.getTextBounds(countStr, 0, countStr.length, tb)
+        canvas.drawText(countStr, ICON_SIZE - 26f, 28f - tb.exactCenterY(), textPaint)
+        return out
     }
 
     fun createShortcutBitmap(context: Context, file: File): Bitmap {

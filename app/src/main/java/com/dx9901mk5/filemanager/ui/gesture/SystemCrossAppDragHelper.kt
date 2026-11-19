@@ -231,11 +231,14 @@ object SystemCrossAppDragHelper {
                 DragEvent.ACTION_DRAG_ENDED -> {
                     if (session != null &&
                         session.sourceViewIdentity == myIdentity &&
-                        session.leftSourceWindow &&
                         !session.acceptedByDxWindow
                     ) {
-                        if (!event.result) {
-                            // 拖曳至桌面放開（系統桌面不消費 ACTION_DROP，event.result 為 false）：建立桌面捷徑
+                        val isVivoOrigin = android.os.Build.MANUFACTURER.equals("vivo", ignoreCase = true) ||
+                            android.os.Build.BRAND.equals("vivo", ignoreCase = true) ||
+                            android.os.Build.BRAND.equals("iQOO", ignoreCase = true)
+                        val shouldPinToDesktop = !event.result || (isVivoOrigin && session.leftSourceWindow)
+                        if (shouldPinToDesktop) {
+                            // 拖曳至桌面放開：建立桌面捷徑（支援任何檔案與資料夾，多選時批次建立）
                             ShortcutHelper.pinFilesToDesktop(v.context, session.files) {
                                 shareFilesViaSystem(v.context, session.files)
                             }

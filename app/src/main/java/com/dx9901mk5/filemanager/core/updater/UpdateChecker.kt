@@ -94,6 +94,21 @@ object UpdateChecker {
         }
     }
 
+    suspend fun checkDriveRelease(isTestChannel: Boolean): Result<ReleaseInfo> = withContext(Dispatchers.IO) {
+        runCatching {
+            val folderId = if (isTestChannel) DRIVE_TEST_FOLDER_ID else DRIVE_RELEASE_FOLDER_ID
+            val label = if (isTestChannel) "測試版雲端硬碟" else "正式版雲端硬碟"
+            fetchLatestFromDriveFolder(folderId, label)
+                ?: ReleaseInfo(
+                    tagName = BuildConfig.VERSION_NAME,
+                    releaseNotes = "${label}目前尚無 APK 檔案",
+                    apkDownloadUrl = null,
+                    htmlUrl = "https://drive.google.com/drive/folders/$folderId",
+                    isNewer = false
+                )
+        }
+    }
+
     private fun fetchLatestFromDriveFolder(folderId: String, sourceLabel: String): ReleaseInfo? {
         return runCatching {
             val folderUrl = "https://drive.google.com/embeddedfolderview?id=$folderId#list"
@@ -141,6 +156,10 @@ object UpdateChecker {
             val req = Request.Builder().url(downloadUrl).build()
             client.newCall(req).execute().use { resp ->
                 if (!resp.isSuccessful) throw IllegalStateException("下載失敗: HTTP ${resp.code}")
+                val contentType = resp.header("Content-Type").orEmpty()
+                if (contentType.contains("text/html", ignoreCase = true)) {
+                    throw IllegalStateException("雲端回傳網頁而非 APK 檔案，請改用網頁下載")
+                }
                 val body = resp.body ?: throw IllegalStateException("空的回應內容")
                 val total = body.contentLength()
                 val outFile = File(context.cacheDir, "dx_file_manager_update.apk")

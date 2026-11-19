@@ -34,6 +34,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
@@ -41,6 +43,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddToHomeScreen
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
@@ -102,6 +105,9 @@ import com.dx9901mk5.filemanager.ui.dialogs.RenameDialog
 import com.dx9901mk5.filemanager.ui.dialogs.SettingsAndAboutDialog
 import com.dx9901mk5.filemanager.ui.dialogs.ShortcutCheatSheetDialog
 import com.dx9901mk5.filemanager.ui.gesture.CopyOrMoveDialog
+import com.dx9901mk5.filemanager.core.shortcut.ShortcutHelper
+import com.dx9901mk5.filemanager.ui.components.FileThumbnailIcon
+import com.dx9901mk5.filemanager.ui.components.IosGlassFolderIcon
 import com.dx9901mk5.filemanager.ui.gesture.CrossPaneDragController
 import com.dx9901mk5.filemanager.ui.gesture.DragAndDropOverlay
 import com.dx9901mk5.filemanager.ui.gesture.DxShortcutAction
@@ -119,6 +125,7 @@ import java.io.File
 class MainActivity : ComponentActivity() {
     private val viewModel: FileManagerViewModel by viewModels()
     private var assignedWindowSlot: Int = 2
+    private val activeShortcutGroup = mutableStateOf<Pair<String, List<VfsFile>>?>(null)
 
     private val requestNotificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { _ -> }
@@ -161,6 +168,75 @@ class MainActivity : ComponentActivity() {
                     windowSlot = assignedWindowSlot,
                     isSmallWindowMode = isSmallWindowMode
                 )
+
+                activeShortcutGroup.value?.let { (groupTitle, groupFiles) ->
+                    AlertDialog(
+                        onDismissRequest = { activeShortcutGroup.value = null },
+                        title = { Text(groupTitle) },
+                        text = {
+                            androidx.compose.foundation.lazy.LazyColumn(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 360.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(groupFiles.size) { idx ->
+                                    val item = groupFiles[idx]
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                activeShortcutGroup.value = null
+                                                if (item.isDirectory) {
+                                                    viewModel.navigateToPath(2, item.path)
+                                                } else {
+                                                    File(item.path).parentFile?.let { p ->
+                                                        if (p.exists() && p.isDirectory) {
+                                                            viewModel.navigateToPath(2, p.absolutePath)
+                                                        }
+                                                    }
+                                                    viewModel.openFile(item)
+                                                }
+                                            }
+                                            .padding(vertical = 4.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        if (item.isDirectory) {
+                                            IosGlassFolderIcon(
+                                                isEmpty = item.isEmpty,
+                                                accentColor = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(34.dp)
+                                            )
+                                        } else {
+                                            FileThumbnailIcon(file = item, iconSize = 34.dp)
+                                        }
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = item.name,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                maxLines = 1,
+                                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                            )
+                                            Text(
+                                                text = item.path,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                maxLines = 1,
+                                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = { activeShortcutGroup.value = null }) {
+                                Text("關閉")
+                            }
+                        }
+                    )
+                }
             }
         }
     }
@@ -177,6 +253,15 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleShortcutIntent(intent: Intent?) {
+        val groupId = intent?.getStringExtra("shortcut_group_id")
+        if (!groupId.isNullOrBlank()) {
+            val files = ShortcutHelper.getShortcutGroup(this, groupId)
+            val title = intent.getStringExtra("shortcut_group_title") ?: "桌面捷徑資料夾"
+            if (files.isNotEmpty()) {
+                activeShortcutGroup.value = title to files
+            }
+            return
+        }
         val path = intent?.getStringExtra("shortcut_path") ?: return
         val target = File(path)
         if (!target.exists()) return
@@ -479,7 +564,18 @@ private fun DxFileManagerScreen(
                 val curMount = if (paneIdx == 2) pane2State.mountId else pane3State.mountId
                 viewModel.performTransfer(curMount, selected, otherState.mountId, otherState.currentPath, isMove = false)
             }
-            ContextMenuAction.CREATE_SHORTCUT -> targetFile?.let { viewModel.createHomeScreenShortcut(it) }
+            ContextMenuAction.CREATE_SHORTCUT -> {
+                val targets = if (selected.isNotEmpty()) selected else listOfNotNull(targetFile)
+                if (targets.isNotEmpty()) {
+                    ShortcutHelper.pinFilesToDesktop(activityContext, targets) {
+                        android.widget.Toast.makeText(
+                            activityContext,
+                            "目前啟動器不支援或未授權建立桌面捷徑",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            }
             ContextMenuAction.INSTALL_WITH_SHIZUKU -> {
                 val apks = selected.filter { !it.isDirectory && it.name.lowercase().endsWith(".apk") }
                     .map { File(it.path) }
@@ -802,6 +898,18 @@ private fun DxFileManagerScreen(
                     bottomActionBarState = null
                     if (selectedList.isNotEmpty()) pendingDeleteRequest = Triple(paneIdx, selectedList, false)
                 },
+                onCreateShortcut = {
+                    bottomActionBarState = null
+                    if (selectedList.isNotEmpty()) {
+                        ShortcutHelper.pinFilesToDesktop(activityContext, selectedList) {
+                            android.widget.Toast.makeText(
+                                activityContext,
+                                "目前啟動器不支援或未授權建立桌面捷徑",
+                                android.widget.Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                },
                 onMore = {
                     bottomActionBarState = null
                     contextMenuTarget = paneIdx to selectedList.firstOrNull()
@@ -1107,6 +1215,7 @@ private fun MultiSelectBottomActionBar(
     onMove: () -> Unit,
     onOpen: () -> Unit,
     onDelete: () -> Unit,
+    onCreateShortcut: () -> Unit,
     onMore: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -1142,6 +1251,7 @@ private fun MultiSelectBottomActionBar(
                 BottomBarActionButton(Icons.Default.Archive, "壓縮", onClick = onCompress)
                 BottomBarActionButton(Icons.Default.CreateNewFolder, "新增資料夾", onClick = onNewFolder)
             }
+            BottomBarActionButton(Icons.Default.AddToHomeScreen, "桌面捷徑", onClick = onCreateShortcut)
             BottomBarActionButton(Icons.Default.Delete, "刪除", isDestructive = true, onClick = onDelete)
             BottomBarActionButton(Icons.Default.MoreHoriz, "更多", onClick = onMore)
             BottomBarActionButton(Icons.Default.Close, "取消", onClick = onDismiss)

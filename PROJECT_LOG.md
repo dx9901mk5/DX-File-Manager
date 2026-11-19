@@ -1,6 +1,6 @@
 # DX檔案管理器 (DX File Manager) — 本機開發與發布紀錄
 
-- **最後更新時間**：2026-11-18
+- **最後更新時間**：2026-11-19
 - **本機專案路徑**：`D:\Google雲端硬碟\Antigravity\DX檔案管理器`
 - **GitHub 儲存庫**：https://github.com/dx9901mk5/DX_fileManager
 - **Application ID**：`com.dx9901mk5.filemanager`
@@ -179,16 +179,21 @@
   - GitHub 最後成功發布於 Releases 的版本：`v1.0.17` (`versionCode = 18`)。
   - 目前帳號 `dx9901mk5` 因系統停權（`403 Your account is suspended`）暫無法 `git push`；已透過 `help.github.com` 送出帳號恢復申訴，工單編號 **`#5015727`**（通知寄往 `dx9901mk5@gmail.com`）。待恢復後可將本機 `main`（含 `v1.0.18`～`v2.0.1`）推送至 `origin`。
 - **本機編譯與發布通道**：
-  - **最新本機簽名測試版 APK**：`v2.1.1` (`versionCode = 211`)，位於 `測試用/DX_fileManager-v2.1.1-release.apk` 與 `release_apks/DX_fileManager-v2.1.1-release.apk`（固定簽名 `app/release.keystore`，`55,871,682 bytes`）。
-  - **近期關鍵更新摘要（v1.2.7 → v2.1.1）**：
+  - **最新本機簽名測試版 APK**：`v2.1.5` (`versionCode = 215`)，位於 `測試用/DX_fileManager-v2.1.5-release.apk` 與 `release_apks/DX_fileManager-v2.1.5-release.apk`（`55,888,326 bytes`）。
+  - **最新已驗證正式版 APK**：`v2.1.4` (`versionCode = 214`)，位於 `正式發布/DX_fileManager-v2.1.4-正式版.apk`（`55,888,066 bytes`）。
+  - **近期關鍵更新摘要（v1.2.7 → v2.1.5）**：
+    - `v2.1.5`：依 Google Play Adaptive App Quality Guidelines 補齊自適應與大螢幕相容規範（`AndroidManifest.xml` 加入 `touchscreen required="false"`、`enableOnBackInvokedCallback="true"` 與完整 `configChanges`，`themes.xml` / `values-v30/themes.xml` 設定 `windowLayoutInDisplayCutoutMode` 消除橫向黑邊）；重構 `FileExplorerPane.kt` 資料夾切換動畫層級（不因 `isLoading` 或空資料夾卸載打斷），實作進入 1 秒由中心展開＋`OvershootInterpolator` 回彈、離開 1 秒 `AnticipateInterpolator` 回彈收合特效。
+    - `v2.1.4`：修正「檢查測試版雲端／檢查正式版雲端」點擊後直接跳轉 Google 雲端硬碟網頁的問題，改為呼叫 `UpdateChecker.checkDriveRelease` 自動解析對應雲端資料夾內最新 APK 版本並自動下載與顯示進度條（`downloadApk` 新增 `text/html` 防呆）；修正 vivo OriginOS 小視窗拖曳至桌面放開時 `event.result == true` 導致未觸發建立捷徑的問題，並將小視窗邊緣手勢距離放寬至 `28dp`；支援任何檔案與資料夾拖曳或從功能表／底部操作列「在桌面建立捷徑」，多選複合類別時自動批次建立桌面捷徑；於 `TwoFingerStackGesture.kt` 新增「多選滑過停住超過 350ms 後再移動即鎖定為純拖曳模式、不再多選經過檔案」手勢。
+    - `v2.1.3`：修復小視窗模式拖曳至桌面空白處偶發未觸發建立捷徑的問題（放寬邊界偵測至 `36px` 並支援純資料夾／混合多選項目拖出，移除 `ACTION_DRAG_ENDED` 對 `leftSourceWindow` 的嚴格攔截）；新增「多選拖曳至啟動器桌面自動集中為一個捷徑資料夾」功能（圖示為金黃玻璃資料夾內嵌 2×2 實景縮圖／類型圖示 + 數量徽章，點擊捷徑開啟「桌面捷徑資料夾」列表）。
     - `v1.2.7`：於 `SystemCrossAppDragHelper.openNewWindow` 補上 `WINDOWING_MODE_FREEFORM (5)` 反射設定並縮小預設啟動尺寸（`260dp × 360dp`、Manifest `280dp × 380dp`）；改以 `ActivityManager.appTasks` 核對存活 Task（`taskSlotMap`），修正主視窗與多開分區編號錯亂問題。
     - `v1.2.8`：`AboutAndUpdateDialog.kt` 與 `UpdateChecker.kt` 改為檢查更新發現新版本即自動開始下載、於主執行緒節流更新進度條與已下載 MB / 百分比，完成後自動觸發安裝。
     - `v2.0.2`：恢復原生 `WINDOWING_MODE_FREEFORM` 方案 1 自由小視窗模式；`UpdateChecker.kt` 新增 Google 雲端硬碟「正式版／測試版」資料夾備援解析與直接下載（因應 GitHub API 停權 404）。
     - `v2.0.3`：點擊「開新視窗」時新增「多重視窗（自由小視窗）說明」對話框，引導開啟開發人員選項「將活動強制設為可調整大小」與「啟用自由形式視窗」，附「前往開發人員選項」快捷鈕與「不再提醒」選項。
     - `v2.1.1`：新增 `ShortcutHelper.kt`，檔案／資料夾拖曳至桌面放開時自動建立桌面捷徑（圖片／影片使用縮圖、壓縮檔與文書／音訊／APK 呈現專屬類型圖示），並補齊點擊桌面捷徑定位及開啟檔案；將「上一層（←）」按鈕移至上方圓角膠囊列內（資料夾名稱右側），方便小視窗點擊。
   - **本機編譯環境與注意事項（Windows 中文路徑）**：
-    - Android SDK：`C:\Users\dx990\AppData\Local\Android\Sdk`（`adb.exe` 可直接於終端呼叫）
-    - 因專案路徑含中文字元且 Google Drive 同步會鎖定 `build/`，需先 `robocopy` 原始碼至純英文暫存路徑 `C:\dx_build_tmp`（`local.properties` 設為 `sdk.dir=C:/Users/dx990/AppData/Local/Android/Sdk`）執行 `gradle assembleRelease --no-daemon`，再複製 APK 回 `測試用/` 與 `release_apks/`。
+    - Android SDK：`D:\Android\Sdk`（`D:\Android\Sdk\platform-tools\adb.exe`）
+    - JDK / Gradle：JDK `C:\jdk-17\jdk-17.0.21+9` + Gradle `8.9`（暫存於 `C:\dx_build_tmp\.gradle-8.9`）
+    - 因專案路徑含中文字元且 Google Drive 同步會鎖定 `build/`，需先 `robocopy` 原始碼至純英文暫存路徑 `C:\dx_build_tmp`（`local.properties` 設為 `sdk.dir=D:/Android/Sdk`）執行 `gradle assembleRelease --no-daemon`，再複製 APK 回 `測試用/`、`release_apks/` 與 `正式發布/`。
   - **Google 雲端硬碟「測試用」資料夾**（已設為知道連結者可瀏覽）：https://drive.google.com/drive/folders/1h_I2rDnRJvTYe2V0_04AM9hAnk17wO5x （已上傳 `v1.0.18`、`v1.0.19`、`v1.0.20`、`v1.0.21`）。
   - **Google 雲端硬碟「正式發布」資料夾**（已設為知道連結者可瀏覽）：https://drive.google.com/drive/folders/1JrrkNtKZZIGEvpLaHuXRxGiCRJPQO6Vu
 - **OAuth 整合現況**：

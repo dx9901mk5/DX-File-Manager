@@ -1,17 +1,24 @@
 package com.dx9901mk5.filemanager.ui.layout
 
+import android.view.animation.AnticipateInterpolator
+import android.view.animation.OvershootInterpolator
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandIn
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -622,7 +629,7 @@ fun FileExplorerPane(
                                 onHideBottomActionBar()
                                 val rootOffset = listContainerRootOffset + localOffset
                                 val isMultiWin = isSmallWindowMode || (context as? Activity)?.isInMultiWindowMode == true
-                                val marginPx = if (isMultiWin) 24f else -4f
+                                val marginPx = if (isMultiWin) (28f * context.resources.displayMetrics.density) else -4f
                                 val w = hapticView.width.toFloat()
                                 val h = hapticView.height.toFloat()
                                 val crossingWindowEdge = w > 0f && h > 0f && (
@@ -632,7 +639,7 @@ fun FileExplorerPane(
                                         rootOffset.y >= h - marginPx
                                     )
                                 if (crossingWindowEdge &&
-                                    dragController.draggedFiles.any { !it.isDirectory && it.mountId == "local" } &&
+                                    dragController.draggedFiles.any { it.mountId == "local" } &&
                                     SystemCrossAppDragHelper.startSystemDrag(
                                         view = hapticView,
                                         context = context,
@@ -669,87 +676,104 @@ fun FileExplorerPane(
                             }
                         )
                 ) {
-                    when {
-                        state.isLoading -> {
-                            CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-                        }
-                        state.errorMessage != null -> {
-                            Text(
-                                text = "載入錯誤：${state.errorMessage}",
-                                color = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.align(Alignment.Center).padding(16.dp)
-                            )
-                        }
-                        state.mode == PaneMode.APPS -> {
-                            AppManagerList(
-                                apps = installedApps,
-                                includeSystemApps = includeSystemApps,
-                                selectedPackages = selectedAppPackages,
-                                onToggleSystemApps = onToggleSystemApps,
-                                onToggleSelect = onToggleAppSelection,
-                                onExportSelected = onExportSelectedApps
-                            )
-                        }
-                        state.mode == PaneMode.TRASH -> {
-                            TrashBinList(
-                                items = trashItems,
-                                onRestore = onRestoreTrashItem,
-                                onEmptyTrash = onEmptyTrash
-                            )
-                        }
-                        filteredFiles.isEmpty() -> {
-                            Text(
-                                text = "此資料夾沒有檔案",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.align(Alignment.Center)
-                            )
-                        }
-                        else -> {
-                            LaunchedEffect(state.currentPath) {
-                                itemRootBounds.clear()
-                                dragController.clearFolderBounds(state.paneIndex)
+                    LaunchedEffect(state.currentPath) {
+                        itemRootBounds.clear()
+                        dragController.clearFolderBounds(state.paneIndex)
+                    }
+                    val folderOvershootEasing = remember {
+                        val interp = OvershootInterpolator(1.65f)
+                        Easing { interp.getInterpolation(it) }
+                    }
+                    val folderAnticipateEasing = remember {
+                        val interp = AnticipateInterpolator(1.4f)
+                        Easing { interp.getInterpolation(it) }
+                    }
+
+                    AnimatedContent(
+                        targetState = Triple(state.currentPath, state.viewMode, state.mode),
+                        transitionSpec = {
+                            val oldPath = initialState.first
+                            val newPath = targetState.first
+                            val oldMode = initialState.third
+                            val newMode = targetState.third
+                            if (oldPath == newPath && oldMode == newMode) {
+                                fadeIn(tween(180)) togetherWith fadeOut(tween(150))
+                            } else {
+                                val oldDepth = oldPath.trimEnd('/').count { it == '/' }
+                                val newDepth = newPath.trimEnd('/').count { it == '/' }
+                                val isEnteringFolder = when {
+                                    newPath.startsWith("$oldPath/") -> true
+                                    oldPath.startsWith("$newPath/") -> false
+                                    else -> newDepth >= oldDepth
+                                }
+                                if (isEnteringFolder) {
+                                    // 進入資料夾：1 秒從中心展開並帶回彈效果
+                                    (scaleIn(
+                                        initialScale = 0.25f,
+                                        animationSpec = tween(1000, easing = folderOvershootEasing)
+                                    ) + expandIn(
+                                        expandFrom = Alignment.Center,
+                                        animationSpec = tween(1000, easing = folderOvershootEasing)
+                                    ) { fullSize -> IntSize(fullSize.width / 3, fullSize.height / 3) } +
+                                        fadeIn(tween(350))) togetherWith
+                                        (scaleOut(
+                                            targetScale = 1.12f,
+                                            animationSpec = tween(900, easing = FastOutSlowInEasing)
+                                        ) + fadeOut(tween(550)))
+                                } else {
+                                    // 離開資料夾：1 秒收合回中心並帶回彈效果
+                                    (scaleIn(
+                                        initialScale = 1.14f,
+                                        animationSpec = tween(1000, easing = folderOvershootEasing)
+                                    ) + fadeIn(tween(450))) togetherWith
+                                        (scaleOut(
+                                            targetScale = 0.22f,
+                                            animationSpec = tween(1000, easing = folderAnticipateEasing)
+                                        ) + shrinkOut(
+                                            shrinkTowards = Alignment.Center,
+                                            animationSpec = tween(1000, easing = folderAnticipateEasing)
+                                        ) { fullSize -> IntSize(fullSize.width / 4, fullSize.height / 4) } +
+                                            fadeOut(tween(900)))
+                                }.using(SizeTransform(clip = true))
                             }
-                            AnimatedContent(
-                                targetState = state.currentPath to state.viewMode,
-                                transitionSpec = {
-                                    val oldPath = initialState.first
-                                    val newPath = targetState.first
-                                    if (oldPath == newPath) {
-                                        fadeIn(tween(180)) togetherWith fadeOut(tween(150))
-                                    } else {
-                                        val isEnteringFolder = newPath.length >= oldPath.length
-                                        if (isEnteringFolder) {
-                                            // 進入資料夾：1 秒展開回彈特效
-                                            (scaleIn(
-                                                initialScale = 0.68f,
-                                                animationSpec = spring(
-                                                    dampingRatio = 0.60f,
-                                                    stiffness = 65f
-                                                )
-                                            ) + fadeIn(tween(380))) togetherWith
-                                                (scaleOut(
-                                                    targetScale = 1.08f,
-                                                    animationSpec = tween(900, easing = FastOutSlowInEasing)
-                                                ) + fadeOut(tween(650)))
-                                        } else {
-                                            // 離開資料夾：1 秒收合回彈特效
-                                            (scaleIn(
-                                                initialScale = 1.12f,
-                                                animationSpec = spring(
-                                                    dampingRatio = 0.60f,
-                                                    stiffness = 65f
-                                                )
-                                            ) + fadeIn(tween(380))) togetherWith
-                                                (scaleOut(
-                                                    targetScale = 0.68f,
-                                                    animationSpec = tween(1000, easing = FastOutSlowInEasing)
-                                                ) + fadeOut(tween(850)))
-                                        }
-                                    }
-                                },
-                                label = "FolderTransition"
-                            ) { (_, animViewMode) ->
-                                if (animViewMode != FileViewMode.LIST) {
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                        label = "FolderTransition"
+                    ) { (_, animViewMode, animMode) ->
+                        Box(modifier = Modifier.fillMaxSize()) {
+                            when {
+                                state.errorMessage != null -> {
+                                    Text(
+                                        text = "載入錯誤：${state.errorMessage}",
+                                        color = MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.align(Alignment.Center).padding(16.dp)
+                                    )
+                                }
+                                animMode == PaneMode.APPS -> {
+                                    AppManagerList(
+                                        apps = installedApps,
+                                        includeSystemApps = includeSystemApps,
+                                        selectedPackages = selectedAppPackages,
+                                        onToggleSystemApps = onToggleSystemApps,
+                                        onToggleSelect = onToggleAppSelection,
+                                        onExportSelected = onExportSelectedApps
+                                    )
+                                }
+                                animMode == PaneMode.TRASH -> {
+                                    TrashBinList(
+                                        items = trashItems,
+                                        onRestore = onRestoreTrashItem,
+                                        onEmptyTrash = onEmptyTrash
+                                    )
+                                }
+                                filteredFiles.isEmpty() && !state.isLoading -> {
+                                    Text(
+                                        text = "此資料夾沒有檔案",
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.align(Alignment.Center)
+                                    )
+                                }
+                                animViewMode != FileViewMode.LIST -> {
                                     val cellMinSize = if (animViewMode == FileViewMode.LARGE_GRID) 132.dp else 88.dp
                                     val gridIconDp = if (animViewMode == FileViewMode.LARGE_GRID) 56.dp else 36.dp
                                     LazyVerticalGrid(
@@ -805,7 +829,8 @@ fun FileExplorerPane(
                                             )
                                         }
                                     }
-                                } else {
+                                }
+                                else -> {
                                     LazyColumn(
                                         state = listState,
                                         contentPadding = PaddingValues(bottom = bottomClearanceDp),
@@ -856,6 +881,10 @@ fun FileExplorerPane(
                                 }
                             }
                         }
+                    }
+
+                    if (state.isLoading) {
+                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
                     }
 
                     // 滑鼠拉框選取視覺層

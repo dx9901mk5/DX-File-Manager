@@ -111,7 +111,7 @@ fun FileContextMenuDialog(
         MenuOption(ContextMenuAction.OPEN_WITH, "7. 開啟方式 (Open With)", Icons.Default.OpenInNew),
         MenuOption(ContextMenuAction.OPEN_DIRECTORY, "8. 開啟所在目錄", Icons.Default.FolderOpen),
         MenuOption(ContextMenuAction.SEND_TO_OTHER_PANE, "9. 傳送到另一面板", Icons.Default.SwapHoriz),
-        MenuOption(ContextMenuAction.CREATE_SHORTCUT, "10. 建立主畫面捷徑", Icons.Default.AddToHomeScreen),
+        MenuOption(ContextMenuAction.CREATE_SHORTCUT, "10. 在桌面建立捷徑", Icons.Default.AddToHomeScreen),
         MenuOption(ContextMenuAction.PROPERTIES, "11. 屬性與雜湊值", Icons.Default.Info),
         MenuOption(ContextMenuAction.DELETE, "刪除項目", Icons.Default.Delete)
     )

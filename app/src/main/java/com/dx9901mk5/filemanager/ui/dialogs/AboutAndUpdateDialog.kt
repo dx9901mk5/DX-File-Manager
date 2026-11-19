@@ -402,6 +402,35 @@ fun SettingsAndAboutDialog(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
+                val runUpdateCheck: (String, suspend () -> Result<ReleaseInfo>) -> Unit = { loadingMsg, checkBlock ->
+                    checkingUpdate = true
+                    releaseInfo = null
+                    updateMessage = loadingMsg
+                    scope.launch {
+                        val res = checkBlock()
+                        checkingUpdate = false
+                        res.onSuccess { info ->
+                            releaseInfo = info
+                            if (info.isNewer) {
+                                val apkUrl = info.apkDownloadUrl
+                                if (apkUrl != null) {
+                                    startUpdateDownload(apkUrl, info.tagName)
+                                } else {
+                                    updateMessage = "發現新版本 ${info.tagName}，但找不到 APK 下載連結"
+                                }
+                            } else {
+                                updateMessage = if (info.apkDownloadUrl == null) {
+                                    info.releaseNotes
+                                } else {
+                                    "目前已是最新版本 (${info.tagName})｜${info.releaseNotes}"
+                                }
+                            }
+                        }.onFailure { err ->
+                            updateMessage = "檢查失敗：${err.message}"
+                        }
+                    }
+                }
+
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
                         onClick = {
@@ -415,26 +444,8 @@ fun SettingsAndAboutDialog(
                     Button(
                         enabled = !checkingUpdate && !downloading,
                         onClick = {
-                            checkingUpdate = true
-                            updateMessage = "正在檢查最新版本..."
-                            scope.launch {
-                                val res = UpdateChecker.checkLatestRelease()
-                                checkingUpdate = false
-                                res.onSuccess { info ->
-                                    releaseInfo = info
-                                    if (info.isNewer) {
-                                        val apkUrl = info.apkDownloadUrl
-                                        if (apkUrl != null) {
-                                            startUpdateDownload(apkUrl, info.tagName)
-                                        } else {
-                                            updateMessage = "發現新版本 ${info.tagName}，但找不到 APK 下載連結"
-                                        }
-                                    } else {
-                                        updateMessage = "目前已是最新版本 (${info.tagName})"
-                                    }
-                                }.onFailure { err ->
-                                    updateMessage = "檢查失敗：${err.message}"
-                                }
+                            runUpdateCheck("正在檢查最新版本...") {
+                                UpdateChecker.checkLatestRelease()
                             }
                         },
                         modifier = Modifier.weight(1f)
@@ -445,28 +456,22 @@ fun SettingsAndAboutDialog(
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
+                        enabled = !checkingUpdate && !downloading,
                         onClick = {
-                            runCatching {
-                                val intent = Intent(
-                                    Intent.ACTION_VIEW,
-                                    Uri.parse("https://drive.google.com/drive/folders/1h_I2rDnRJvTYe2V0_04AM9hAnk17wO5x")
-                                ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
-                                context.startActivity(intent)
-                            }.onFailure { updateMessage = "無法開啟測試版雲端硬碟：${it.message}" }
+                            runUpdateCheck("正在檢查測試版雲端...") {
+                                UpdateChecker.checkDriveRelease(isTestChannel = true)
+                            }
                         },
                         modifier = Modifier.weight(1f)
                     ) {
                         Text("檢查測試版雲端")
                     }
                     OutlinedButton(
+                        enabled = !checkingUpdate && !downloading,
                         onClick = {
-                            runCatching {
-                                val intent = Intent(
-                                    Intent.ACTION_VIEW,
-                                    Uri.parse("https://drive.google.com/drive/folders/1JrrkNtKZZIGEvpLaHuXRxGiCRJPQO6Vu")
-                                ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
-                                context.startActivity(intent)
-                            }.onFailure { updateMessage = "無法開啟正式版雲端硬碟：${it.message}" }
+                            runUpdateCheck("正在檢查正式版雲端...") {
+                                UpdateChecker.checkDriveRelease(isTestChannel = false)
+                            }
                         },
                         modifier = Modifier.weight(1f)
                     ) {
@@ -476,6 +481,21 @@ fun SettingsAndAboutDialog(
 
                 updateMessage?.let { msg ->
                     Text(msg, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                }
+
+                val infoForLink = releaseInfo
+                if (infoForLink != null && !checkingUpdate && !downloading) {
+                    TextButton(
+                        onClick = {
+                            runCatching {
+                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(infoForLink.htmlUrl))
+                                    .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                                context.startActivity(intent)
+                            }.onFailure { updateMessage = "無法開啟網頁：${it.message}" }
+                        }
+                    ) {
+                        Text("手動開啟雲端 / 發佈頁面")
+                    }
                 }
 
                 if (checkingUpdate) {

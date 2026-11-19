@@ -86,7 +86,12 @@ fun Modifier.dxFileTouchGesture(
         var isHolding = true
         var didDragBeyondSlop = false
         var usedSecondFinger = false
+        var sweepModeActive = true
+        var lastMoveTimeMs = System.currentTimeMillis()
+        var pauseAnchorPos = startPosition
         val visitedInSweep = mutableSetOf(touchedFile)
+        val pauseThresholdMs = 350L
+        val moveJitterSlop = touchSlop * 0.6f
 
         // 第 2 階段：持續按住監聽第二指多選點擊、第一指挪動拖曳、或原地放開
         try {
@@ -117,13 +122,24 @@ fun Modifier.dxFileTouchGesture(
                         currentOnStationaryRelease(touchedFile, usedSecondFinger)
                     }
                 } else if (primaryChange.positionChange() != Offset.Zero) {
+                    val now = System.currentTimeMillis()
                     if (!didDragBeyondSlop && (primaryChange.position - startPosition).getDistance() > touchSlop) {
                         didDragBeyondSlop = true
+                        lastMoveTimeMs = now
+                        pauseAnchorPos = primaryChange.position
                     }
                     if (didDragBeyondSlop) {
                         primaryChange.consume()
+                        if ((primaryChange.position - pauseAnchorPos).getDistance() > moveJitterSlop) {
+                            if (sweepModeActive && (now - lastMoveTimeMs) >= pauseThresholdMs) {
+                                // 手指停住後再次移動：鎖定為純拖曳模式，不再多選經過的檔案
+                                sweepModeActive = false
+                            }
+                            lastMoveTimeMs = now
+                            pauseAnchorPos = primaryChange.position
+                        }
                         val hoveredItem = currentFindItem(primaryChange.position)
-                        if (hoveredItem != null && visitedInSweep.add(hoveredItem)) {
+                        if (sweepModeActive && hoveredItem != null && visitedInSweep.add(hoveredItem)) {
                             DxHaptics.lightVibrate(context, hapticView)
                             currentOnSweepSelectItem(hoveredItem, primaryChange.position)
                         }
