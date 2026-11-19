@@ -179,8 +179,7 @@
   - GitHub 最後成功發布於 Releases 的版本：`v1.0.17` (`versionCode = 18`)。
   - 目前帳號 `dx9901mk5` 因系統停權（`403 Your account is suspended`）暫無法 `git push`；已透過 `help.github.com` 送出帳號恢復申訴，工單編號 **`#5015727`**（通知寄往 `dx9901mk5@gmail.com`）。待恢復後可將本機 `main`（含 `v1.0.18`～`v2.0.1`）推送至 `origin`。
 - **本機編譯與發布通道**：
-  - **最新本機簽名測試版 APK**：`v2.1.6` (`versionCode = 216`)，位於 `測試用/DX_fileManager-v2.1.6-release.apk` 與 `release_apks/DX_fileManager-v2.1.6-release.apk`（`55,921,098 bytes`）。
-  - **最新已驗證正式版 APK**：`v2.1.4` (`versionCode = 214`)，位於 `正式發布/DX_fileManager-v2.1.4-正式版.apk`（`55,888,066 bytes`）。
+  - **最新本機簽名正式版 APK**：`v2.1.6` (`versionCode = 216`)，位於 `正式發布/DX_fileManager-v2.1.6-正式版.apk`（`55,921,098 bytes`），測試用與備份同步僅保留最新版本於 `測試用/DX_fileManager-v2.1.6-release.apk` 與 `release_apks/DX_fileManager-v2.1.6-release.apk`（已清除所有舊版 APK）。
   - **近期關鍵更新摘要（v1.2.7 → v2.1.6）**：
     - `v2.1.6`：全面擴充並串接四國語言介面（繁體中文、简体中文、English、日本語），於 `DxI18n.kt` 建立 `LocalDxStrings`，使導覽側邊欄、檔案面板、多選底部操作列、右鍵選單及設定更新對話框支援即時切換語言。
     - `v2.1.5`：依 Google Play Adaptive App Quality Guidelines 補齊自適應與大螢幕相容規範（`AndroidManifest.xml` 加入 `touchscreen required="false"`、`enableOnBackInvokedCallback="true"` 與完整 `configChanges`，`themes.xml` / `values-v30/themes.xml` 設定 `windowLayoutInDisplayCutoutMode` 消除橫向黑邊）；重構 `FileExplorerPane.kt` 資料夾切換動畫層級（不因 `isLoading` 或空資料夾卸載打斷），實作進入 1 秒由中心展開＋`OvershootInterpolator` 回彈、離開 1 秒 `AnticipateInterpolator` 回彈收合特效。
