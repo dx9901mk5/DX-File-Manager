@@ -302,12 +302,11 @@ class MainActivity : ComponentActivity() {
 
     private fun ensureStoragePermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
-            runCatching {
-                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                    data = Uri.parse("package:$packageName")
-                }
-                startActivity(intent)
-            }
+            com.dx9901mk5.filemanager.ui.dialogs.openSettingsWithScrollHighlight(
+                context = this,
+                action = Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                fallbackAction = Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION
+            )
         }
     }
 }
@@ -1197,12 +1196,12 @@ private fun DxFileManagerScreen(
                             SystemCrossAppDragHelper.setFreeformGuideSuppressed(activityContext, true)
                         }
                         showFreeformGuideDialog = false
-                        runCatching {
-                            val devIntent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            activityContext.startActivity(devIntent)
-                        }
+                        com.dx9901mk5.filemanager.ui.dialogs.openSettingsWithScrollHighlight(
+                            context = activityContext,
+                            action = Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS,
+                            packageName = null,
+                            highlightKey = "enable_freeform_support"
+                        )
                     }) {
                         Text(s.freeformGoDevSettings)
                     }

@@ -1,8 +1,13 @@
 package com.dx9901mk5.filemanager.ui.dialogs
 
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import android.os.Environment
+import android.provider.Settings
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -240,6 +245,72 @@ fun SettingsAndAboutDialog(
                             ) {
                                 Text("重新偵測")
                             }
+                        }
+                    }
+                }
+                val hasAllFilesAccess = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    Environment.isExternalStorageManager()
+                } else {
+                    true
+                }
+                val canInstallUnknownApps = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.packageManager.canRequestPackageInstalls()
+                } else {
+                    true
+                }
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "系統授權與權限連動（自動定位至本 App）",
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium)
+                    )
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                                    openSettingsWithScrollHighlight(
+                                        context = context,
+                                        action = Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                                        fallbackAction = Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION
+                                    )
+                                } else {
+                                    openSettingsWithScrollHighlight(
+                                        context = context,
+                                        action = Settings.ACTION_APPLICATION_DETAILS_SETTINGS
+                                    )
+                                }
+                            }
+                        ) {
+                            Text(if (hasAllFilesAccess) "所有檔案存取：已授權" else "前往授權所有檔案存取")
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                    openSettingsWithScrollHighlight(
+                                        context = context,
+                                        action = Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES
+                                    )
+                                } else {
+                                    openSettingsWithScrollHighlight(
+                                        context = context,
+                                        action = Settings.ACTION_APPLICATION_DETAILS_SETTINGS
+                                    )
+                                }
+                            }
+                        ) {
+                            Text(if (canInstallUnknownApps) "未知來源安裝：已授權" else "前往授權安裝 APK")
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                openSettingsWithScrollHighlight(
+                                    context = context,
+                                    action = Settings.ACTION_APPLICATION_DETAILS_SETTINGS
+                                )
+                            }
+                        ) {
+                            Text("應用詳情 / 關聯啟動")
                         }
                     }
                 }
@@ -563,5 +634,31 @@ private fun SettingSwitchRow(
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Switch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+fun openSettingsWithScrollHighlight(
+    context: Context,
+    action: String,
+    packageName: String? = context.packageName,
+    highlightKey: String = context.packageName,
+    fallbackAction: String? = null
+) {
+    val args = Bundle().apply {
+        putString(":settings:fragment_args_key", highlightKey)
+    }
+    fun buildIntent(act: String, withPkgData: Boolean): Intent = Intent(act).apply {
+        if (withPkgData && !packageName.isNullOrBlank()) {
+            data = Uri.parse("package:$packageName")
+        }
+        putExtra(":settings:fragment_args_key", highlightKey)
+        putExtra(":settings:show_fragment_args", args)
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    if (runCatching { context.startActivity(buildIntent(action, true)) }.isSuccess) return
+    if (fallbackAction != null && runCatching { context.startActivity(buildIntent(fallbackAction, false)) }.isSuccess) return
+    if (runCatching { context.startActivity(buildIntent(action, false)) }.isSuccess) return
+    runCatching {
+        context.startActivity(buildIntent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, true))
     }
 }
