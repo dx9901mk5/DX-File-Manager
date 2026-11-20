@@ -177,7 +177,7 @@
 ## 4. 待辦與進行中紀錄（接續對話用 — 2026-11-18 更新）
 - **GitHub 帳號與發布狀態**：
   - GitHub 帳號 `dx9901mk5` 已恢復；公開倉庫（`https://github.com/dx9901mk5/DX_fileManager`）已改為**純發布頁**：`main`（`0d64ad8`）與所有遠端 Tag 均已強制重置為僅含中英文 `README.md` 的單一乾淨歷史（清空所有公開原始碼與舊 Git 歷史中的敏感檔），完整原始碼僅保留於本機工作目錄。
-  - 最新 GitHub Release：`v2.2.0`（`DX_fileManager-v2.2.0-release.apk`，`55,953,938 bytes`），公開倉庫維持純發布頁（僅含中英文 `README.md`、雙語 About 與 Releases `.apk`）。
+  - 最新 GitHub Release：`v2.2.1`（`DX_fileManager-v2.2.1-github-release.apk`，`55,954,314 bytes`；已清除 `v1.0.0`～`v2.2.0` 所有舊版 Release 與 Tag），公開倉庫維持純發布頁（僅含中英文 `README.md`、雙語 About 與 Releases `.apk`）。
 - **本機編譯與發布通道**：
   - **最新本機簽名正式版（v2.2.1，雙版本共存）**：
     - **GitHub 版 (`full`)**：`com.dx9901mk5.filemanager.github` (`versionCode = 221`)，位於 `github版/DX_fileManager-v2.2.1-github-release.apk`（`55,954,314 bytes`）與 `release_apks/DX_fileManager-v2.2.1-github-release.apk`；圖示右下角附 `git` 徽章，可與 Play 版同機共存。
