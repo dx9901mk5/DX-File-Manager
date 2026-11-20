@@ -68,10 +68,10 @@ object PlayBillingBridge : PurchasesUpdatedListener {
         val params = QueryProductDetailsParams.newBuilder()
             .setProductList(productList)
             .build()
-        client.queryProductDetailsAsync(params) { result, detailsList ->
+        client.queryProductDetailsAsync(params) { result, queryResult ->
             if (result.responseCode == BillingClient.BillingResponseCode.OK) {
                 val priceMap = mutableMapOf<ProPlan, String>()
-                detailsList.forEach { details ->
+                queryResult.productDetailsList.forEach { details ->
                     productDetailsMap[details.productId] = details
                     val plan = ProPlan.entries.firstOrNull { it.productId == details.productId }
                     val price = details.oneTimePurchaseOfferDetails?.formattedPrice
