@@ -61,18 +61,32 @@ fun Modifier.dxVerticalOverscrollBounce(): Modifier = composed {
                 return Offset.Zero
             }
 
+            override suspend fun onPreFling(available: Velocity): Velocity {
+                if (overscrollOffset.value != 0f) {
+                    overscrollOffset.animateTo(
+                        targetValue = 0f,
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    )
+                    return available
+                }
+                return Velocity.Zero
+            }
+
             override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                if (overscrollOffset.value == 0f && abs(available.y) > 250f) {
-                    // 慣性高速滑到底/頂時給予微幅撞擊回彈衝量
-                    val impulse = (available.y * 0.022f).coerceIn(-maxOverscrollPx * 0.55f, maxOverscrollPx * 0.55f)
+                if (overscrollOffset.value == 0f && abs(available.y) > 400f) {
+                    // 慣性高速滑到底/頂時給予微幅撞擊回彈衝量，單次平順歸位
+                    val impulse = (available.y * 0.018f).coerceIn(-maxOverscrollPx * 0.45f, maxOverscrollPx * 0.45f)
                     overscrollOffset.snapTo(impulse)
                 }
                 if (overscrollOffset.value != 0f) {
                     overscrollOffset.animateTo(
                         targetValue = 0f,
                         animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessMediumLow
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMedium
                         )
                     )
                 }

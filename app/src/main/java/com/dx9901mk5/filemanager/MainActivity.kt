@@ -25,7 +25,13 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.LocalOverscrollConfiguration
 import androidx.compose.foundation.background
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -135,16 +141,32 @@ class MainActivity : ComponentActivity() {
     private var assignedWindowSlot: Int = 2
     private val activeShortcutGroup = mutableStateOf<Pair<String, List<VfsFile>>?>(null)
 
+    private val showStoragePermissionDialog = mutableStateOf(false)
+
     private val requestNotificationPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { _ -> }
 
-    @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
+    private val requestLegacyStoragePermission =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { _ ->
+            if (hasStoragePermission()) {
+                showStoragePermissionDialog.value = false
+                viewModel.refreshStorageSpace()
+                viewModel.navigateToPath(2, viewModel.pane2State.value.currentPath)
+                viewModel.navigateToPath(3, viewModel.pane3State.value.currentPath)
+                ensureNotificationPermission()
+            }
+        }
+
+    @OptIn(ExperimentalMaterial3WindowSizeClassApi::class, ExperimentalFoundationApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         ProLicenseManager.init(this)
-        ensureStoragePermission()
-        ensureNotificationPermission()
+        if (hasStoragePermission()) {
+            ensureNotificationPermission()
+        } else {
+            showStoragePermissionDialog.value = true
+        }
         OAuth2AuthHelper.handleRedirectIntent(intent)
 
         val preferredSlot = intent.getIntExtra("extra_window_slot", -1).takeIf { it in 2..9 }
@@ -172,7 +194,26 @@ class MainActivity : ComponentActivity() {
                 darkTheme = settings.darkTheme,
                 darkBackgroundStyle = settings.darkBackgroundStyle
             ) {
-                CompositionLocalProvider(LocalDxStrings provides dxStringsFor(settings.language)) {
+                CompositionLocalProvider(
+                    LocalDxStrings provides dxStringsFor(settings.language),
+                    LocalOverscrollConfiguration provides null
+                ) {
+                    val lifecycleOwner = LocalLifecycleOwner.current
+                    DisposableEffect(lifecycleOwner) {
+                        val observer = LifecycleEventObserver { _, event ->
+                            if (event == Lifecycle.Event.ON_RESUME && hasStoragePermission()) {
+                                if (showStoragePermissionDialog.value) {
+                                    showStoragePermissionDialog.value = false
+                                    viewModel.refreshStorageSpace()
+                                    viewModel.navigateToPath(2, viewModel.pane2State.value.currentPath)
+                                    viewModel.navigateToPath(3, viewModel.pane3State.value.currentPath)
+                                    ensureNotificationPermission()
+                                }
+                            }
+                        }
+                        lifecycleOwner.lifecycle.addObserver(observer)
+                        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+                    }
                     val isGithubExpired = remember {
                         !BuildConfig.IS_PLAY_EDITION && isGithubEditionExpired()
                     }
@@ -200,6 +241,32 @@ class MainActivity : ComponentActivity() {
                             windowSlot = assignedWindowSlot,
                             isSmallWindowMode = isSmallWindowMode
                         )
+
+                        if (showStoragePermissionDialog.value) {
+                            AlertDialog(
+                                onDismissRequest = {
+                                    showStoragePermissionDialog.value = false
+                                    ensureNotificationPermission()
+                                },
+                                title = { Text("需要檔案管理權限") },
+                                text = {
+                                    Text("DX 檔案管理器需要「所有檔案存取權」才能瀏覽、搬移、壓縮與管理您裝置中的檔案與資料夾。")
+                                },
+                                confirmButton = {
+                                    Button(onClick = { ensureStoragePermission() }) {
+                                        Text("立即授權")
+                                    }
+                                },
+                                dismissButton = {
+                                    TextButton(onClick = {
+                                        showStoragePermissionDialog.value = false
+                                        ensureNotificationPermission()
+                                    }) {
+                                        Text("稍後再說")
+                                    }
+                                }
+                            )
+                        }
 
                 activeShortcutGroup.value?.let { (groupTitle, groupFiles) ->
                     AlertDialog(
@@ -328,12 +395,32 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun hasStoragePermission(): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            Environment.isExternalStorageManager()
+        } else {
+            ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            ) == PackageManager.PERMISSION_GRANTED
+        }
+    }
+
     private fun ensureStoragePermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
-            com.dx9901mk5.filemanager.ui.dialogs.openSettingsWithScrollHighlight(
-                context = this,
-                action = Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                fallbackAction = Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                com.dx9901mk5.filemanager.ui.dialogs.openSettingsWithScrollHighlight(
+                    context = this,
+                    action = Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                    fallbackAction = Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION
+                )
+            }
+        } else if (!hasStoragePermission()) {
+            requestLegacyStoragePermission.launch(
+                arrayOf(
+                    Manifest.permission.READ_EXTERNAL_STORAGE,
+                    Manifest.permission.WRITE_EXTERNAL_STORAGE
+                )
             )
         }
     }
