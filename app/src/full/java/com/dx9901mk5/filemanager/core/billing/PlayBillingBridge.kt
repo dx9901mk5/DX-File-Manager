@@ -8,7 +8,7 @@ object PlayBillingBridge {
         // GitHub 版無須串接 Google Play Billing
     }
 
-    fun launchPurchase(activity: Activity, onMessage: (String) -> Unit) {
+    fun launchPurchase(activity: Activity, plan: ProPlan, onMessage: (String) -> Unit) {
         onMessage("GitHub 版無須付費解鎖")
     }
 

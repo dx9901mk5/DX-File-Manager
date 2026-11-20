@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.dx9901mk5.filemanager.R
 import com.dx9901mk5.filemanager.core.billing.ProLicenseManager
+import com.dx9901mk5.filemanager.core.billing.ProPlan
 import com.dx9901mk5.filemanager.core.settings.LocalDxStrings
 
 @Composable
@@ -47,15 +48,19 @@ fun ProUpgradeDialog(
     val licenseStatus by ProLicenseManager.status.collectAsState()
     var billingNote by remember { mutableStateOf<String?>(null) }
 
-    val (title, badgeText, featuresText, buyText, restoreText) = when (s.done) {
+    val p3 = licenseStatus.planPrices[ProPlan.DEVICES_3] ?: ProPlan.DEVICES_3.defaultPriceLabel
+    val p10 = licenseStatus.planPrices[ProPlan.DEVICES_10] ?: ProPlan.DEVICES_10.defaultPriceLabel
+    val pUnlim = licenseStatus.planPrices[ProPlan.UNLIMITED] ?: ProPlan.UNLIMITED.defaultPriceLabel
+
+    val (title, badgeText, featuresText, restoreText) = when (s.done) {
         "Done" -> listOf(
             "Unlock DX File Manager Pro",
             if (licenseStatus.isTrialActive) "Free Trial: ${licenseStatus.trialDaysLeft} day(s) left"
             else "7-Day Free Trial Ended",
-            "• Unlimited Cloud & Network Mounts (Free: max 2 mounts, 1 account per cloud type)\n" +
+            "• Unlimited Cloud & Network Mounts (Free: max 2 mounts, 1 account per type)\n" +
                 "• Multi-Account Support for Same Cloud Provider\n" +
-                "• Freeform Multi-Window Mode (up to 8 resizable floating windows with cross-app drag & drop, as shown below)",
-            if (licenseStatus.productPriceLabel != null) "Unlock Pro (${licenseStatus.productPriceLabel})" else "Unlock Pro",
+                "• Freeform Multi-Window Mode (up to 8 resizable floating windows, as shown below)\n" +
+                "• Device Binding Policy: Bound devices cannot be removed. If device limit is full, please purchase again. Reinstalling/restoring on the original device via Google account restores the license without counting twice.",
             "Restore Purchase"
         )
         "完了" -> listOf(
@@ -64,8 +69,8 @@ fun ProUpgradeDialog(
             else "7日間の無料体験が終了しました",
             "・クラウド／ネットワーク接続の上限解除（無料版は最大2個・同種クラウド1アカウントまで）\n" +
                 "・同一クラウドの複数アカウント同時接続に対応\n" +
-                "・マルチウィンドウ（フリーフォーム小窓）モード解放（下図のように最大8個の小窓でドラッグ＆ドロップ連携）",
-            if (licenseStatus.productPriceLabel != null) "Pro版を購入 (${licenseStatus.productPriceLabel})" else "Pro版を購入",
+                "・マルチウィンドウ（フリーフォーム小窓）モード解放（下図のように最大8個の小窓）\n" +
+                "・端末バインド規定：登録済み端末の削除はできません。上限に達した場合は再購入が必要です（同一端末のGoogleアカウント復元では台数加算されません）。",
             "購入を復元"
         )
         "完成" -> if (s.selectAll == "全选") listOf(
@@ -74,8 +79,8 @@ fun ProUpgradeDialog(
             else "7 天免费试用已结束",
             "• 解锁云盘／网络挂载数量上限（免费版最多 2 个，且同类别仅限 1 个账号）\n" +
                 "• 支持同一类别云盘挂载多个账号\n" +
-                "• 解锁自由小窗模式（如下图所示，最多同时开启 8 个小窗并支持跨 App 拖拽交互）",
-            if (licenseStatus.productPriceLabel != null) "立即解锁 (${licenseStatus.productPriceLabel})" else "立即解锁 Pro 版",
+                "• 解锁自由小窗模式（如下图所示，最多同时开启 8 个小窗并跨 App 拖拽）\n" +
+                "• 设备绑定规则：不提供移除已绑定设备，名额满后需重新购买；原手机配合 Google 账号还原可恢复授权，不重复累计设备数。",
             "恢复购买"
         ) else listOf(
             "升級 DX檔案管理器 Pro 版",
@@ -83,8 +88,8 @@ fun ProUpgradeDialog(
             else "7 天免費試用已結束",
             "• 解除雲端／網路硬碟掛載上限（免費版最多 2 個，且單一類別僅限 1 個帳號）\n" +
                 "• 支援單一類別雲端同時掛載多個帳號\n" +
-                "• 解鎖自由小視窗模式（如下圖所示，最多同時開啟 8 個獨立分區小視窗並跨 App 拖曳交互）",
-            if (licenseStatus.productPriceLabel != null) "立即解鎖 (${licenseStatus.productPriceLabel})" else "立即解鎖 Pro 版",
+                "• 解鎖自由小視窗模式（如下圖所示，最多同時開啟 8 個獨立分區小視窗並跨 App 拖曳）\n" +
+                "• 裝置綁定說明：不提供移除裝置，額度滿了須重新購買；原手機配合 Google 帳號還原可恢復授權，不累計裝置數量。",
             "恢復購買"
         )
         else -> listOf(
@@ -93,10 +98,48 @@ fun ProUpgradeDialog(
             else "7 天免費試用已結束",
             "• 解除雲端／網路硬碟掛載上限（免費版最多 2 個，且單一類別僅限 1 個帳號）\n" +
                 "• 支援單一類別雲端同時掛載多個帳號\n" +
-                "• 解鎖自由小視窗模式（如下圖所示，最多同時開啟 8 個獨立分區小視窗並跨 App 拖曳交互）",
-            if (licenseStatus.productPriceLabel != null) "立即解鎖 (${licenseStatus.productPriceLabel})" else "立即解鎖 Pro 版",
+                "• 解鎖自由小視窗模式（如下圖所示，最多同時開啟 8 個獨立分區小視窗並跨 App 拖曳）\n" +
+                "• 裝置綁定說明：不提供移除裝置，額度滿了須重新購買；原手機配合 Google 帳號還原可恢復授權，不累計裝置數量。",
             "恢復購買"
         )
+    }
+
+    val planLabels = when (s.done) {
+        "Done" -> Triple(
+            "3 Devices ($p3)",
+            "10 Devices ($p10)",
+            "Lifetime Unlimited ($pUnlim)"
+        )
+        "完了" -> Triple(
+            "3台まで解除 ($p3)",
+            "10台まで解除 ($p10)",
+            "永久・無制限 ($pUnlim)"
+        )
+        "完成" -> if (s.selectAll == "全选") Triple(
+            "解锁 3 个设备 ($p3)",
+            "解锁 10 个设备 ($p10)",
+            "永久无限设备授权 ($pUnlim)"
+        ) else Triple(
+            "解鎖 3 個裝置 ($p3)",
+            "解鎖 10 個裝置 ($p10)",
+            "永久無限裝置授權 ($pUnlim)"
+        )
+        else -> Triple(
+            "解鎖 3 個裝置 ($p3)",
+            "解鎖 10 個裝置 ($p10)",
+            "永久無限裝置授權 ($pUnlim)"
+        )
+    }
+
+    fun triggerBuy(plan: ProPlan) {
+        if (activity == null) return
+        ProLicenseManager.launchPurchase(activity, plan) { msg ->
+            billingNote = msg
+            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+            if (ProLicenseManager.status.value.isProPurchased) {
+                onDismiss()
+            }
+        }
     }
 
     AlertDialog(
@@ -118,8 +161,11 @@ fun ProUpgradeDialog(
                     shape = RoundedCornerShape(10.dp),
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.7f)
                 ) {
+                    val deviceInfo = if (licenseStatus.maxDevices > 0 && !licenseStatus.isUnlimited) {
+                        " ｜ 裝置 ${licenseStatus.boundDeviceCount}/${licenseStatus.maxDevices}"
+                    } else ""
                     Text(
-                        text = badgeText,
+                        text = "$badgeText$deviceInfo",
                         style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
@@ -147,9 +193,30 @@ fun ProUpgradeDialog(
                     contentScale = ContentScale.Fit,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 240.dp)
+                        .heightIn(max = 200.dp)
                         .clip(RoundedCornerShape(14.dp))
                 )
+
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedButton(
+                        onClick = { triggerBuy(ProPlan.DEVICES_3) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(planLabels.first)
+                    }
+                    OutlinedButton(
+                        onClick = { triggerBuy(ProPlan.DEVICES_10) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(planLabels.second)
+                    }
+                    Button(
+                        onClick = { triggerBuy(ProPlan.UNLIMITED) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(planLabels.third)
+                    }
+                }
 
                 billingNote?.let { note ->
                     Text(
@@ -161,10 +228,9 @@ fun ProUpgradeDialog(
             }
         },
         confirmButton = {
-            Button(
+            OutlinedButton(
                 onClick = {
-                    if (activity == null) return@Button
-                    ProLicenseManager.launchPurchase(activity) { msg ->
+                    ProLicenseManager.restorePurchases(context) { msg ->
                         billingNote = msg
                         Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
                         if (ProLicenseManager.status.value.isProPurchased) {
@@ -173,27 +239,12 @@ fun ProUpgradeDialog(
                     }
                 }
             ) {
-                Text(buyText)
+                Text(restoreText)
             }
         },
         dismissButton = {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedButton(
-                    onClick = {
-                        ProLicenseManager.restorePurchases(context) { msg ->
-                            billingNote = msg
-                            Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
-                            if (ProLicenseManager.status.value.isProPurchased) {
-                                onDismiss()
-                            }
-                        }
-                    }
-                ) {
-                    Text(restoreText)
-                }
-                TextButton(onClick = onDismiss) {
-                    Text(s.cancel)
-                }
+            TextButton(onClick = onDismiss) {
+                Text(s.cancel)
             }
         }
     )
