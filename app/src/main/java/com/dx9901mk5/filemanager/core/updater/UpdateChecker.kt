@@ -57,9 +57,11 @@ object UpdateChecker {
                             for (i in 0 until assets.length()) {
                                 val asset = assets.getJSONObject(i)
                                 val name = asset.optString("name")
-                                if (name.endsWith(".apk", ignoreCase = true)) {
+                                if (name.endsWith(".apk", ignoreCase = true) &&
+                                    !name.contains("Shizuku", ignoreCase = true)
+                                ) {
                                     apkUrl = asset.optString("browser_download_url")
-                                    break
+                                    if (name.startsWith("DX_fileManager", ignoreCase = true)) break
                                 }
                             }
                         }
@@ -76,9 +78,8 @@ object UpdateChecker {
                 }
             }
 
-            // 2. 檢查 Google 雲端硬碟（正式版資料夾、測試版資料夾）
+            // 2. 檢查正式版 Google 雲端硬碟備援（不再檢查測試版資料夾）
             fetchLatestFromDriveFolder(DRIVE_RELEASE_FOLDER_ID, "正式版雲端硬碟")?.let { candidates += it }
-            fetchLatestFromDriveFolder(DRIVE_TEST_FOLDER_ID, "測試版雲端硬碟")?.let { candidates += it }
 
             if (candidates.isEmpty()) {
                 throw IllegalStateException("無法取得線上版本資訊，請檢查網路連線")

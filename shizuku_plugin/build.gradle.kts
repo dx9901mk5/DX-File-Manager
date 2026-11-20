@@ -20,8 +20,8 @@ android {
         applicationId = "com.dx9901mk5.filemanager.shizukuplugin"
         minSdk = 29
         targetSdk = 35
-        versionCode = 100
-        versionName = "1.0.0"
+        versionCode = 110
+        versionName = "1.1.0"
         base.archivesName.set("DX_Shizuku_Helper-v${versionName}")
     }
 
