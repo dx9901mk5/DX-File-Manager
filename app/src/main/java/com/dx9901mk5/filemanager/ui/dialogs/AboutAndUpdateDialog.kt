@@ -145,10 +145,10 @@ fun SettingsAndAboutDialog(
                 } else {
                     true
                 }
-                val canInstallUnknownApps = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.packageManager.canRequestPackageInstalls()
+                val canInstallUnknownApps = if (!BuildConfig.IS_PLAY_EDITION && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    runCatching { context.packageManager.canRequestPackageInstalls() }.getOrDefault(false)
                 } else {
-                    true
+                    false
                 }
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
