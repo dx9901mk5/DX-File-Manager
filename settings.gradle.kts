@@ -17,3 +17,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "DX_fileManager"
 include(":app")
+include(":shizuku_plugin")

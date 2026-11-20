@@ -1,10 +1,15 @@
 package com.dx9901mk5.filemanager.ui
 
 import android.app.Application
+import android.content.ComponentName
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Environment
+import android.webkit.MimeTypeMap
 import android.widget.Toast
+import java.util.Locale
 import androidx.core.content.FileProvider
 import androidx.core.content.pm.ShortcutInfoCompat
 import com.dx9901mk5.filemanager.core.shortcut.ShortcutHelper
@@ -77,6 +82,20 @@ data class ClipboardState(
     val isCut: Boolean
 )
 
+data class OpenWithCandidate(
+    val packageName: String,
+    val activityName: String,
+    val appLabel: String
+)
+
+data class OpenWithPrompt(
+    val file: File,
+    val mimeType: String,
+    val defaultKey: String,
+    val currentDefaultPkg: String?,
+    val candidates: List<OpenWithCandidate>
+)
+
 class FileManagerViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as DxFileManagerApp
     private val prefs = app.preferences
@@ -103,6 +122,8 @@ class FileManagerViewModel(application: Application) : AndroidViewModel(applicat
     val localStorageSpace = MutableStateFlow<StorageSpaceInfo?>(null)
     val clipboard = MutableStateFlow<ClipboardState?>(null)
     val installedApps = MutableStateFlow<List<InstalledAppInfo>>(emptyList())
+    val openWithPrompt = MutableStateFlow<OpenWithPrompt?>(null)
+    private val defaultAppPrefs = app.getSharedPreferences("dx_default_open_apps", Context.MODE_PRIVATE)
     val includeSystemApps = MutableStateFlow(false)
     val selectedAppPackages = MutableStateFlow<Set<String>>(emptySet())
 
@@ -492,7 +513,10 @@ class FileManagerViewModel(application: Application) : AndroidViewModel(applicat
             return
         }
         val localFile = File(file.path)
-        if (localFile.extension.equals("apk", ignoreCase = true) && settings.value.useShizukuInstall) {
+        if (localFile.extension.equals("apk", ignoreCase = true) &&
+            settings.value.useShizukuInstall &&
+            ShizukuApkInstaller.isShizukuPluginInstalled(app)
+        ) {
             installApkWithShizukuOrFallback(localFile)
             return
         }
@@ -501,59 +525,175 @@ class FileManagerViewModel(application: Application) : AndroidViewModel(applicat
 
     fun installApksWithShizuku(apkFiles: List<File>) {
         if (apkFiles.isEmpty()) return
-        viewModelScope.launch {
-            if (!ShizukuApkInstaller.isShizukuAvailable()) {
-                toast("Shizuku 服務未啟動，請先開啟 Shizuku App")
-                return@launch
-            }
-            if (!ShizukuApkInstaller.isShizukuReady()) {
-                ShizukuApkInstaller.requestShizukuPermission()
-                toast("請先在彈窗允許 Shizuku 授權後再試一次")
-                return@launch
-            }
-            var okCount = 0
-            var lastErr: String? = null
-            apkFiles.forEach { apk ->
-                toast("正在透過 Shizuku 安裝 ${apk.name}...")
-                ShizukuApkInstaller.installApkSilently(apk)
-                    .onSuccess { okCount++ }
-                    .onFailure { lastErr = it.message }
-            }
-            if (okCount == apkFiles.size) {
-                toast("透過 Shizuku 成功安裝 $okCount 個 APK！")
-            } else {
-                toast("Shizuku 安裝完成 $okCount/${apkFiles.size} 個（${lastErr ?: "部分失敗"}）")
-            }
-        }
+        ShizukuApkInstaller.installApksViaPlugin(app, apkFiles)
+            .onFailure { toast(it.message ?: "無法啟動 DX Shizuku 安裝助手") }
     }
 
     fun installApkWithShizukuOrFallback(apkFile: File) {
-        viewModelScope.launch {
-            if (settings.value.useShizukuInstall && ShizukuApkInstaller.isShizukuReady()) {
-                toast("正在透過 Shizuku 靜默安裝 ${apkFile.name}...")
-                ShizukuApkInstaller.installApkSilently(apkFile)
-                    .onSuccess { toast("靜默安裝成功！") }
-                    .onFailure {
-                        toast("Shizuku 安裝失敗，改用系統安裝器：${it.message}")
-                        openWithSystemChooser(apkFile, "application/vnd.android.package-archive")
-                    }
-            } else {
-                openWithSystemChooser(apkFile, "application/vnd.android.package-archive")
-            }
+        if (settings.value.useShizukuInstall && ShizukuApkInstaller.isShizukuPluginInstalled(app)) {
+            ShizukuApkInstaller.installApksViaPlugin(app, listOf(apkFile))
+                .onFailure {
+                    toast("外掛安裝失敗，改用系統安裝器：${it.message}")
+                    openWithSystemChooser(apkFile, "application/vnd.android.package-archive")
+                }
+        } else {
+            openWithSystemChooser(apkFile, "application/vnd.android.package-archive")
         }
     }
 
-    fun openWithSystemChooser(localFile: File, mimeType: String) {
+    private fun resolveOpenMimeType(localFile: File, hintMime: String): String {
+        val ext = localFile.extension.lowercase(Locale.ROOT)
+        if (ext.isNotEmpty()) {
+            MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext)?.let { return it }
+            when (ext) {
+                "mkv", "avi", "mov", "wmv", "flv", "rmvb", "ts", "m2ts", "webm", "3gp", "mp4" -> return "video/*"
+                "mp3", "flac", "wav", "aac", "ogg", "m4a", "opus", "ape" -> return "audio/*"
+                "jpg", "jpeg", "png", "gif", "webp", "bmp", "heic", "heif" -> return "image/*"
+                "apk" -> return "application/vnd.android.package-archive"
+                "pdf" -> return "application/pdf"
+            }
+        }
+        return hintMime.takeIf { it.isNotBlank() && it != "*/*" } ?: "*/*"
+    }
+
+    private fun defaultPreferenceKey(localFile: File, mimeType: String): String {
+        val m = mimeType.lowercase(Locale.ROOT)
+        return when {
+            m.startsWith("video/") -> "cat:video/*"
+            m.startsWith("audio/") -> "cat:audio/*"
+            m.startsWith("image/") -> "cat:image/*"
+            localFile.extension.isNotBlank() -> "ext:${localFile.extension.lowercase(Locale.ROOT)}"
+            else -> "mime:$m"
+        }
+    }
+
+    fun openWithSystemChooser(localFile: File, mimeType: String, forceAsk: Boolean = false) {
+        val resolvedMime = resolveOpenMimeType(localFile, mimeType)
+        val prefKey = defaultPreferenceKey(localFile, resolvedMime)
+        val savedPkg = defaultAppPrefs.getString(prefKey, null)
+
+        if (!forceAsk && !savedPkg.isNullOrBlank()) {
+            val launched = launchWithTarget(localFile, resolvedMime, savedPkg, activityName = null)
+            if (launched) return
+            defaultAppPrefs.edit().remove(prefKey).apply()
+        }
+
+        val uri = runCatching {
+            FileProvider.getUriForFile(app, "${app.packageName}.fileprovider", localFile)
+        }.getOrNull()
+        if (uri == null) {
+            toast("無法存取該檔案")
+            return
+        }
+
+        val queryIntent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, resolvedMime)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        val pm = app.packageManager
+        val resolvedList = runCatching {
+            pm.queryIntentActivities(queryIntent, PackageManager.MATCH_DEFAULT_ONLY)
+        }.getOrDefault(emptyList())
+
+        val candidates = resolvedList
+            .filter { it.activityInfo.packageName != app.packageName }
+            .distinctBy { it.activityInfo.packageName }
+            .map { info ->
+                OpenWithCandidate(
+                    packageName = info.activityInfo.packageName,
+                    activityName = info.activityInfo.name,
+                    appLabel = info.loadLabel(pm).toString().ifBlank { info.activityInfo.packageName }
+                )
+            }
+
+        if (candidates.isNotEmpty()) {
+            if (!forceAsk && candidates.size == 1) {
+                val only = candidates.first()
+                if (launchWithTarget(localFile, resolvedMime, only.packageName, only.activityName)) return
+            }
+            openWithPrompt.value = OpenWithPrompt(
+                file = localFile,
+                mimeType = resolvedMime,
+                defaultKey = prefKey,
+                currentDefaultPkg = savedPkg,
+                candidates = candidates
+            )
+            return
+        }
+
+        // 若系統未回傳候選清單，直接送出 ACTION_VIEW（不包 createChooser，讓系統原生彈窗保留「一律採用」）
+        launchSystemDirectView(uri, resolvedMime)
+    }
+
+    fun launchOpenWithCandidate(
+        prompt: OpenWithPrompt,
+        candidate: OpenWithCandidate,
+        setAsDefault: Boolean
+    ) {
+        if (setAsDefault) {
+            defaultAppPrefs.edit().putString(prompt.defaultKey, candidate.packageName).apply()
+        }
+        openWithPrompt.value = null
+        if (!launchWithTarget(prompt.file, prompt.mimeType, candidate.packageName, candidate.activityName)) {
+            toast("無法使用 ${candidate.appLabel} 開啟此檔案")
+        }
+    }
+
+    fun launchSystemOpenChooser(prompt: OpenWithPrompt) {
+        openWithPrompt.value = null
         runCatching {
-            val uri: Uri = FileProvider.getUriForFile(app, "${app.packageName}.fileprovider", localFile)
+            val uri = FileProvider.getUriForFile(app, "${app.packageName}.fileprovider", prompt.file)
+            launchSystemDirectView(uri, prompt.mimeType)
+        }.onFailure {
+            toast("找不到可開啟此檔案的應用程式")
+        }
+    }
+
+    fun dismissOpenWithPrompt() {
+        openWithPrompt.value = null
+    }
+
+    fun clearDefaultOpenApp(localFile: File, mimeType: String) {
+        val resolvedMime = resolveOpenMimeType(localFile, mimeType)
+        val prefKey = defaultPreferenceKey(localFile, resolvedMime)
+        defaultAppPrefs.edit().remove(prefKey).apply()
+        toast("已重置此類檔案的預設開啟程式（$resolvedMime）")
+    }
+
+    fun clearAllDefaultOpenApps() {
+        defaultAppPrefs.edit().clear().apply()
+        toast("已清除所有預設開啟應用程式記憶")
+    }
+
+    private fun launchWithTarget(
+        localFile: File,
+        mimeType: String,
+        packageName: String,
+        activityName: String?
+    ): Boolean {
+        return runCatching {
+            val uri = FileProvider.getUriForFile(app, "${app.packageName}.fileprovider", localFile)
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, mimeType)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                if (!activityName.isNullOrBlank()) {
+                    component = ComponentName(packageName, activityName)
+                } else {
+                    setPackage(packageName)
+                }
+            }
+            app.startActivity(intent)
+            true
+        }.getOrDefault(false)
+    }
+
+    private fun launchSystemDirectView(uri: Uri, mimeType: String) {
+        runCatching {
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(uri, mimeType)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-            val chooser = Intent.createChooser(intent, "開啟方式").apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            app.startActivity(chooser)
+            app.startActivity(intent)
         }.onFailure {
             toast("找不到可開啟此檔案的應用程式")
         }

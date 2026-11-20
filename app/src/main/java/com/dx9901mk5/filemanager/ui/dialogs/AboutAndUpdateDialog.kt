@@ -55,7 +55,6 @@ import com.dx9901mk5.filemanager.core.shizuku.ShizukuApkInstaller
 import com.dx9901mk5.filemanager.core.updater.ReleaseInfo
 import com.dx9901mk5.filemanager.core.updater.UpdateChecker
 import kotlinx.coroutines.launch
-import rikka.shizuku.Shizuku
 import java.io.File
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -75,6 +74,7 @@ fun SettingsAndAboutDialog(
     onOpenStorageAnalyzer: () -> Unit,
     onOpenWebShare: () -> Unit,
     onOpenShortcuts: () -> Unit,
+    onClearDefaultOpenApps: () -> Unit = {},
     onInstallUpdateApk: (File) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -82,47 +82,7 @@ fun SettingsAndAboutDialog(
     val scope = rememberCoroutineScope()
     val s = remember(settings.language) { dxStringsFor(settings.language) }
 
-    var shizukuAvailable by remember { mutableStateOf(ShizukuApkInstaller.isShizukuAvailable()) }
-    var shizukuReady by remember { mutableStateOf(ShizukuApkInstaller.isShizukuReady()) }
-    var shizukuStatusMsg by remember { mutableStateOf<String?>(null) }
-
-    DisposableEffect(Unit) {
-        ShizukuApkInstaller.ensureBinderRequested(context)
-        val binderReceivedListener = Shizuku.OnBinderReceivedListener {
-            shizukuAvailable = ShizukuApkInstaller.isShizukuAvailable()
-            shizukuReady = ShizukuApkInstaller.isShizukuReady()
-            if (shizukuReady) {
-                shizukuStatusMsg = "Shizuku 已授權就緒"
-            } else if (shizukuAvailable) {
-                shizukuStatusMsg = "偵測到 Shizuku，點擊開關即可請求授權"
-            }
-        }
-        val binderDeadListener = Shizuku.OnBinderDeadListener {
-            shizukuAvailable = false
-            shizukuReady = false
-        }
-        val listener = Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
-            if (requestCode == ShizukuApkInstaller.SHIZUKU_REQUEST_CODE) {
-                val granted = grantResult == PackageManager.PERMISSION_GRANTED
-                shizukuAvailable = ShizukuApkInstaller.isShizukuAvailable()
-                shizukuReady = granted
-                onToggleShizukuInstall(granted)
-                shizukuStatusMsg = if (granted) "Shizuku 授權成功" else "Shizuku 授權遭拒絕"
-            }
-        }
-        runCatching {
-            Shizuku.addBinderReceivedListenerSticky(binderReceivedListener)
-            Shizuku.addBinderDeadListener(binderDeadListener)
-            Shizuku.addRequestPermissionResultListener(listener)
-        }
-        onDispose {
-            runCatching {
-                Shizuku.removeBinderReceivedListener(binderReceivedListener)
-                Shizuku.removeBinderDeadListener(binderDeadListener)
-                Shizuku.removeRequestPermissionResultListener(listener)
-            }
-        }
-    }
+    var pluginInstalled by remember { mutableStateOf(ShizukuApkInstaller.isShizukuPluginInstalled(context)) }
 
     var checkingUpdate by remember { mutableStateOf(false) }
     var releaseInfo by remember { mutableStateOf<ReleaseInfo?>(null) }
@@ -172,81 +132,13 @@ fun SettingsAndAboutDialog(
                     checked = settings.recycleBinEnabled,
                     onCheckedChange = onToggleRecycleBin
                 )
-                SettingSwitchRow(
-                    title = s.shizukuTitle,
-                    subtitle = shizukuStatusMsg ?: when {
-                        shizukuReady -> "Shizuku 已授權就緒"
-                        shizukuAvailable -> "偵測到 Shizuku，開啟開關將要求授權"
-                        else -> "未偵測到 Shizuku 服務（請先於 Shizuku App 啟動服務）"
-                    },
-                    checked = settings.useShizukuInstall,
-                    onCheckedChange = { checked ->
-                        ShizukuApkInstaller.ensureBinderRequested(context)
-                        shizukuAvailable = ShizukuApkInstaller.isShizukuAvailable()
-                        shizukuReady = ShizukuApkInstaller.isShizukuReady()
-                        if (!checked) {
-                            onToggleShizukuInstall(false)
-                            shizukuStatusMsg = null
-                        } else if (!shizukuAvailable) {
-                            onToggleShizukuInstall(true)
-                            shizukuStatusMsg = "已開啟設定；目前尚未偵測到 Shizuku 服務，請先啟動 Shizuku App"
-                        } else if (!shizukuReady) {
-                            onToggleShizukuInstall(true)
-                            ShizukuApkInstaller.requestShizukuPermission()
-                            shizukuStatusMsg = "正在向 Shizuku 請求授權..."
-                        } else {
-                            onToggleShizukuInstall(true)
-                            shizukuStatusMsg = "Shizuku 已授權就緒"
-                        }
-                    }
-                )
-                if (!shizukuReady) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (shizukuAvailable) {
-                            OutlinedButton(
-                                onClick = {
-                                    ShizukuApkInstaller.requestShizukuPermission()
-                                    shizukuStatusMsg = "已送出 Shizuku 授權請求..."
-                                },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text("請求 Shizuku 授權")
-                            }
-                        } else {
-                            OutlinedButton(
-                                onClick = {
-                                    val launchIntent = context.packageManager.getLaunchIntentForPackage("moe.shizuku.privileged.api")
-                                    if (launchIntent != null) {
-                                        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                        context.startActivity(launchIntent)
-                                    } else {
-                                        shizukuStatusMsg = "未安裝 Shizuku App（moe.shizuku.privileged.api）"
-                                    }
-                                },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text("開啟 Shizuku App")
-                            }
-                            OutlinedButton(
-                                onClick = {
-                                    ShizukuApkInstaller.ensureBinderRequested(context)
-                                    shizukuAvailable = ShizukuApkInstaller.isShizukuAvailable()
-                                    shizukuReady = ShizukuApkInstaller.isShizukuReady()
-                                    shizukuStatusMsg = when {
-                                        shizukuReady -> "Shizuku 已授權就緒"
-                                        shizukuAvailable -> {
-                                            ShizukuApkInstaller.requestShizukuPermission()
-                                            "已偵測到 Shizuku，正在請求授權..."
-                                        }
-                                        else -> "仍未收到 Shizuku Binder（請確認系統允許關聯啟動／背景執行，或重開本 App）"
-                                    }
-                                },
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Text("重新偵測")
-                            }
-                        }
-                    }
+                if (pluginInstalled) {
+                    SettingSwitchRow(
+                        title = s.shizukuTitle,
+                        subtitle = "已偵測到外掛：DX Shizuku 安裝助手",
+                        checked = settings.useShizukuInstall,
+                        onCheckedChange = onToggleShizukuInstall
+                    )
                 }
                 val hasAllFilesAccess = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                     Environment.isExternalStorageManager()
@@ -285,22 +177,24 @@ fun SettingsAndAboutDialog(
                         ) {
                             Text(if (hasAllFilesAccess) "所有檔案存取：已授權" else "前往授權所有檔案存取")
                         }
-                        OutlinedButton(
-                            onClick = {
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                    openSettingsWithScrollHighlight(
-                                        context = context,
-                                        action = Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES
-                                    )
-                                } else {
-                                    openSettingsWithScrollHighlight(
-                                        context = context,
-                                        action = Settings.ACTION_APPLICATION_DETAILS_SETTINGS
-                                    )
+                        if (!BuildConfig.IS_PLAY_EDITION) {
+                            OutlinedButton(
+                                onClick = {
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                        openSettingsWithScrollHighlight(
+                                            context = context,
+                                            action = Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES
+                                        )
+                                    } else {
+                                        openSettingsWithScrollHighlight(
+                                            context = context,
+                                            action = Settings.ACTION_APPLICATION_DETAILS_SETTINGS
+                                        )
+                                    }
                                 }
+                            ) {
+                                Text(if (canInstallUnknownApps) "未知來源安裝：已授權" else "前往授權安裝 APK")
                             }
-                        ) {
-                            Text(if (canInstallUnknownApps) "未知來源安裝：已授權" else "前往授權安裝 APK")
                         }
                         OutlinedButton(
                             onClick = {
@@ -311,6 +205,11 @@ fun SettingsAndAboutDialog(
                             }
                         ) {
                             Text("應用詳情 / 關聯啟動")
+                        }
+                        OutlinedButton(
+                            onClick = onClearDefaultOpenApps
+                        ) {
+                            Text("清除預設開啟 App")
                         }
                     }
                 }
@@ -512,31 +411,37 @@ fun SettingsAndAboutDialog(
                     ) {
                         Text(s.githubProject)
                     }
-                    Button(
-                        enabled = !checkingUpdate && !downloading,
-                        onClick = {
-                            runUpdateCheck(s.checkingUpdate) {
-                                UpdateChecker.checkLatestRelease()
-                            }
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(if (checkingUpdate) s.checkingUpdate else if (downloading) s.downloadingUpdate else s.checkUpdate)
+                    if (BuildConfig.IS_PLAY_EDITION) {
+                        Button(
+                            onClick = {
+                                runCatching {
+                                    val playIntent = Intent(
+                                        Intent.ACTION_VIEW,
+                                        Uri.parse("https://play.google.com/store/apps/details?id=${BuildConfig.APPLICATION_ID}")
+                                    ).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }
+                                    context.startActivity(playIntent)
+                                }.onFailure { updateMessage = "無法開啟 Play 商店：${it.message}" }
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("前往 Play 商店")
+                        }
+                    } else {
+                        Button(
+                            enabled = !checkingUpdate && !downloading,
+                            onClick = {
+                                runUpdateCheck(s.checkingUpdate) {
+                                    UpdateChecker.checkLatestRelease()
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(if (checkingUpdate) s.checkingUpdate else if (downloading) s.downloadingUpdate else s.checkUpdate)
+                        }
                     }
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(
-                        enabled = !checkingUpdate && !downloading,
-                        onClick = {
-                            runUpdateCheck(s.checkingUpdate) {
-                                UpdateChecker.checkDriveRelease(isTestChannel = true)
-                            }
-                        },
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        Text(s.checkTestCloud)
-                    }
+                if (!BuildConfig.IS_PLAY_EDITION) {
                     OutlinedButton(
                         enabled = !checkingUpdate && !downloading,
                         onClick = {
@@ -544,7 +449,7 @@ fun SettingsAndAboutDialog(
                                 UpdateChecker.checkDriveRelease(isTestChannel = false)
                             }
                         },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(s.checkReleaseCloud)
                     }

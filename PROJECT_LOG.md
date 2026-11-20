@@ -177,12 +177,14 @@
 ## 4. 待辦與進行中紀錄（接續對話用 — 2026-11-18 更新）
 - **GitHub 帳號與發布狀態**：
   - GitHub 帳號 `dx9901mk5` 已恢復；公開倉庫（`https://github.com/dx9901mk5/DX_fileManager`）已改為**純發布頁**：`main`（`0d64ad8`）與所有遠端 Tag 均已強制重置為僅含中英文 `README.md` 的單一乾淨歷史（清空所有公開原始碼與舊 Git 歷史中的敏感檔），完整原始碼僅保留於本機工作目錄。
-  - 最新 GitHub Release：`v2.2.2`（`DX_fileManager-v2.2.2-github-release.apk`，`55,970,694 bytes`；已移除舊版 `v2.2.1`），公開倉庫維持純發布頁（僅含中英文 `README.md`、雙語 About 與 Releases `.apk`）。
+  - 最新 GitHub Release：`v2.2.3`（包含 `DX_fileManager-v2.2.3-github-release.apk` 與獨立外掛 `DX_Shizuku_Helper-v1.0.0-release.apk`；已移除舊版 `v2.2.2`），公開倉庫維持純發布頁（僅含中英文 `README.md`、雙語 About 與 Releases `.apk`）。
 - **本機編譯與發布通道**：
-  - **最新本機簽名正式版（v2.2.1，雙版本共存）**：
-    - **GitHub 版 (`full`)**：`com.dx9901mk5.filemanager.github` (`versionCode = 222`)，位於 `github版/DX_fileManager-v2.2.2-github-release.apk`（`55,970,694 bytes`）與 `release_apks/DX_fileManager-v2.2.2-github-release.apk`；圖示右下角附 `git` 徽章，設定至 `2026/12/15` 到期停用並提示前往 Google Play 商店。
-    - **Play 版 (`play`)**：`com.dx9901mk5.filemanager` (`versionCode = 221`)，位於 `play版/DX_fileManager-v2.2.1-play-release.apk`（`55,953,810 bytes`）與 `play版/DX_fileManager-v2.2.1-play-release.aab`（`17,141,103 bytes`）。
-  - **近期關鍵更新摘要（v1.2.7 → v2.2.1）**：
+  - **最新本機簽名正式版（v2.2.3，雙版本基礎程式碼已統一 + 獨立 Shizuku 外掛）**：
+    - **GitHub 版 (`full`)**：`com.dx9901mk5.filemanager.github` (`versionCode = 223`)，位於 `github版/DX_fileManager-v2.2.3-github-release.apk`（`55,888,622 bytes`）與 `release_apks/DX_fileManager-v2.2.3-github-release.apk`；圖示右下角附 `git` 徽章，設定至 `2026/12/15` 到期停用並提示前往 Google Play 商店。
+    - **Play 版 (`play`)**：`com.dx9901mk5.filemanager` (`versionCode = 223`)，位於 `play版/DX_fileManager-v2.2.3-play-release.apk`（`55,888,230 bytes`）與 `play版/DX_fileManager-v2.2.3-play-release.aab`（`17,115,514 bytes`）。
+    - **獨立 Shizuku 外掛 (`shizuku_plugin`)**：`com.dx9901mk5.filemanager.shizukuplugin`（**DX Shizuku 安裝助手** `v1.0.0`），位於 `github版/DX_Shizuku_Helper-v1.0.0-release.apk`（`40,832,310 bytes`）；獨立點擊僅顯示須搭配 DX 檔案管理器提示，安裝後 Play 版與 GitHub 版選取 APK 長壓選單第 5 項即自動出現輔助安裝選項。
+  - **近期關鍵更新摘要（v1.2.7 → v2.2.3）**：
+    - `v2.2.3`：從 `:app` 主體全面移除 `rikka.shizuku` SDK、`ShizukuProvider` 與 `REQUEST_INSTALL_PACKAGES` 權限，使 Play 版與 GitHub 版核心程式碼完全統一；新增 `:shizuku_plugin` 獨立外掛模組（`DX Shizuku 安裝助手`），於 `FileOperationDialogs` 長壓選單第 5 項依外掛安裝狀態自動連動顯示。
     - `v2.2.1`：建立 `github版/`（原 `正式發布/`）與 `play版/`（原 `play專用/`）雙版本資料夾；於 `app/build.gradle.kts` 為 GitHub 版（`full`）設定 `applicationIdSuffix = ".github"` 使兩版可同機共存，並於 `app/src/full/res/drawable/ic_launcher_foreground.xml` 圖示右下角加上 `git` 小字徽章以供區隔。
     - `v2.2.0`：於長壓／右鍵選單（`FileContextMenuDialog`）新增防呆按鈕「重置預設開啟程式」（`ContextMenuAction.RESET_DEFAULT_APP`），可針對目前檔案類型／副檔名即時清除預設開啟 App 記憶。
     - `v2.1.9`：移除 App 內建「測試版雲端」更新檢查入口，保留 GitHub Releases 與正式版通道更新；移除本機 `測試用/` 資料夾，於 `正式發布/` 僅保留最新版 APK 並發布 GitHub Release `v2.1.9`。

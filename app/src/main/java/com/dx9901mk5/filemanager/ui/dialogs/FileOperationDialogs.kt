@@ -64,6 +64,7 @@ enum class ContextMenuAction {
     COMPRESS_OR_EXTRACT,
     ENCRYPT_OR_DECRYPT,
     OPEN_WITH,
+    RESET_DEFAULT_APP,
     OPEN_DIRECTORY,
     SEND_TO_OTHER_PANE,
     CREATE_SHORTCUT,
@@ -91,15 +92,17 @@ fun FileContextMenuDialog(
         it.endsWith(".zip") || it.endsWith(".7z") || it.endsWith(".tar") || it.endsWith(".gz") || it.endsWith(".tgz")
     } == true
     val isEncrypted = targetFile?.name?.lowercase()?.endsWith(".dxe") == true
-    val showShizukuInstall = hasApkSelected || (targetFile?.isDirectory == false && targetFile.name.lowercase().endsWith(".apk"))
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val showShizukuInstall = com.dx9901mk5.filemanager.core.shizuku.ShizukuApkInstaller.isShizukuPluginInstalled(ctx) &&
+        (hasApkSelected || (targetFile?.isDirectory == false && targetFile.name.lowercase().endsWith(".apk")))
 
     val s = LocalDxStrings.current
     val options = listOfNotNull(
-        if (showShizukuInstall) MenuOption(ContextMenuAction.INSTALL_WITH_SHIZUKU, s.installWithShizuku, Icons.Default.Android) else null,
         MenuOption(ContextMenuAction.MULTI_SELECT, s.selectAll, Icons.Default.CheckBox),
         MenuOption(ContextMenuAction.RENAME, s.rename, Icons.Default.DriveFileRenameOutline),
         MenuOption(ContextMenuAction.COPY, s.copy, Icons.Default.ContentCopy),
         if (hasClipboard) MenuOption(ContextMenuAction.PASTE, s.paste, Icons.Default.ContentPaste) else null,
+        if (showShizukuInstall) MenuOption(ContextMenuAction.INSTALL_WITH_SHIZUKU, "5. ${s.installWithShizuku}", Icons.Default.Android) else null,
         MenuOption(
             ContextMenuAction.COMPRESS_OR_EXTRACT,
             s.compress,
@@ -111,6 +114,7 @@ fun FileContextMenuDialog(
             Icons.Default.Lock
         ),
         MenuOption(ContextMenuAction.OPEN_WITH, s.open, Icons.Default.OpenInNew),
+        if (targetFile?.isDirectory == false) MenuOption(ContextMenuAction.RESET_DEFAULT_APP, "重置預設開啟程式", Icons.Default.SwapHoriz) else null,
         MenuOption(ContextMenuAction.OPEN_DIRECTORY, s.goHome, Icons.Default.FolderOpen),
         MenuOption(ContextMenuAction.SEND_TO_OTHER_PANE, s.sendToOtherPane, Icons.Default.SwapHoriz),
         MenuOption(ContextMenuAction.CREATE_SHORTCUT, s.pinDesktopShortcut, Icons.Default.AddToHomeScreen),

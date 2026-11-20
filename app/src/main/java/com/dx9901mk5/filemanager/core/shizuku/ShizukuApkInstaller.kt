@@ -1,15 +1,17 @@
 package com.dx9901mk5.filemanager.core.shizuku
 
+import android.content.ClipData
 import android.content.Context
+import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import net.lingala.zip4j.ZipFile
-import com.dx9901mk5.filemanager.core.vfs.VfsFile
-import rikka.shizuku.Shizuku
 import java.io.File
 
 data class InstalledAppInfo(
@@ -24,138 +26,46 @@ data class InstalledAppInfo(
 )
 
 object ShizukuApkInstaller {
+    const val PLUGIN_PACKAGE = "com.dx9901mk5.filemanager.shizukuplugin"
+    const val ACTION_PLUGIN_INSTALL_APK = "com.dx9901mk5.filemanager.shizukuplugin.ACTION_INSTALL_APK"
+    const val EXTRA_APK_URIS = "extra_apk_uris"
 
-    const val SHIZUKU_REQUEST_CODE = 1001
-
-    fun ensureBinderRequested(context: Context) {
-        // 單進程 App 由 ShizukuProvider 自動接收 Binder，勿呼叫 enableMultiProcessSupport(false) 以免覆寫 isProviderProcess
+    fun isShizukuPluginInstalled(context: Context): Boolean {
+        val intent = Intent(ACTION_PLUGIN_INSTALL_APK)
+        val pm = context.packageManager
+        val resolved = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            pm.resolveActivity(intent, PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_DEFAULT_ONLY.toLong()))
+        } else {
+            @Suppress("DEPRECATION")
+            pm.resolveActivity(intent, PackageManager.MATCH_DEFAULT_ONLY)
+        }
+        return resolved != null
     }
 
-    fun isShizukuAvailable(): Boolean {
-        return try {
-            Shizuku.pingBinder()
-        } catch (_: Throwable) {
-            false
+    fun installApksViaPlugin(context: Context, apkFiles: List<File>): Result<Unit> {
+        val validFiles = apkFiles.filter { it.exists() && it.isFile }
+        if (validFiles.isEmpty()) {
+            return Result.failure(IllegalArgumentException("找不到有效的 APK 檔案"))
         }
-    }
-
-    fun isShizukuReady(): Boolean {
-        return try {
-            Shizuku.pingBinder() && Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED
-        } catch (_: Throwable) {
-            false
+        if (!isShizukuPluginInstalled(context)) {
+            return Result.failure(IllegalStateException("尚未安裝「DX Shizuku 安裝助手」外掛"))
         }
-    }
-
-    fun requestShizukuPermission() {
-        try {
-            if (Shizuku.pingBinder() && Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) {
-                Shizuku.requestPermission(SHIZUKU_REQUEST_CODE)
-            }
-        } catch (_: Throwable) {
-        }
-    }
-
-    /**
-     * 使用 Shizuku 以 Shell 權限靜默安裝 APK (透過 stdin 串流寫入 pm install -r -d -S，避開 Android 11+ FUSE/SELinux 讀檔限制)
-     */
-    suspend fun installApkSilently(apkFile: File): Result<String> = withContext(Dispatchers.IO) {
-        if (!isShizukuAvailable()) {
-            return@withContext Result.failure(IllegalStateException("Shizuku 服務未啟動，請先開啟 Shizuku App"))
-        }
-        if (!isShizukuReady()) {
-            requestShizukuPermission()
-            return@withContext Result.failure(IllegalStateException("尚未取得 Shizuku 授權，請於彈窗點擊允許"))
-        }
-        if (!apkFile.exists() || !apkFile.isFile) {
-            return@withContext Result.failure(IllegalArgumentException("找不到 APK 檔案：${apkFile.absolutePath}"))
-        }
-        try {
-            val newProcessMethod = Shizuku::class.java.getDeclaredMethod(
-                "newProcess",
-                Array<String>::class.java,
-                Array<String>::class.java,
-                String::class.java
-            ).apply { isAccessible = true }
-
-            val fileSize = apkFile.length()
-            val process = newProcessMethod.invoke(
-                null,
-                arrayOf("pm", "install", "-r", "-d", "-S", fileSize.toString()),
-                null,
-                null
-            ) as Process
-
-            apkFile.inputStream().use { input ->
-                process.outputStream.use { out ->
-                    input.copyTo(out, bufferSize = 64 * 1024)
-                    out.flush()
+        return runCatching {
+            val authority = "${context.packageName}.fileprovider"
+            val uris = ArrayList<Uri>(validFiles.map { FileProvider.getUriForFile(context, authority, it) })
+            val intent = Intent(ACTION_PLUGIN_INSTALL_APK).apply {
+                putParcelableArrayListExtra(EXTRA_APK_URIS, uris)
+                data = uris.first()
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                val clip = ClipData.newRawUri("apk", uris.first())
+                for (i in 1 until uris.size) {
+                    clip.addItem(ClipData.Item(uris[i]))
                 }
+                clipData = clip
             }
-
-            val output = process.inputStream.bufferedReader().readText()
-            val err = process.errorStream.bufferedReader().readText()
-            val exitCode = process.waitFor()
-            if (exitCode == 0 && output.contains("Success", ignoreCase = true)) {
-                Result.success(output.trim())
-            } else {
-                Result.failure(RuntimeException("Shizuku 安裝失敗 (Code $exitCode): ${output.trim()} ${err.trim()}".trim()))
-            }
-        } catch (e: Throwable) {
-            val causeMsg = e.cause?.message ?: e.message ?: e.javaClass.simpleName
-            Result.failure(RuntimeException("無法呼叫 Shizuku：$causeMsg", e))
+            context.startActivity(intent)
         }
     }
-
-    /**
-     * 使用 Shizuku 列出受保護目錄 (如 Android/data、Android/obb、系統根目錄)
-     */
-    suspend fun listDirectoryWithShizuku(dirPath: String, showHidden: Boolean): List<VfsFile> =
-        withContext(Dispatchers.IO) {
-            if (!isShizukuReady()) return@withContext emptyList()
-            runCatching {
-                val escaped = dirPath.replace("\"", "\\\"")
-                val newProcessMethod = Shizuku::class.java.getDeclaredMethod(
-                    "newProcess",
-                    Array<String>::class.java,
-                    Array<String>::class.java,
-                    String::class.java
-                ).apply { isAccessible = true }
-                // 輸出格式：類型(d/f/l)|大小|名稱
-                val cmd = "for f in \"$escaped\"/* \"$escaped\"/.*; do " +
-                    "b=\"\${f##*/}\"; [ \"\$b\" = \".\" ] || [ \"\$b\" = \"..\" ] || [ ! -e \"\$f\" ] && continue; " +
-                    "if [ -d \"\$f\" ]; then t=d; s=0; else t=f; s=\$(wc -c < \"\$f\" 2>/dev/null || echo 0); fi; " +
-                    "echo \"\$t|\$s|\$b\"; done"
-                val process = newProcessMethod.invoke(
-                    null,
-                    arrayOf("sh", "-c", cmd),
-                    null,
-                    null
-                ) as Process
-                val out = process.inputStream.bufferedReader().readLines()
-                process.waitFor()
-                val normalizedDir = dirPath.trimEnd('/').ifEmpty { "/" }
-                out.mapNotNull { line ->
-                    val parts = line.split("|", limit = 3)
-                    if (parts.size < 3) return@mapNotNull null
-                    val isDir = parts[0] == "d"
-                    val size = parts[1].trim().toLongOrNull() ?: 0L
-                    val name = parts[2]
-                    if (!showHidden && name.startsWith(".")) return@mapNotNull null
-                    val fullPath = if (normalizedDir == "/") "/$name" else "$normalizedDir/$name"
-                    VfsFile(
-                        name = name,
-                        path = fullPath,
-                        isDirectory = isDir,
-                        size = size,
-                        lastModified = System.currentTimeMillis(),
-                        mimeType = if (isDir) "inode/directory" else "application/octet-stream",
-                        mountId = "local",
-                        isEmpty = false
-                    )
-                }.sortedWith(compareByDescending<VfsFile> { it.isDirectory }.thenBy { it.name.lowercase() })
-            }.getOrDefault(emptyList())
-        }
 
     /**
      * 讀取已安裝應用程式清單

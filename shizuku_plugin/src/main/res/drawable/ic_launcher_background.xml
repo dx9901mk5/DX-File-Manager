@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path android:pathData="M0,0h108v108h-108z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="0"
+                android:startY="0"
+                android:endX="108"
+                android:endY="108"
+                android:type="linear">
+                <item android:color="#FF0E131F" android:offset="0.0" />
+                <item android:color="#FF1B2436" android:offset="0.5" />
+                <item android:color="#FF090C12" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- 溫暖金黃玻璃光暈 -->
+    <path android:pathData="M54,54m-44,0a44,44 0,1 1,88 0a44,44 0,1 1,-88 0">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="50"
+                android:centerY="44"
+                android:gradientRadius="46"
+                android:type="radial">
+                <item android:color="#66FFC83D" android:offset="0.0" />
+                <item android:color="#28F59E0B" android:offset="0.55" />
+                <item android:color="#00000000" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>
