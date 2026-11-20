@@ -34,9 +34,18 @@ A high-efficiency multi-pane & freeform-window file manager for Android featurin
 
 ## 下載與安裝 / Download & Install
 
-- 前往 [GitHub Releases](https://github.com/dx9901mk5/DX_fileManager/releases/latest) 下載最新簽名版 `DX_fileManager-v<version>-release.apk`（固定簽名，可直接覆蓋更新）。
-- App 內「設定與關於我」亦內建自動更新檢查，可自動偵測 GitHub Releases 與雲端硬碟最新版本並顯示下載進度條。
-- Download the latest signed APK from [GitHub Releases](https://github.com/dx9901mk5/DX_fileManager/releases/latest) (consistent signing key for direct in-place upgrades), or use the built-in updater in **Settings & About**.
+前往 [GitHub Releases](https://github.com/dx9901mk5/DX_fileManager/releases/latest) 可下載以下兩個分離版本（皆為固定簽名，可直接覆蓋更新）：
+
+1. **DX 檔案管理器 GitHub 獨立版（主程式）**：`DX_fileManager-v<version>-full-release.apk`
+   - 分離完整版主程式，App 內「設定與關於我」內建自動檢查 GitHub Releases 更新並下載安裝。
+2. **DX Shizuku 輔助安裝器（DX 專屬輔助用安裝器外掛）**：`DX_Shizuku_Helper-v<version>-release.apk`
+   - 本 App 為 **DX檔案管理器 專屬的 Shizuku 輔助用安裝器**，**同時支援 GitHub 版與 Google Play 版主程式**。
+   - **支援 Google Play 版觸發能力**：安裝此輔助安裝器並授權 Shizuku 後，Google Play 版 DX檔案管理器 會自動偵測此外掛；當您在 Play 版內長壓任何 `.apk` 檔案時，功能選單會自動出現 **「用 DX Shizuku 靜默安裝」** 選項供選擇安裝 APK。
+   - **外掛自我更新**：DX Shizuku 安裝助手內建「檢查外掛更新 (GitHub)」按鈕，可自動檢查 GitHub 最新外掛版本並下載安裝。
+
+- Download the signed APKs from [GitHub Releases](https://github.com/dx9901mk5/DX_fileManager/releases/latest):
+  - **`DX_fileManager-v<version>-full-release.apk`**: Standalone GitHub full edition with built-in GitHub auto-updater.
+  - **`DX_Shizuku_Helper-v<version>-release.apk`**: Dedicated Shizuku helper installer plugin for **DX File Manager** (works with both the **GitHub edition** and the **Google Play edition**—when installed, the Play edition automatically detects the plugin and reveals the Shizuku APK install option in the context menu; includes built-in GitHub self-update check & download/install).
 
 ---
 
