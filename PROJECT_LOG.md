@@ -1,11 +1,11 @@
 # DX檔案管理器 (DX File Manager) — 本機開發與發布紀錄
 
-- **最後更新時間**：2026-11-19
+- **最後更新時間**：2026-11-20
 - **本機專案路徑**：`D:\Google雲端硬碟\Antigravity\DX檔案管理器`
 - **GitHub 儲存庫**：https://github.com/dx9901mk5/DX_fileManager
 - **Application ID**：`com.dx9901mk5.filemanager`
 - **APK 產出名稱**：`DX_fileManager-v<versionName>-release.apk`（自下一版起自動帶入版本號）
-- **開發與發布規範（重要）**：以後所有修改皆**先使用本機 Android SDK 編譯產出簽名 APK**，先存至 `D:\Google雲端硬碟\Antigravity\DX檔案管理器\測試用`（並同步保留於 `release_apks/`）；待使用者測試確認可發布正式版後，再複製至 `D:\Google雲端硬碟\Antigravity\DX檔案管理器\正式發布`，並詢問是否上傳至 GitHub 發布 Release。
+- **開發與發布規範（重要）**：所有修改皆**先使用本機 Android SDK 編譯產出簽名 APK**（`assembleFullRelease`），只保留最新版於 `D:\Google雲端硬碟\Antigravity\DX檔案管理器\正式發布`（`DX_fileManager-v<versionName>-正式版.apk`）與 `release_apks/`（已移除 `測試用/` 資料夾）；Play 商店專用 `.aab`／`.apk` 產出至 `play專用/`；確認無誤後上傳至 GitHub Releases（公開倉庫僅保留 `README.md` 與 Releases `.apk`）。
 
 ---
 
@@ -176,11 +176,17 @@
 
 ## 4. 待辦與進行中紀錄（接續對話用 — 2026-11-18 更新）
 - **GitHub 帳號與發布狀態**：
-  - GitHub 最後成功發布於 Releases 的版本：`v1.0.17` (`versionCode = 18`)。
-  - 目前帳號 `dx9901mk5` 因系統停權（`403 Your account is suspended`）暫無法 `git push`；已透過 `help.github.com` 送出帳號恢復申訴，工單編號 **`#5015727`**（通知寄往 `dx9901mk5@gmail.com`）。待恢復後可將本機 `main`（含 `v1.0.18`～`v2.0.1`）推送至 `origin`。
+  - GitHub 帳號 `dx9901mk5` 已恢復；公開倉庫（`https://github.com/dx9901mk5/DX_fileManager`）已改為**純發布頁**：`main`（`0d64ad8`）與所有遠端 Tag 均已強制重置為僅含中英文 `README.md` 的單一乾淨歷史（清空所有公開原始碼與舊 Git 歷史中的敏感檔），完整原始碼僅保留於本機工作目錄。
+  - 最新 GitHub Release：`v2.2.0`（`DX_fileManager-v2.2.0-release.apk`，`55,953,938 bytes`），公開倉庫維持純發布頁（僅含中英文 `README.md`、雙語 About 與 Releases `.apk`）。
 - **本機編譯與發布通道**：
-  - **最新本機簽名正式版 APK**：`v2.1.7` (`versionCode = 217`)，已複製至 `正式發布/DX_fileManager-v2.1.7-正式版.apk`、`測試用/DX_fileManager-v2.1.7-release.apk` 與 `release_apks/DX_fileManager-v2.1.7-release.apk`（固定簽名 `app/release.keystore`），並同步推送 GitHub `main` 與發布 Release `v2.1.7`。
-  - **近期關鍵更新摘要（v1.2.7 → v2.1.7）**：
+  - **最新本機簽名正式版（v2.2.1，雙版本共存）**：
+    - **GitHub 版 (`full`)**：`com.dx9901mk5.filemanager.github` (`versionCode = 221`)，位於 `github版/DX_fileManager-v2.2.1-github-release.apk`（`55,954,314 bytes`）與 `release_apks/DX_fileManager-v2.2.1-github-release.apk`；圖示右下角附 `git` 徽章，可與 Play 版同機共存。
+    - **Play 版 (`play`)**：`com.dx9901mk5.filemanager` (`versionCode = 221`)，位於 `play版/DX_fileManager-v2.2.1-play-release.apk`（`55,953,810 bytes`）與 `play版/DX_fileManager-v2.2.1-play-release.aab`（`17,141,103 bytes`）。
+  - **近期關鍵更新摘要（v1.2.7 → v2.2.1）**：
+    - `v2.2.1`：建立 `github版/`（原 `正式發布/`）與 `play版/`（原 `play專用/`）雙版本資料夾；於 `app/build.gradle.kts` 為 GitHub 版（`full`）設定 `applicationIdSuffix = ".github"` 使兩版可同機共存，並於 `app/src/full/res/drawable/ic_launcher_foreground.xml` 圖示右下角加上 `git` 小字徽章以供區隔。
+    - `v2.2.0`：於長壓／右鍵選單（`FileContextMenuDialog`）新增防呆按鈕「重置預設開啟程式」（`ContextMenuAction.RESET_DEFAULT_APP`），可針對目前檔案類型／副檔名即時清除預設開啟 App 記憶。
+    - `v2.1.9`：移除 App 內建「測試版雲端」更新檢查入口，保留 GitHub Releases 與正式版通道更新；移除本機 `測試用/` 資料夾，於 `正式發布/` 僅保留最新版 APK 並發布 GitHub Release `v2.1.9`。
+    - `v2.1.8`：修正所有檔案（影片、音訊、圖片、文件等）開啟時因 `Intent.createChooser` 無法記憶預設 App 的問題；於 `FileManagerViewModel.kt` 與 `MainActivity.kt` 新增「選擇開啟應用程式」與「設為此類檔案的預設開啟 App（下次直接開啟）」記憶功能（影片／音訊／圖片依類別、其他依副檔名記憶），支援右鍵選單「開啟方式」重選與設定頁一鍵「清除預設開啟 App」。
     - `v2.1.7`：於設定對話框新增「系統授權與權限連動」按鈕組（所有檔案存取、安裝未知應用、應用詳情／關聯啟動）並實作 `openSettingsWithScrollHighlight`，透過 `:settings:fragment_args_key` / `:settings:show_fragment_args` 跳轉系統設定清單時自動滑動並高亮定位至本 App；補齊雙語（繁體中文／English）`README.md`、GitHub 專案「About」中英文介紹，並發布 GitHub Release `v2.1.7`（彙整 `v1.0.17 → v2.1.7` 完整版本更新摘要）。
     - `v2.1.6`：全面擴充並串接四國語言介面（繁體中文、简体中文、English、日本語），於 `DxI18n.kt` 建立 `LocalDxStrings`，使導覽側邊欄、檔案面板、多選底部操作列、右鍵選單及設定更新對話框支援即時切換語言。
     - `v2.1.5`：依 Google Play Adaptive App Quality Guidelines 補齊自適應與大螢幕相容規範（`AndroidManifest.xml` 加入 `touchscreen required="false"`、`enableOnBackInvokedCallback="true"` 與完整 `configChanges`，`themes.xml` / `values-v30/themes.xml` 設定 `windowLayoutInDisplayCutoutMode` 消除橫向黑邊）；重構 `FileExplorerPane.kt` 資料夾切換動畫層級（不因 `isLoading` 或空資料夾卸載打斷），實作進入 1 秒由中心展開＋`OvershootInterpolator` 回彈、離開 1 秒 `AnticipateInterpolator` 回彈收合特效。
@@ -194,7 +200,7 @@
   - **本機編譯環境與注意事項（Windows 中文路徑）**：
     - Android SDK：`D:\Android\Sdk`（`D:\Android\Sdk\platform-tools\adb.exe`）
     - JDK / Gradle：JDK `C:\jdk-17\jdk-17.0.21+9` + Gradle `8.9`（暫存於 `C:\dx_build_tmp\.gradle-8.9`）
-    - 因專案路徑含中文字元且 Google Drive 同步會鎖定 `build/`，需先 `robocopy` 原始碼至純英文暫存路徑 `C:\dx_build_tmp`（`local.properties` 設為 `sdk.dir=D:/Android/Sdk`）執行 `gradle assembleRelease --no-daemon`，再複製 APK 回 `測試用/`、`release_apks/` 與 `正式發布/`。
+    - 因專案路徑含中文字元且 Google Drive 同步會鎖定 `build/`，需先 `robocopy` 原始碼至純英文暫存路徑 `C:\dx_build_tmp`（`local.properties` 設為 `sdk.dir=D:/Android/Sdk`）執行 `gradle assembleFullRelease --no-daemon`（或 `bundlePlayRelease assemblePlayRelease`），再複製最新版產出回 `正式發布/`、`release_apks/` 或 `play專用/`（清除舊版 APK）。
   - **Google 雲端硬碟「測試用」資料夾**（已設為知道連結者可瀏覽）：https://drive.google.com/drive/folders/1h_I2rDnRJvTYe2V0_04AM9hAnk17wO5x （已上傳 `v1.0.18`、`v1.0.19`、`v1.0.20`、`v1.0.21`）。
   - **Google 雲端硬碟「正式發布」資料夾**（已設為知道連結者可瀏覽）：https://drive.google.com/drive/folders/1JrrkNtKZZIGEvpLaHuXRxGiCRJPQO6Vu
 - **OAuth 整合現況**：
@@ -204,8 +210,9 @@
 ---
 
 ## 5. Google Play 商店上架規劃紀錄（2026-11-18）
-- **雙版本分流策略（`full` 側載版 vs. `play` 商店版）**：
-  - **`play` 版必須移除**：`REQUEST_INSTALL_PACKAGES` 權限、App 內建自我更新下載 APK 按鈕（改由 Play 商店自動更新）。
+- **雙版本分流策略（`full` 側載版 vs. `play` 商店版 — 已實作於 `app/build.gradle.kts` 與 `play專用/`）**：
+  - 已建立 `play專用/` 資料夾，產出 `DX_fileManager-play-v2.1.7-release.aab` 與 `DX_fileManager-play-v2.1.7-release.apk`，並附 `PLAY_上架準備與付費預留說明.md`。
+  - **`play` 版已透過 `app/src/play/AndroidManifest.xml` 與 `BuildConfig.IS_PLAY_EDITION` 移除／隱藏**：`REQUEST_INSTALL_PACKAGES`、`QUERY_ALL_PACKAGES`、`moe.shizuku.manager.permission.API_V23`、`<queries>`、App 內建自我更新下載 APK 按鈕（改為導向 Play 商店）與 Shizuku 靜默安裝開關／選單。
   - **`MANAGE_EXTERNAL_STORAGE`**：檔案管理器屬官方允許類別，需於 Play Console 填寫聲明並附 YouTube 不公開示範影片（範例檔案與腳本已備妥於 `示範影片/`）。
   - **`QUERY_ALL_PACKAGES`（參考 Solid Explorer `pl.solidexplorer2` 做法）**：檔案管理器若具備裝置應用程式管理核心功能（瀏覽已安裝 App 資訊＋匯出備份 APK），可依「檔案管理／裝置管理核心功能」提出聲明並附影片佐證；**穩妥策略**為新帳號初審先上不含 `QUERY_ALL_PACKAGES` 的乾淨版，正式過審後再於下一版補申請加回（或連同示範影片一起送審）。
   - **Shizuku 獨立外掛 APK 架構**：Play 版主體移除 `rikka.shizuku` 與安裝邏輯，改以同簽名權限（`protectionLevel="signature"`）的 Bound Service / Provider 偵測 GitHub 獨立發布的外掛 APK（如 `DX_Shizuku_Plugin.apk`），安裝外掛後主體選單自動出現 Shizuku 功能。

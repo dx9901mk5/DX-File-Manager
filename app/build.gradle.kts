@@ -20,8 +20,8 @@ android {
         applicationId = "com.dx9901mk5.filemanager"
         minSdk = 29
         targetSdk = 35
-        versionCode = 217
-        versionName = "2.1.7"
+        versionCode = 221
+        versionName = "2.2.1"
         base.archivesName.set("DX_fileManager-v${versionName}")
 
         buildConfigField(
@@ -34,6 +34,20 @@ android {
             "GITHUB_API_LATEST",
             "\"https://api.github.com/repos/dx9901mk5/DX_fileManager/releases/latest\""
         )
+    }
+
+    flavorDimensions += "dist"
+    productFlavors {
+        create("full") {
+            dimension = "dist"
+            applicationIdSuffix = ".github"
+            buildConfigField("boolean", "IS_PLAY_EDITION", "false")
+        }
+        create("play") {
+            dimension = "dist"
+            buildConfigField("boolean", "IS_PLAY_EDITION", "true")
+            versionNameSuffix = "-play"
+        }
     }
 
     signingConfigs {
