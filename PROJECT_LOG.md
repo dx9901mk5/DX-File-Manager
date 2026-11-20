@@ -177,10 +177,10 @@
 ## 4. 待辦與進行中紀錄（接續對話用 — 2026-11-18 更新）
 - **GitHub 帳號與發布狀態**：
   - GitHub 帳號 `dx9901mk5` 已恢復；公開倉庫（`https://github.com/dx9901mk5/DX_fileManager`）已改為**純發布頁**：`main`（`0d64ad8`）與所有遠端 Tag 均已強制重置為僅含中英文 `README.md` 的單一乾淨歷史（清空所有公開原始碼與舊 Git 歷史中的敏感檔），完整原始碼僅保留於本機工作目錄。
-  - 最新 GitHub Release：`v2.2.1`（`DX_fileManager-v2.2.1-github-release.apk`，`55,954,314 bytes`；已清除 `v1.0.0`～`v2.2.0` 所有舊版 Release 與 Tag），公開倉庫維持純發布頁（僅含中英文 `README.md`、雙語 About 與 Releases `.apk`）。
+  - 最新 GitHub Release：`v2.2.2`（`DX_fileManager-v2.2.2-github-release.apk`，`55,970,694 bytes`；已移除舊版 `v2.2.1`），公開倉庫維持純發布頁（僅含中英文 `README.md`、雙語 About 與 Releases `.apk`）。
 - **本機編譯與發布通道**：
   - **最新本機簽名正式版（v2.2.1，雙版本共存）**：
-    - **GitHub 版 (`full`)**：`com.dx9901mk5.filemanager.github` (`versionCode = 221`)，位於 `github版/DX_fileManager-v2.2.1-github-release.apk`（`55,954,314 bytes`）與 `release_apks/DX_fileManager-v2.2.1-github-release.apk`；圖示右下角附 `git` 徽章，可與 Play 版同機共存。
+    - **GitHub 版 (`full`)**：`com.dx9901mk5.filemanager.github` (`versionCode = 222`)，位於 `github版/DX_fileManager-v2.2.2-github-release.apk`（`55,970,694 bytes`）與 `release_apks/DX_fileManager-v2.2.2-github-release.apk`；圖示右下角附 `git` 徽章，設定至 `2026/12/15` 到期停用並提示前往 Google Play 商店。
     - **Play 版 (`play`)**：`com.dx9901mk5.filemanager` (`versionCode = 221`)，位於 `play版/DX_fileManager-v2.2.1-play-release.apk`（`55,953,810 bytes`）與 `play版/DX_fileManager-v2.2.1-play-release.aab`（`17,141,103 bytes`）。
   - **近期關鍵更新摘要（v1.2.7 → v2.2.1）**：
     - `v2.2.1`：建立 `github版/`（原 `正式發布/`）與 `play版/`（原 `play專用/`）雙版本資料夾；於 `app/build.gradle.kts` 為 GitHub 版（`full`）設定 `applicationIdSuffix = ".github"` 使兩版可同機共存，並於 `app/src/full/res/drawable/ic_launcher_foreground.xml` 圖示右下角加上 `git` 小字徽章以供區隔。

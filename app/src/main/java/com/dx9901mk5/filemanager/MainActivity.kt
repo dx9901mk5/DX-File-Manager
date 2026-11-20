@@ -44,6 +44,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddToHomeScreen
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.core.graphics.drawable.toBitmap
 import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
@@ -124,6 +126,7 @@ import com.dx9901mk5.filemanager.ui.layout.NavigationPane
 import com.dx9901mk5.filemanager.ui.layout.ThreePaneScaffold
 import com.dx9901mk5.filemanager.ui.theme.DxFileManagerTheme
 import java.io.File
+import java.util.Calendar
 
 class MainActivity : ComponentActivity() {
     private val viewModel: FileManagerViewModel by viewModels()
@@ -166,13 +169,33 @@ class MainActivity : ComponentActivity() {
                 darkBackgroundStyle = settings.darkBackgroundStyle
             ) {
                 CompositionLocalProvider(LocalDxStrings provides dxStringsFor(settings.language)) {
-                    DxFileManagerScreen(
-                        viewModel = viewModel,
-                        isExpandedScreen = isExpandedScreen,
-                        isLargeTablet = isLargeTablet,
-                        windowSlot = assignedWindowSlot,
-                        isSmallWindowMode = isSmallWindowMode
-                    )
+                    val isGithubExpired = remember {
+                        !BuildConfig.IS_PLAY_EDITION && isGithubEditionExpired()
+                    }
+                    if (isGithubExpired) {
+                        GithubExpiredBlockingScreen(
+                            onOpenPlayStore = {
+                                val marketIntent = Intent(
+                                    Intent.ACTION_VIEW,
+                                    Uri.parse("market://details?id=com.dx9901mk5.filemanager")
+                                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                val webIntent = Intent(
+                                    Intent.ACTION_VIEW,
+                                    Uri.parse("https://play.google.com/store/apps/details?id=com.dx9901mk5.filemanager")
+                                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                runCatching { startActivity(marketIntent) }
+                                    .onFailure { runCatching { startActivity(webIntent) } }
+                            },
+                            onExit = { finishAffinity() }
+                        )
+                    } else {
+                        DxFileManagerScreen(
+                            viewModel = viewModel,
+                            isExpandedScreen = isExpandedScreen,
+                            isLargeTablet = isLargeTablet,
+                            windowSlot = assignedWindowSlot,
+                            isSmallWindowMode = isSmallWindowMode
+                        )
 
                 activeShortcutGroup.value?.let { (groupTitle, groupFiles) ->
                     AlertDialog(
@@ -242,6 +265,7 @@ class MainActivity : ComponentActivity() {
                         }
                     )
                 }
+                    }
                 }
             }
         }
@@ -330,6 +354,7 @@ private fun DxFileManagerScreen(
     val installedApps by viewModel.installedApps.collectAsState()
     val includeSystemApps by viewModel.includeSystemApps.collectAsState()
     val selectedAppPackages by viewModel.selectedAppPackages.collectAsState()
+    val openWithPrompt by viewModel.openWithPrompt.collectAsState()
 
     val dragController = remember { CrossPaneDragController() }
     dragController.onRequestCrossPaneSwitch = { targetPane ->
@@ -560,7 +585,15 @@ private fun DxFileManagerScreen(
                     "請輸入密碼"
                 ) { pwd -> viewModel.encryptOrDecryptDxe(paneIdx, first, pwd) }
             }
-            ContextMenuAction.OPEN_WITH -> targetFile?.let { viewModel.openWithSystemChooser(File(it.path), it.mimeType) }
+            ContextMenuAction.OPEN_WITH -> targetFile?.let { viewModel.openWithSystemChooser(File(it.path), it.mimeType, forceAsk = true) }
+            ContextMenuAction.RESET_DEFAULT_APP -> {
+                val f = targetFile ?: selected.firstOrNull { !it.isDirectory }
+                if (f != null) {
+                    viewModel.clearDefaultOpenApp(File(f.path), f.mimeType)
+                } else {
+                    viewModel.clearAllDefaultOpenApps()
+                }
+            }
             ContextMenuAction.OPEN_DIRECTORY -> targetFile?.let {
                 val parent = File(it.path).parent ?: return@let
                 viewModel.navigateToPath(paneIdx, parent)
@@ -1078,6 +1111,7 @@ private fun DxFileManagerScreen(
                 onChangeAiProvider = { viewModel.setAiProvider(it) },
                 onSaveAiApiKey = { provider, key -> viewModel.setAiApiKey(provider, key) },
                 onChangeAiModel = { provider, model -> viewModel.setAiModel(provider, model) },
+                onClearDefaultOpenApps = { viewModel.clearAllDefaultOpenApps() },
                 onToggleAiThinking = { viewModel.setAiThinkingEnabled(it) },
                 onOpenStorageAnalyzer = { showStorageAnalyzer = true },
                 onOpenWebShare = { showWebShare = true },
@@ -1208,6 +1242,105 @@ private fun DxFileManagerScreen(
                 }
             )
         }
+
+        openWithPrompt?.let { prompt ->
+            var setAsDefault by remember(prompt) { mutableStateOf(true) }
+            val pm = activityContext.packageManager
+            AlertDialog(
+                onDismissRequest = { viewModel.dismissOpenWithPrompt() },
+                title = {
+                    Text(
+                        text = "選擇開啟應用程式",
+                        maxLines = 1
+                    )
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = "${prompt.file.name} (${prompt.mimeType})",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { setAsDefault = !setAsDefault },
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Checkbox(
+                                checked = setAsDefault,
+                                onCheckedChange = { setAsDefault = it }
+                            )
+                            Text(
+                                text = "設為此類檔案的預設開啟 App（下次直接開啟）",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        androidx.compose.foundation.lazy.LazyColumn(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(max = 280.dp)
+                        ) {
+                            items(prompt.candidates.size) { idx ->
+                                val cand = prompt.candidates[idx]
+                                val appIconBitmap = remember(cand.packageName) {
+                                    runCatching {
+                                        pm.getApplicationIcon(cand.packageName)
+                                            .toBitmap(width = 96, height = 96)
+                                            .asImageBitmap()
+                                    }.getOrNull()
+                                }
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            viewModel.launchOpenWithCandidate(prompt, cand, setAsDefault)
+                                        }
+                                        .padding(vertical = 8.dp, horizontal = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    if (appIconBitmap != null) {
+                                        androidx.compose.foundation.Image(
+                                            bitmap = appIconBitmap,
+                                            contentDescription = cand.appLabel,
+                                            modifier = Modifier.size(34.dp)
+                                        )
+                                    }
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = cand.appLabel,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            maxLines = 1,
+                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                        )
+                                        if (cand.packageName == prompt.currentDefaultPkg) {
+                                            Text(
+                                                text = "目前預設",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { viewModel.launchSystemOpenChooser(prompt) }) {
+                        Text("系統選單")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { viewModel.dismissOpenWithPrompt() }) {
+                        Text("取消")
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -1297,5 +1430,90 @@ private fun BottomBarActionButton(
             color = tint,
             maxLines = 1
         )
+    }
+}
+
+private fun isGithubEditionExpired(): Boolean {
+    val cutoff = Calendar.getInstance().apply {
+        set(2026, Calendar.DECEMBER, 15, 0, 0, 0)
+        set(Calendar.MILLISECOND, 0)
+    }.timeInMillis
+    return System.currentTimeMillis() >= cutoff
+}
+
+@Composable
+private fun GithubExpiredBlockingScreen(
+    onOpenPlayStore: () -> Unit,
+    onExit: () -> Unit
+) {
+    val s = LocalDxStrings.current
+    BackHandler { onExit() }
+    val (title, message, playBtnText) = when (s.done) {
+        "Done" -> Triple(
+            "GitHub Version Expired",
+            "This GitHub version expired on Dec 15, 2026 and can no longer be launched.\n\nPlease search for \"DX File Manager\" on Google Play Store to install the official release.",
+            "Go to Google Play Store"
+        )
+        "完了" -> Triple(
+            "GitHub 版の有効期限が切れました",
+            "この GitHub 版は 2026 年 12 月 15 日をもって利用期限が終了し、起動できなくなりました。\n\nGoogle Play ストアで「DX ファイルマネージャー」を検索して正式版をインストールしてください。",
+            "Google Play ストアへ"
+        )
+        "完成" -> if (s.selectAll == "全选") Triple(
+            "GitHub 版已到期停用",
+            "此 GitHub 版本已于 2026 年 12 月 15 日到期，无法再启动使用。\n\n请前往 Google Play 商店搜索「DX文件管理器」下载正式版。",
+            "前往 Google Play 商店"
+        ) else Triple(
+            "GitHub 版已到期停用",
+            "此 GitHub 版本已於 2026 年 12 月 15 日到期，無法再啟動使用。\n\n請前往 Google Play 商店搜尋「DX檔案管理器」下載正式版。",
+            "前往 Google Play 商店"
+        )
+        else -> Triple(
+            "GitHub 版已到期停用",
+            "此 GitHub 版本已於 2026 年 12 月 15 日到期，無法再啟動使用。\n\n請前往 Google Play 商店搜尋「DX檔案管理器」下載正式版。",
+            "前往 Google Play 商店"
+        )
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Surface(
+            shape = RoundedCornerShape(24.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            tonalElevation = 8.dp,
+            shadowElevation = 12.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    TextButton(onClick = onExit) {
+                        Text(s.exitAction)
+                    }
+                    Button(onClick = onOpenPlayStore) {
+                        Text(playBtnText)
+                    }
+                }
+            }
+        }
     }
 }
