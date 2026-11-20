@@ -179,11 +179,12 @@
   - GitHub 帳號 `dx9901mk5` 已恢復；公開倉庫（`https://github.com/dx9901mk5/DX_fileManager`）已改為**純發布頁**：`main`（`0d64ad8`）與所有遠端 Tag 均已強制重置為僅含中英文 `README.md` 的單一乾淨歷史（清空所有公開原始碼與舊 Git 歷史中的敏感檔），完整原始碼僅保留於本機工作目錄。
   - 最新 GitHub Release：`v2.2.3`（包含 `DX_fileManager-v2.2.3-github-release.apk` 與獨立外掛 `DX_Shizuku_Helper-v1.0.0-release.apk`；已移除舊版 `v2.2.2`），公開倉庫維持純發布頁（僅含中英文 `README.md`、雙語 About 與 Releases `.apk`）。
 - **本機編譯與發布通道**：
-  - **最新本機簽名正式版（v2.2.4，支援 Pixelbook / ChromeOS + Play 商店上架準備就緒）**：
-    - **GitHub 版 (`full`)**：`com.dx9901mk5.filemanager.github` (`versionCode = 224`)，位於 `github版/DX_fileManager-v2.2.4-github-release.apk`（`55,888,654 bytes`）與 `release_apks/DX_fileManager-v2.2.4-github-release.apk`。
-    - **Play 版 (`play`)**：`com.dx9901mk5.filemanager` (`versionCode = 224`)，位於 `play版/DX_fileManager-v2.2.4-play-release.apk`（`55,888,246 bytes`）與 `play版/DX_fileManager-v2.2.4-play-release.aab`（`17,115,324 bytes`）。
+  - **最新本機簽名正式版（v2.2.5，含 7 天試用與 Google Play 內購機制）**：
+    - **GitHub 版 (`full`)**：`com.dx9901mk5.filemanager.github` (`versionCode = 225`)，位於 `github版/DX_fileManager-v2.2.5-github-release.apk`（`56,097,806 bytes`）與 `release_apks/DX_fileManager-v2.2.5-github-release.apk`。
+    - **Play 版 (`play`)**：`com.dx9901mk5.filemanager` (`versionCode = 225`)，位於 `play版/DX_fileManager-v2.2.5-play-release.apk`（`56,805,174 bytes`）與 `play版/DX_fileManager-v2.2.5-play-release.aab`（`17,570,055 bytes`）。
     - **獨立 Shizuku 外掛 (`shizuku_plugin`)**：`com.dx9901mk5.filemanager.shizukuplugin`（**DX Shizuku 安裝助手** `v1.0.0`），位於 `github版/DX_Shizuku_Helper-v1.0.0-release.apk`（`40,832,310 bytes`）；獨立點擊僅顯示須搭配 DX 檔案管理器提示，安裝後 Play 版與 GitHub 版選取 APK 長壓選單第 5 項即自動出現輔助安裝選項。
-  - **近期關鍵更新摘要（v1.2.7 → v2.2.4）**：
+  - **近期關鍵更新摘要（v1.2.7 → v2.2.5）**：
+    - `v2.2.5`：實作 Play 版 7 天全功能試用與 Pro 付費解鎖機制（`ProLicenseManager.kt` + `play` 專屬 `PlayBillingBridge.kt` 串接 `billing-ktx:7.1.1`，商品 ID `dx_pro_unlock`）；7 天試用結束後免費版限制雲端最多 2 個且單類別限 1 帳號、側邊欄開新視窗按鈕顯示上鎖圖示並禁用小視窗模式，點擊受限功能彈出 `ProUpgradeDialog.kt`（內附雙開自由小視窗實機展示圖）。
     - `v2.2.4`：依 Google Pixelbook / ChromeOS（Chromebook）規範補齊 `<uses-feature android:name="android.hardware.type.pc" android:required="false" />`，配合全架構 ABI（含 `x86` / `x86_64`）、無觸控相容與完整鍵鼠支援；Play 版側邊欄隱藏受 `QUERY_ALL_PACKAGES` 限制的「應用程式」清單並移除 `-play` 版本號後綴。
     - `v2.2.3`：從 `:app` 主體全面移除 `rikka.shizuku` SDK、`ShizukuProvider` 與 `REQUEST_INSTALL_PACKAGES` 權限，使 Play 版與 GitHub 版核心程式碼完全統一；新增 `:shizuku_plugin` 獨立外掛模組（`DX Shizuku 安裝助手`），於 `FileOperationDialogs` 長壓選單第 5 項依外掛安裝狀態自動連動顯示。
     - `v2.2.1`：建立 `github版/`（原 `正式發布/`）與 `play版/`（原 `play專用/`）雙版本資料夾；於 `app/build.gradle.kts` 為 GitHub 版（`full`）設定 `applicationIdSuffix = ".github"` 使兩版可同機共存，並於 `app/src/full/res/drawable/ic_launcher_foreground.xml` 圖示右下角加上 `git` 小字徽章以供區隔。

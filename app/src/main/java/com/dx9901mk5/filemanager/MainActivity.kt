@@ -64,6 +64,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import com.dx9901mk5.filemanager.core.billing.ProLicenseManager
 import com.dx9901mk5.filemanager.core.settings.DarkBackgroundStyle
 import com.dx9901mk5.filemanager.core.settings.LocalDxStrings
 import com.dx9901mk5.filemanager.core.settings.dxStringsFor
@@ -106,6 +107,7 @@ import com.dx9901mk5.filemanager.ui.dialogs.FileContextMenuDialog
 import com.dx9901mk5.filemanager.ui.dialogs.FilePropertiesDialog
 import com.dx9901mk5.filemanager.ui.dialogs.NewFolderDialog
 import com.dx9901mk5.filemanager.ui.dialogs.PasswordInputDialog
+import com.dx9901mk5.filemanager.ui.dialogs.ProUpgradeDialog
 import com.dx9901mk5.filemanager.ui.dialogs.RenameDialog
 import com.dx9901mk5.filemanager.ui.dialogs.SettingsAndAboutDialog
 import com.dx9901mk5.filemanager.ui.dialogs.ShortcutCheatSheetDialog
@@ -140,6 +142,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        ProLicenseManager.init(this)
         ensureStoragePermission()
         ensureNotificationPermission()
         OAuth2AuthHelper.handleRedirectIntent(intent)
@@ -158,6 +161,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val s = LocalDxStrings.current
+    val licenseStatus by ProLicenseManager.status.collectAsState()
     val settings by viewModel.settings.collectAsState()
             val windowSizeClass = calculateWindowSizeClass(this)
             val isExpandedScreen = windowSizeClass.widthSizeClass != WindowWidthSizeClass.Compact
@@ -344,6 +348,7 @@ private fun DxFileManagerScreen(
     isSmallWindowMode: Boolean = false
 ) {
     val s = LocalDxStrings.current
+    val licenseStatus by ProLicenseManager.status.collectAsState()
     val settings by viewModel.settings.collectAsState()
     val pane2State by viewModel.pane2State.collectAsState()
     val pane3State by viewModel.pane3State.collectAsState()
@@ -380,6 +385,8 @@ private fun DxFileManagerScreen(
     var showExitConfirmDialog by remember { mutableStateOf(false) }
     var showFreeformGuideDialog by remember { mutableStateOf(false) }
     var dontShowFreeformGuideAgain by remember { mutableStateOf(false) }
+    var showProUpgradeDialog by remember { mutableStateOf(false) }
+    var proUpgradeReason by remember { mutableStateOf<String?>(null) }
     // Pair(paneIndex, prioritizeCreateOrCompress)
     var bottomActionBarState by remember { mutableStateOf<Pair<Int, Boolean>?>(null) }
 
@@ -715,8 +722,13 @@ private fun DxFileManagerScreen(
                     onOpenSettings = { showSettingsDialog = true },
                     onToggleDualPane = { viewModel.setPaneExpanded(isExpandedScreen, 3, !pane3Expanded) },
                     showDualPaneToggle = !isSmallWindowMode,
+                    isMultiWindowLocked = licenseStatus.isMultiWindowLocked,
                     onOpenNewWindow = {
-                        if (SystemCrossAppDragHelper.isFreeformGuideSuppressed(activityContext)) {
+                        ProLicenseManager.refreshStatus(activityContext)
+                        if (ProLicenseManager.status.value.isMultiWindowLocked) {
+                            proUpgradeReason = "7 天免費試用已結束：自由小視窗多開模式需升級 Pro 版才可使用。"
+                            showProUpgradeDialog = true
+                        } else if (SystemCrossAppDragHelper.isFreeformGuideSuppressed(activityContext)) {
                             SystemCrossAppDragHelper.openNewWindow(activityContext)
                         } else {
                             dontShowFreeformGuideAgain = false
@@ -733,7 +745,15 @@ private fun DxFileManagerScreen(
                     },
                     onOpenCloudMount = { mount -> viewModel.openCloudMount(focusedPane, mount) },
                     onRemoveCloudMount = { mountId -> viewModel.removeCloudMount(mountId) },
-                    onOpenCloudWizard = { showCloudWizard = true },
+                    onOpenCloudWizard = {
+                        ProLicenseManager.refreshStatus(activityContext)
+                        if (!ProLicenseManager.status.value.hasProAccess && settings.cloudMounts.size >= 2) {
+                            proUpgradeReason = "7 天免費試用已結束：免費版最多只能掛載 2 個雲端／網路硬碟（且單一類別僅限 1 個帳號）。"
+                            showProUpgradeDialog = true
+                        } else {
+                            showCloudWizard = true
+                        }
+                    },
                     onOpenCategory = { cat -> viewModel.openCategory(focusedPane, cat) },
                     onOpenBookmark = { path -> viewModel.navigateToPath(focusedPane, path, "local", "內部儲存空間") },
                     onRemoveBookmark = { path -> viewModel.removeBookmark(path) }
@@ -1094,7 +1114,19 @@ private fun DxFileManagerScreen(
 
         if (showCloudWizard) {
             CloudMountWizardDialog(
-                onMountCreated = { viewModel.saveCloudMount(it) },
+                onMountCreated = { newMount ->
+                    val check = ProLicenseManager.canAddCloudMount(
+                        context = activityContext,
+                        existingMounts = settings.cloudMounts,
+                        targetProtocol = newMount.protocol
+                    )
+                    if (check.isSuccess) {
+                        viewModel.saveCloudMount(newMount)
+                    } else {
+                        proUpgradeReason = check.exceptionOrNull()?.message
+                        showProUpgradeDialog = true
+                    }
+                },
                 onDismiss = { showCloudWizard = false }
             )
         }
@@ -1338,6 +1370,15 @@ private fun DxFileManagerScreen(
                     TextButton(onClick = { viewModel.dismissOpenWithPrompt() }) {
                         Text("取消")
                     }
+                }
+            )
+        }
+        if (showProUpgradeDialog) {
+            ProUpgradeDialog(
+                reasonMessage = proUpgradeReason,
+                onDismiss = {
+                    showProUpgradeDialog = false
+                    proUpgradeReason = null
                 }
             )
         }

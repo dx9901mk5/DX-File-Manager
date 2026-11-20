@@ -52,6 +52,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Splitscreen
@@ -114,6 +115,7 @@ fun NavigationPane(
     onOpenSettings: () -> Unit,
     onToggleDualPane: () -> Unit,
     showDualPaneToggle: Boolean = true,
+    isMultiWindowLocked: Boolean = false,
     onOpenNewWindow: () -> Unit = {},
     onOpenLocalRoot: () -> Unit,
     onOpenCloudMount: (VfsMountConfig) -> Unit,
@@ -176,11 +178,29 @@ fun NavigationPane(
                     }
                 }
                 IconButton(onClick = onOpenNewWindow) {
-                    Icon(
-                        Icons.AutoMirrored.Filled.OpenInNew,
-                        contentDescription = s.openNewWindow,
-                        tint = MaterialTheme.colorScheme.onBackground
-                    )
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.OpenInNew,
+                            contentDescription = s.openNewWindow,
+                            tint = if (isMultiWindowLocked) {
+                                MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
+                            } else {
+                                MaterialTheme.colorScheme.onBackground
+                            }
+                        )
+                        if (isMultiWindowLocked) {
+                            Icon(
+                                Icons.Default.Lock,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .size(13.dp)
+                                    .background(MaterialTheme.colorScheme.surface, CircleShape)
+                                    .padding(1.dp)
+                            )
+                        }
+                    }
                 }
             }
 
