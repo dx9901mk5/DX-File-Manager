@@ -417,16 +417,18 @@ fun NavigationPane(
                     SectionHeader(s.categoriesSection)
                 }
 
-                val categories = listOf(
-                    FileCategory.MEDIA,
-                    FileCategory.AUDIO,
-                    FileCategory.DOCUMENTS,
-                    FileCategory.APKS,
-                    FileCategory.ARCHIVES,
-                    FileCategory.RECENT,
-                    FileCategory.APPS,
-                    FileCategory.TRASH
-                )
+                val categories = buildList {
+                    add(FileCategory.MEDIA)
+                    add(FileCategory.AUDIO)
+                    add(FileCategory.DOCUMENTS)
+                    add(FileCategory.APKS)
+                    add(FileCategory.ARCHIVES)
+                    add(FileCategory.RECENT)
+                    if (!com.dx9901mk5.filemanager.BuildConfig.IS_PLAY_EDITION) {
+                        add(FileCategory.APPS)
+                    }
+                    add(FileCategory.TRASH)
+                }
 
                 items(categories) { category ->
                     Row(
