@@ -716,9 +716,35 @@ class FileManagerViewModel(application: Application) : AndroidViewModel(applicat
                 if (ShizukuApkInstaller.exportInstalledAppApk(app, pkg).isSuccess) count++
             }
             selectedAppPackages.value = emptySet()
-            toast("已匯出 $count 個 APK 至 Download/DX_Backup_APK")
+            toast("已輸出 $count 個 APK 至 Download/DX_Backup_APK")
             loadPane(2)
             loadPane(3)
+        }
+    }
+
+    fun shareInstalledAppApk(packageName: String) {
+        viewModelScope.launch {
+            val shareDir = File(app.cacheDir, "shared_apks")
+            val res = ShizukuApkInstaller.exportInstalledAppApk(app, packageName, shareDir)
+            res.onSuccess { file ->
+                val uri = FileProvider.getUriForFile(app, "${app.packageName}.fileprovider", file)
+                val mime = if (file.name.endsWith(".apk", ignoreCase = true)) {
+                    "application/vnd.android.package-archive"
+                } else {
+                    "application/zip"
+                }
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = mime
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                val chooser = Intent.createChooser(shareIntent, "分享 APK：${file.name}").apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                app.startActivity(chooser)
+            }.onFailure { err ->
+                toast("輸出 APK 失敗：${err.message}")
+            }
         }
     }
 

@@ -21,8 +21,10 @@ import androidx.compose.animation.shrinkOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -163,6 +165,7 @@ fun FileExplorerPane(
     onToggleAppSelection: (String) -> Unit,
     onToggleSystemApps: () -> Unit,
     onExportSelectedApps: () -> Unit,
+    onShareAppApk: (String) -> Unit = {},
     onRestoreTrashItem: (TrashItemEntity) -> Unit,
     onEmptyTrash: () -> Unit,
     windowPartitionLabel: String? = null,
@@ -758,7 +761,8 @@ fun FileExplorerPane(
                                         selectedPackages = selectedAppPackages,
                                         onToggleSystemApps = onToggleSystemApps,
                                         onToggleSelect = onToggleAppSelection,
-                                        onExportSelected = onExportSelectedApps
+                                        onExportSelected = onExportSelectedApps,
+                                        onShareAppApk = onShareAppApk
                                     )
                                 }
                                 animMode == PaneMode.TRASH -> {
@@ -1082,6 +1086,7 @@ private fun FolderMagnifierBadge(visible: Boolean) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AppManagerList(
     apps: List<InstalledAppInfo>,
@@ -1089,7 +1094,8 @@ private fun AppManagerList(
     selectedPackages: Set<String>,
     onToggleSystemApps: () -> Unit,
     onToggleSelect: (String) -> Unit,
-    onExportSelected: () -> Unit
+    onExportSelected: () -> Unit,
+    onShareAppApk: (String) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxSize().padding(8.dp)) {
         Row(
@@ -1106,7 +1112,7 @@ private fun AppManagerList(
                 enabled = selectedPackages.isNotEmpty(),
                 onClick = onExportSelected
             ) {
-                Text("匯出 APK (${selectedPackages.size})")
+                Text("輸出 APK (${selectedPackages.size})")
             }
         }
         Spacer(Modifier.height(6.dp))
@@ -1116,7 +1122,10 @@ private fun AppManagerList(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onToggleSelect(app.packageName) }
+                        .combinedClickable(
+                            onClick = { onToggleSelect(app.packageName) },
+                            onLongClick = { onShareAppApk(app.packageName) }
+                        )
                         .padding(vertical = 6.dp, horizontal = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {

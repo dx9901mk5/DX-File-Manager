@@ -58,6 +58,32 @@ object ExternalStorageHelper {
             }
         }
 
+        // 備援掃描 getExternalFilesDirs(null)：部分手機 ROM 的 SD 卡 / 外接儲存僅能透過此 API 取得真實掛載根路徑
+        val primaryRoot = runCatching { Environment.getExternalStorageDirectory().canonicalPath }.getOrNull()
+        val extDirs = runCatching { context.getExternalFilesDirs(null) }.getOrNull().orEmpty()
+        for (dir in extDirs) {
+            val abs = dir?.absolutePath ?: continue
+            val idx = abs.indexOf("/Android/data/")
+            if (idx <= 0) continue
+            val rootPath = abs.substring(0, idx)
+            val canonical = runCatching { File(rootPath).canonicalPath }.getOrDefault(rootPath)
+            if (canonical == primaryRoot || canonical in seenPaths) continue
+            val rootFile = File(canonical)
+            if (!rootFile.exists() || !rootFile.canRead()) continue
+            val space = readSpaceInfo(canonical) ?: continue
+            if (space.totalBytes <= 0L) continue
+            seenPaths.add(canonical)
+            val volName = rootFile.name
+            val isUsb = volName.contains("usb", ignoreCase = true) || volName.contains("otg", ignoreCase = true)
+            result += ExternalStorageVolume(
+                id = volName,
+                label = if (isUsb) "OTG 外接裝置 ($volName)" else "SD 記憶卡 ($volName)",
+                path = canonical,
+                isUsb = isUsb,
+                spaceInfo = space
+            )
+        }
+
         // 備援掃描 /storage 與 /mnt/media_rw，涵蓋部分陸版/客製 ROM 未回報 StorageVolume.directory 的 OTG 硬碟
         listOf("/storage", "/mnt/media_rw").forEach { parentPath ->
             val parent = File(parentPath)

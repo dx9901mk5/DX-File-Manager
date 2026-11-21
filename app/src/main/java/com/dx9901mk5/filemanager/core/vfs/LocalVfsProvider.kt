@@ -115,7 +115,8 @@ class LocalVfsProvider : VfsProvider {
     override suspend fun getStorageSpace(path: String): StorageSpaceInfo? =
         withContext(Dispatchers.IO) {
             runCatching {
-                val stat = StatFs(path.ifBlank { rootStoragePath })
+                val target = if (path.isBlank() || path == "/") rootStoragePath else path
+                val stat = StatFs(target)
                 StorageSpaceInfo(
                     totalBytes = stat.totalBytes,
                     availableBytes = stat.availableBytes
