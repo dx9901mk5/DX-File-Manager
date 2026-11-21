@@ -28,6 +28,8 @@ import com.dx9901mk5.filemanager.core.settings.DarkBackgroundStyle
 import com.dx9901mk5.filemanager.core.settings.DxSettingsState
 import com.dx9901mk5.filemanager.core.shizuku.InstalledAppInfo
 import com.dx9901mk5.filemanager.core.shizuku.ShizukuApkInstaller
+import com.dx9901mk5.filemanager.core.vfs.ExternalStorageHelper
+import com.dx9901mk5.filemanager.core.vfs.ExternalStorageVolume
 import com.dx9901mk5.filemanager.core.trash.TrashItemEntity
 import com.dx9901mk5.filemanager.core.vfs.FileCategory
 import com.dx9901mk5.filemanager.core.vfs.StorageSpaceInfo
@@ -120,6 +122,7 @@ class FileManagerViewModel(application: Application) : AndroidViewModel(applicat
 
     val focusedPaneIndex = MutableStateFlow(2)
     val localStorageSpace = MutableStateFlow<StorageSpaceInfo?>(null)
+    val externalStorages = MutableStateFlow<List<ExternalStorageVolume>>(emptyList())
     val clipboard = MutableStateFlow<ClipboardState?>(null)
     val installedApps = MutableStateFlow<List<InstalledAppInfo>>(emptyList())
     val openWithPrompt = MutableStateFlow<OpenWithPrompt?>(null)
@@ -144,6 +147,7 @@ class FileManagerViewModel(application: Application) : AndroidViewModel(applicat
     fun refreshStorageSpace() {
         viewModelScope.launch {
             localStorageSpace.value = vfsRegistry.localProvider.getStorageSpace()
+            externalStorages.value = ExternalStorageHelper.listRemovableStorages(app)
         }
     }
 

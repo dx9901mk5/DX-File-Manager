@@ -2,7 +2,11 @@ package com.dx9901mk5.filemanager
 
 import android.Manifest
 import android.app.Activity
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.hardware.usb.UsbManager
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.net.Uri
@@ -201,18 +205,40 @@ class MainActivity : ComponentActivity() {
                     val lifecycleOwner = LocalLifecycleOwner.current
                     DisposableEffect(lifecycleOwner) {
                         val observer = LifecycleEventObserver { _, event ->
-                            if (event == Lifecycle.Event.ON_RESUME && hasStoragePermission()) {
-                                if (showStoragePermissionDialog.value) {
+                            if (event == Lifecycle.Event.ON_RESUME) {
+                                viewModel.refreshStorageSpace()
+                                if (hasStoragePermission() && showStoragePermissionDialog.value) {
                                     showStoragePermissionDialog.value = false
-                                    viewModel.refreshStorageSpace()
                                     viewModel.navigateToPath(2, viewModel.pane2State.value.currentPath)
                                     viewModel.navigateToPath(3, viewModel.pane3State.value.currentPath)
                                     ensureNotificationPermission()
                                 }
                             }
                         }
+                        val otgReceiver = object : BroadcastReceiver() {
+                            override fun onReceive(context: Context?, intent: Intent?) {
+                                viewModel.refreshStorageSpace()
+                            }
+                        }
+                        val mediaFilter = IntentFilter().apply {
+                            addAction(Intent.ACTION_MEDIA_MOUNTED)
+                            addAction(Intent.ACTION_MEDIA_UNMOUNTED)
+                            addAction(Intent.ACTION_MEDIA_REMOVED)
+                            addAction(Intent.ACTION_MEDIA_BAD_REMOVAL)
+                            addAction(Intent.ACTION_MEDIA_EJECT)
+                            addDataScheme("file")
+                        }
+                        val usbFilter = IntentFilter().apply {
+                            addAction(UsbManager.ACTION_USB_DEVICE_ATTACHED)
+                            addAction(UsbManager.ACTION_USB_DEVICE_DETACHED)
+                        }
+                        ContextCompat.registerReceiver(this@MainActivity, otgReceiver, mediaFilter, ContextCompat.RECEIVER_EXPORTED)
+                        ContextCompat.registerReceiver(this@MainActivity, otgReceiver, usbFilter, ContextCompat.RECEIVER_EXPORTED)
                         lifecycleOwner.lifecycle.addObserver(observer)
-                        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+                        onDispose {
+                            lifecycleOwner.lifecycle.removeObserver(observer)
+                            runCatching { unregisterReceiver(otgReceiver) }
+                        }
                     }
                     val isGithubExpired = remember {
                         !BuildConfig.IS_PLAY_EDITION && isGithubEditionExpired()
@@ -441,6 +467,7 @@ private fun DxFileManagerScreen(
     val pane3State by viewModel.pane3State.collectAsState()
     val focusedPane by viewModel.focusedPaneIndex.collectAsState()
     val storageSpace by viewModel.localStorageSpace.collectAsState()
+    val externalStorages by viewModel.externalStorages.collectAsState()
     val clipboard by viewModel.clipboard.collectAsState()
     val trashItems by viewModel.trashItems.collectAsState()
     val installedApps by viewModel.installedApps.collectAsState()
@@ -793,6 +820,7 @@ private fun DxFileManagerScreen(
             pane1Content = {
                 NavigationPane(
                     localStorageSpace = storageSpace,
+                    externalStorages = externalStorages,
                     cloudMounts = settings.cloudMounts,
                     bookmarks = settings.bookmarks,
                     trashCount = trashItems.size,
@@ -829,6 +857,17 @@ private fun DxFileManagerScreen(
                             "local",
                             "內部儲存空間"
                         )
+                    },
+                    onOpenExternalStorage = { ext ->
+                        viewModel.navigateToPath(
+                            focusedPane,
+                            ext.path,
+                            "local",
+                            ext.label
+                        )
+                    },
+                    onRefreshStorages = {
+                        viewModel.refreshStorageSpace()
                     },
                     onOpenCloudMount = { mount -> viewModel.openCloudMount(focusedPane, mount) },
                     onRemoveCloudMount = { mountId -> viewModel.removeCloudMount(mountId) },

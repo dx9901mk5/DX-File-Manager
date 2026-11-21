@@ -53,8 +53,12 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.SdCard
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Smartphone
+import androidx.compose.material.icons.filled.Usb
+import com.dx9901mk5.filemanager.core.vfs.ExternalStorageVolume
 import androidx.compose.material.icons.filled.Splitscreen
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material3.AlertDialog
@@ -106,6 +110,7 @@ import java.io.File
 @Composable
 fun NavigationPane(
     localStorageSpace: StorageSpaceInfo?,
+    externalStorages: List<ExternalStorageVolume> = emptyList(),
     cloudMounts: List<VfsMountConfig>,
     bookmarks: List<String>,
     trashCount: Int,
@@ -118,6 +123,8 @@ fun NavigationPane(
     isMultiWindowLocked: Boolean = false,
     onOpenNewWindow: () -> Unit = {},
     onOpenLocalRoot: () -> Unit,
+    onOpenExternalStorage: (ExternalStorageVolume) -> Unit = {},
+    onRefreshStorages: () -> Unit = {},
     onOpenCloudMount: (VfsMountConfig) -> Unit,
     onRemoveCloudMount: (String) -> Unit,
     onOpenCloudWizard: () -> Unit,
@@ -225,7 +232,24 @@ fun NavigationPane(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                 item {
-                    SectionHeader(s.storageDevices)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        SectionHeader(s.storageDevices)
+                        IconButton(
+                            onClick = onRefreshStorages,
+                            modifier = Modifier.size(26.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "重新掃描 OTG / 外接儲存裝置",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
                     val isRootHovered = dragController != null &&
                         dragController.isDragging &&
                         dragController.hoveredFolderPaneIndex == 1 &&
@@ -378,6 +402,79 @@ fun NavigationPane(
                                 Spacer(Modifier.width(6.dp))
                                 NavMagnifierBadge(visible = isHovered)
                             }
+                        }
+                    }
+                }
+
+                if (externalStorages.isNotEmpty()) {
+                    items(externalStorages, key = { "ext_${it.path}" }) { ext ->
+                        val isExtHovered = dragController != null &&
+                            dragController.isDragging &&
+                            dragController.hoveredFolderPaneIndex == 1 &&
+                            dragController.hoveredFolderPath == ext.path
+                        val extHoverScale by animateFloatAsState(
+                            targetValue = if (isExtHovered) 1.05f else 1f,
+                            label = "ExtHoverScale"
+                        )
+                        Box(contentAlignment = Alignment.CenterEnd) {
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isExtHovered) {
+                                    MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .scale(extHoverScale)
+                                    .then(
+                                        if (isExtHovered) Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(10.dp))
+                                        else Modifier
+                                    )
+                                    .onGloballyPositioned { coords ->
+                                        dragController?.updateFolderBounds(1, ext.path, coords.boundsInRoot())
+                                    }
+                                    .clickable { onOpenExternalStorage(ext) }
+                            ) {
+                                Column(modifier = Modifier.padding(10.dp)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = if (ext.isUsb) Icons.Default.Usb else Icons.Default.SdCard,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            text = ext.label,
+                                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    }
+                                    if (ext.spaceInfo != null) {
+                                        Spacer(Modifier.height(6.dp))
+                                        LinearProgressIndicator(
+                                            progress = { ext.spaceInfo.usedFraction },
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
+                                        Spacer(Modifier.height(4.dp))
+                                        Text(
+                                            text = s.availableTotalSpace(
+                                                formatFileSize(ext.spaceInfo.availableBytes),
+                                                formatFileSize(ext.spaceInfo.totalBytes)
+                                            ),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                            NavMagnifierBadge(
+                                visible = isExtHovered,
+                                modifier = Modifier.padding(end = 10.dp)
+                            )
                         }
                     }
                 }
