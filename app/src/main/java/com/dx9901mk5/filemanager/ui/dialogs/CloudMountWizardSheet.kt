@@ -332,7 +332,6 @@ fun CloudMountWizardDialog(
                                                 accountPickerLauncher.launch(OAuth2AuthHelper.createGoogleAccountPickerIntent())
                                             }.onFailure {
                                                 statusMessage = "無法開啟系統 Google 帳戶選擇器：${it.message}"
-                                                showAdvancedAuth = true
                                             }
                                         } else {
                                             OAuth2AuthHelper.launchBrowserAuth(context, selectedProtocol, clientId)
@@ -351,59 +350,49 @@ fun CloudMountWizardDialog(
                                 }
                             }
 
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { showAdvancedAuth = !showAdvancedAuth }
-                                    .padding(vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    text = "進階：手動 Token / Client ID",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Icon(
-                                    imageVector = if (showAdvancedAuth) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                            if (selectedProtocol != VfsProtocol.GOOGLE_DRIVE) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { showAdvancedAuth = !showAdvancedAuth }
+                                        .padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "進階：手動 Token / Client ID",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Icon(
+                                        imageVector = if (showAdvancedAuth) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
 
-                            AnimatedVisibility(visible = showAdvancedAuth) {
-                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    OutlinedTextField(
-                                        value = clientId,
-                                        onValueChange = { clientId = it },
-                                        label = { Text("OAuth Client ID（瀏覽器登入用）") },
-                                        singleLine = true,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                    if (selectedProtocol == VfsProtocol.GOOGLE_DRIVE && clientId.isNotBlank()) {
-                                        OutlinedButton(
-                                            onClick = {
-                                                statusMessage = null
-                                                OAuth2AuthHelper.launchBrowserAuth(context, selectedProtocol, clientId)
-                                                    .onFailure { statusMessage = it.message }
-                                            },
+                                AnimatedVisibility(visible = showAdvancedAuth) {
+                                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        OutlinedTextField(
+                                            value = clientId,
+                                            onValueChange = { clientId = it },
+                                            label = { Text("OAuth Client ID（瀏覽器登入用）") },
+                                            singleLine = true,
                                             modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Text("改用瀏覽器 OAuth 登入 Google 雲端硬碟")
-                                        }
+                                        )
+                                        OutlinedTextField(
+                                            value = accessToken,
+                                            onValueChange = {
+                                                accessToken = it
+                                                if (it.isNotBlank() && loggedInAccount == null) {
+                                                    loggedInAccount = displayName.ifBlank { selectedProtocol.displayName }
+                                                }
+                                            },
+                                            label = { Text("OAuth2 Access Token") },
+                                            singleLine = true,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
                                     }
-                                    OutlinedTextField(
-                                        value = accessToken,
-                                        onValueChange = {
-                                            accessToken = it
-                                            if (it.isNotBlank() && loggedInAccount == null) {
-                                                loggedInAccount = displayName.ifBlank { selectedProtocol.displayName }
-                                            }
-                                        },
-                                        label = { Text("OAuth2 Access Token") },
-                                        singleLine = true,
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
                                 }
                             }
                         } else {

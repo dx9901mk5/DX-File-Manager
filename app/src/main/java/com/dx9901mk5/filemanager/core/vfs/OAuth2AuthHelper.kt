@@ -94,7 +94,7 @@ object OAuth2AuthHelper {
             } catch (e: Exception) {
                 val detail = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
                 GoogleTokenResult.Error(
-                    "系統 Google 授權失敗 ($detail)：本機開發簽名尚未於 Google Cloud Console 註冊 Android OAuth 用戶端，請於下方進階設定填入 OAuth Client ID 改用瀏覽器登入，或貼上 Access Token。"
+                    "Google 帳號授權失敗 ($detail)，請確認裝置已登入 Google 帳號並允許雲端硬碟存取權限。"
                 )
             }
         }
